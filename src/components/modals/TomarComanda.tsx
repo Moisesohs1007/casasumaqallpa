@@ -5,12 +5,9 @@ import {
   IonSelect, IonSelectOption, IonText, IonTextarea, IonChip,
 } from '@ionic/react';
 import {
-  add, basket, bed, cafe, cart, cash, checkmarkCircle, close, closeCircle,
-  documentText, fastFood, informationCircle, person, remove, restaurantOutline, wine,
+  add, basket, bed, cash, checkmarkCircle, close, closeCircle,
+  documentText, informationCircle, person, restaurantOutline,
 } from 'ionicons/icons';
-// Ionic 8 workaround: asegurarse de importar el type IconId tambien (error "IconId is not defined" en Consola Vite)
-import type { Icon as IonicIconDef } from 'ionicons/components';
-void (0 && (IonicIconDef as any));
 import type { Comanda, Habitacion, Mesa, ProductoFB, Reserva } from '../../types';
 import {
   CatalogoFBService, ComandaService, HabitacionService, MesaService, ReservaService, FolioService,
