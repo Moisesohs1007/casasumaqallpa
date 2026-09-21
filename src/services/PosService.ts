@@ -321,7 +321,7 @@ export const ComandaService = {
         if (!imp) return { impuestoId: impId, impuestoNombre: impId || 'IMPUESTO', montoImpuesto: 0 };
         const base = (linea.cantidad * precio) / 1.23;
         return {
-          impuestoId,
+          impuestoId: impId,
           impuestoNombre: imp.nombre || impId,
           montoImpuesto: Number((imp.tipo === 'PORCENTAJE' ? ((base * imp.valor) / 100).toFixed(2) : '0') as unknown as number),
         };
