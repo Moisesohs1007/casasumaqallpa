@@ -1,0 +1,32 @@
+.profile-card {
+  border-radius: 12px;
+}
+
+.profile-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.profile-info {
+  flex: 1;
+}
+
+.profile-avatar {
+  width: 72px;
+  height: 72px;
+}
+
+.avatar-inner {
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(135deg, var(--ion-color-primary, #2dd36f), var(--ion-color-tertiary, #6a64ff));
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.5rem;
+  font-weight: 700;
+  border-radius: 50%;
+  letter-spacing: 0.5px;
+}

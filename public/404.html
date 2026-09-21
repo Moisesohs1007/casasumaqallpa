@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="es-PE">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Casa Sumaq Allpa - Sistema de Gestión</title>
+    <script>
+      // GitHub Pages SPA Fallback: redirige rutas 404 al index.html preservando path + query + hash
+      // Ver: https://github.com/rafgraph/spa-github-pages
+      (function () {
+        var l = window.location;
+        var pathSegmentsToKeep = 0; // ajustar a 1 si despliegas en /reponame/
+        var redirect =
+          l.protocol +
+          '//' +
+          l.hostname +
+          (l.port ? ':' + l.port : '') +
+          l.pathname.split('/').slice(0, 1 + pathSegmentsToKeep).join('/') +
+          '/?p=/' +
+          l.pathname.slice(1).split('/').slice(pathSegmentsToKeep).join('/').replace(/&/g, '~and~') +
+          (l.search ? '&q=' + l.search.slice(1).replace(/&/g, '~and~') : '') +
+          l.hash;
+        // Solo redirigir si no existe ya la query de fallback
+        if (l.search.indexOf('p=/') === -1) {
+          l.replace(redirect);
+        }
+      })();
+    </script>
+  </head>
+  <body>
+    <h1>Cargando...</h1>
+  </body>
+</html>

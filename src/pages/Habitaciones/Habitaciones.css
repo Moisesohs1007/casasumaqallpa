@@ -1,0 +1,29 @@
+.hab-card {
+  border-radius: 12px;
+  border-left-width: 6px;
+  border-left-style: solid;
+  transition: transform 0.15s ease-in-out;
+}
+
+.hab-card:active {
+  transform: scale(0.98);
+}
+
+.hab-libre {
+  border-left-color: var(--ion-color-success, #2dd36f);
+}
+.hab-ocupada {
+  border-left-color: var(--ion-color-danger, #eb445a);
+}
+.hab-limpieza {
+  border-left-color: var(--ion-color-warning, #ffc409);
+}
+.hab-mantenimiento {
+  border-left-color: var(--ion-color-medium, #92949c);
+}
+
+.hab-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}

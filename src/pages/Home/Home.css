@@ -1,0 +1,36 @@
+.dashboard-card {
+  min-height: 160px;
+  border-radius: 12px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.08);
+}
+
+.card-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.badge-value {
+  font-size: 1.4rem;
+  padding: 8px 14px;
+  border-radius: 999px;
+}
+
+.badge-sub {
+  margin-left: 4px;
+  opacity: 0.8;
+  font-size: 0.85rem;
+}
+
+.card-title {
+  font-size: 1rem;
+  font-weight: 500;
+}
+
+.home-ul {
+  padding-left: 1.25rem;
+}
+
+.home-ul li {
+  margin-bottom: 6px;
+}

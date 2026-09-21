@@ -1,0 +1,56 @@
+.pos-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.pos-mesa {
+  border-radius: 12px;
+  border-left-width: 6px;
+  border-left-style: solid;
+  transition: transform 0.15s ease-in-out;
+  min-height: 180px;
+}
+
+.pos-mesa:active {
+  transform: scale(0.98);
+}
+
+.pos-libre {
+  border-left-color: var(--ion-color-success, #2dd36f);
+}
+.pos-ocupada {
+  border-left-color: var(--ion-color-danger, #eb445a);
+}
+.pos-sucia {
+  border-left-color: var(--ion-color-warning, #ffc409);
+}
+
+.pos-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.hab-ref {
+  display: block;
+  margin-top: 4px;
+  font-size: 0.85rem;
+  opacity: 0.8;
+}
+
+.comanda-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+}
+
+.total {
+  margin-top: 6px;
+  font-size: 1rem;
+}
+
+.sin-comanda {
+  opacity: 0.7;
+}
