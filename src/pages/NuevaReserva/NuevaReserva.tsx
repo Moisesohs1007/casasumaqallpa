@@ -87,10 +87,112 @@ const NuevaReserva: React.FC = () => {
   const [habitacionesDisponibles, setHabitacionesDisponibles] = useState<Habitacion[]>([]);
   const [habitacionSeleccionada, setHabitacionSeleccionada] = useState<Habitacion | null>(null);
 
-  // ====== Paso 3: Tarifa + Promo ======
+  // ====== Paso 3: Tarifa + Promo (con lista seleccionable + override manual) ======
   const [codPromoInput, setCodPromoInput] = useState('');
-  const [promoAplicada, setPromoAplicada] = useState<ReturnType<typeof TarifaService.buscarMejorParaFecha> | null>(null);
+  const [precioNocheManual, setPrecioNocheManual] = useState<string>('');
+  const [tarifaSeleccionadaId, setTarifaSeleccionadaId] = useState<string | null>(null);
   const [promoValidacionMsg, setPromoValidacionMsg] = useState<{ ok: boolean; texto: string } | null>(null);
+
+  const tarifasDisponiblesParaHab = useMemo(() => {
+    if (!habitacionSeleccionada) return [];
+    const base = (TarifaService as any).listarTodas?.({
+      tipoHabitacionId: habitacionSeleccionada.tipoHabitacionId,
+      estado: 'ACTIVO',
+      vigentesEnFecha: `${checkin}T15:00:00.000Z`,
+    }) ?? [];
+    const tipoHab = HabitacionService.listarTipos().find((t) => t.id === habitacionSeleccionada.tipoHabitacionId);
+    if (base.length === 0 && tipoHab) {
+      base.push({
+        id: `TAR-DYN-${tipoHab.id}`,
+        tipoHabitacionId: tipoHab.id,
+        nombre: `Tarifa Base ${tipoHab.nombre} (auto)`,
+        descripcion: 'Tarifa por defecto tipo de habitación',
+        precioPorNoche: Number(tipoHab.precioBaseNoche) || 350,
+        moneda: 'PEN',
+      });
+    }
+    return base;
+  }, [habitacionSeleccionada, checkin]);
+
+  const resumenTarifa = useMemo(() => {
+    if (!habitacionSeleccionada || noches < 1) return null;
+    let precioNoche: number;
+    let tarifaNombre = '';
+    let tarifaId: string | null = null;
+
+    if (precioNocheManual.trim() && !isNaN(Number(precioNocheManual)) && Number(precioNocheManual) > 0) {
+      precioNoche = Number(precioNocheManual);
+      tarifaNombre = 'Precio manual (override)';
+    } else {
+      let tarifa: any = null;
+      if (tarifaSeleccionadaId) {
+        tarifa = tarifasDisponiblesParaHab.find((t: any) => t.id === tarifaSeleccionadaId) || null;
+      }
+      if (!tarifa && tarifasDisponiblesParaHab.length > 0) {
+        tarifa = tarifasDisponiblesParaHab[tarifasDisponiblesParaHab.length - 1];
+      }
+      if (!tarifa) {
+        const tipoHab = HabitacionService.listarTipos().find((t) => t.id === habitacionSeleccionada.tipoHabitacionId);
+        precioNoche = Number(tipoHab?.precioBaseNoche) || 350;
+        tarifaNombre = `Tarifa Base ${tipoHab?.nombre || 'Habitación'}`;
+      } else {
+        const factorPct = (TarifaService as any).TemporadaService?.calcularFactorPorcentaje?.(`${checkin}T15:00:00.000Z`) ?? 0;
+        precioNoche = Number((Number(tarifa.precioPorNoche || 0) * (1 + factorPct / 100)).toFixed(2));
+        tarifaNombre = tarifa.nombre;
+        tarifaId = tarifa.id;
+      }
+    }
+
+    const subTotalSinImpuestos = Number((precioNoche * noches).toFixed(2));
+    const imps = (TarifaService as any).ImpuestoService?.listarTodos?.() ?? [];
+    const impuestosDetalle = imps.map((i: any) => {
+      const porc = i.tipo === 'PORCENTAJE' ? i.valor : 0;
+      return {
+        impuesto: i,
+        monto: Number(((subTotalSinImpuestos * porc) / 100).toFixed(2)),
+      };
+    });
+    const montoImpuestos = Number(impuestosDetalle.reduce((s: number, x: any) => s + Number(x.monto || 0), 0).toFixed(2));
+    const subTotalConImpuestos = Number((subTotalSinImpuestos + montoImpuestos).toFixed(2));
+
+    let descuentoPromo = 0;
+    let promoAplicada: any = null;
+    let promoValida = false;
+    if (codPromoInput.trim()) {
+      const cod = codPromoInput.trim().toUpperCase();
+      try {
+        const validacion = (TarifaService as any).CodigoPromocionalService?.validarYAplicar?.({
+          codigo: cod,
+          totalNoches: noches,
+          montoBaseReserva: subTotalConImpuestos,
+          tiposHabitacionIds: [habitacionSeleccionada.tipoHabitacionId],
+          tarifasIds: tarifaId ? [tarifaId] : undefined,
+          fechaAplicacionISO: `${checkin}T15:00:00.000Z`,
+        }) ?? {};
+        if (validacion.valido && validacion.descuentoMonto) {
+          descuentoPromo = Number(validacion.descuentoMonto);
+          promoAplicada = validacion.promo;
+          promoValida = true;
+        }
+      } catch { /* ignore */ }
+    }
+
+    const totalFinal = Number(Math.max(0, subTotalConImpuestos - descuentoPromo).toFixed(2));
+
+    return {
+      tarifaNombre,
+      tarifaId,
+      precioNoche,
+      subTotalSinImpuestos,
+      impuestosDetalle,
+      montoImpuestos,
+      subTotalConImpuestos,
+      descuentoPromo,
+      promoAplicada,
+      promoValida,
+      totalFinal,
+    };
+  }, [habitacionSeleccionada, noches, tarifasDisponiblesParaHab, tarifaSeleccionadaId, precioNocheManual, codPromoInput, checkin]);
 
   // ====== Paso 4: Origen + Crear ======
   const [origen, setOrigen] = useState<OrigenReserva>('WEB_OFICIAL');
@@ -206,60 +308,11 @@ const NuevaReserva: React.FC = () => {
       capacidadMinimaPax: adultos + ninos,
     });
     setHabitacionesDisponibles(list);
-    setHabitacionSeleccionada(
-      habitacionSeleccionada && list.find((x) => x.id === habitacionSeleccionada.id) || list[0] || null
-    );
+    const seleccionada = list.find((x) => x.id === habitacionSeleccionada?.id) || list[0] || null;
+    setHabitacionSeleccionada(seleccionada);
+    setTarifaSeleccionadaId(null);
+    setPrecioNocheManual('');
   };
-
-  // ===== Acciones Paso 3 =====
-  const calcularTarifa = () => {
-    if (!habitacionSeleccionada) {
-      setPromoAplicada(null);
-      return null;
-    }
-    const r = TarifaService.buscarMejorParaFecha({
-      tipoHabitacionId: habitacionSeleccionada.tipoHabitacionId,
-      fechaCheckinISO: `${checkin}T15:00:00.000Z`,
-      fechaCheckoutISO: `${checkout}T11:00:00.000Z`,
-      noches,
-      codPromocionalAplicado: codPromoInput.trim() || undefined,
-    });
-    return r;
-  };
-  const aplicarPromoYSumar = () => {
-    setErrorMsg(null);
-    const r = calcularTarifa();
-    setPromoAplicada(r as any);
-    if (!r) {
-      setPromoValidacionMsg({ ok: false, texto: 'No hay tarifa vigente para este tipo de habitación y fecha.' });
-      return;
-    }
-    if (codPromoInput.trim() && !r.promocionAplicada) {
-      setPromoValidacionMsg({
-        ok: false,
-        texto: `Código "${codPromoInput.trim()}" no válido. Revisa fechas mínimo de noches o monto.`,
-      });
-    } else if (r.promocionAplicada) {
-      setPromoValidacionMsg({
-        ok: true,
-        texto: `✅ Promo "${r.promocionAplicada.codigo}" aplicada: -S/ ${Number(r.descuentoAplicadoMonto || 0).toFixed(2)} ${r.promocionAplicada.tipoDescuento === 'PORCENTAJE' ? `(${r.promocionAplicada.valorDescuento}%)` : `(S/ ${r.promocionAplicada.valorDescuento})`}`,
-      });
-    } else {
-      setPromoValidacionMsg(null);
-    }
-  };
-
-  const resumenTarifa = useMemo(() => {
-    if (!habitacionSeleccionada || !promoAplicada) return null;
-    const p = promoAplicada as any;
-    const precioNoche = Number(p.precioNocheConFactor || 0);
-    const subtotalAlojamiento = Number(precioNoche * noches).toFixed(2);
-    const subtotal = Number(p.subTotalSinImpuestos || 0).toFixed(2);
-    const igv = (p.impuestosDetalleMontoPorImpuestoId || []).reduce((s: number, x: any) => s + Number(x.montoImpuesto || 0), 0);
-    const total = Number(p.totalFinalMonto || 0).toFixed(2);
-    const descuento = Number(p.descuentoAplicadoMonto || 0).toFixed(2);
-    return { precioNoche, subtotalAlojamiento, subtotal, igv, total, descuento };
-  }, [habitacionSeleccionada, promoAplicada, noches]);
 
   // ===== Paso 4: Crear =====
   const doCrearReserva = () => {
@@ -294,9 +347,9 @@ const NuevaReserva: React.FC = () => {
           fechaCheckout: `${checkout}T11:00:00.000Z`,
           totalNoches: noches,
           precioBaseAcordadoPorNoche: Number(resumenTarifa.precioNoche),
-          tarifaAplicadaId: (promoAplicada as any)?.tarifaAplicadaId,
-          promocionAplicadaId: (promoAplicada as any)?.promocionAplicada?.id || null as any,
-          precioTotalAlojamiento: Number(resumenTarifa.total),
+          tarifaAplicadaId: resumenTarifa.tarifaId || null as any,
+          promocionAplicadaId: resumenTarifa.promoAplicada?.id || null as any,
+          precioTotalAlojamiento: Number(resumenTarifa.totalFinal),
           observaciones: observacionesHuesped,
           createdBy: 'USR-MOISES-0001',
           updatedBy: 'USR-MOISES-0001',
@@ -304,12 +357,12 @@ const NuevaReserva: React.FC = () => {
           updatedAt: seedUtil.nowISO(),
         } as any],
         tarifasAplicadas: [{
-          id: (promoAplicada as any)?.tarifaAplicadaId || seedUtil.generateUUID(),
+          id: resumenTarifa.tarifaId || seedUtil.generateUUID(),
           reservaId: '',
-          tarifaId: (promoAplicada as any)?.tarifaAplicadaId || 'TARIFA-FAMILIAR',
-          nombreTarifa: (promoAplicada as any)?.tarifaNombre || 'Tarifa General',
+          tarifaId: resumenTarifa.tarifaId || 'TARIFA-GENERAL',
+          nombreTarifa: resumenTarifa.tarifaNombre || 'Tarifa General',
           tipoHabitacionId: tipoHabitacion.id,
-          temporadaId: (promoAplicada as any)?.temporadaAplicadaId,
+          temporadaId: null as any,
           factorVigenteId: '',
           fechaInicio: `${checkin}T15:00:00.000Z`,
           fechaFin: `${checkout}T11:00:00.000Z`,
@@ -319,13 +372,13 @@ const NuevaReserva: React.FC = () => {
           createdBy: 'USR-MOISES-0001',
           updatedBy: 'USR-MOISES-0001',
         } as any],
-        promocionesAplicadas: (promoAplicada as any)?.promocionAplicada ? [{
-          id: (promoAplicada as any).promocionAplicada.id,
+        promocionesAplicadas: resumenTarifa.promoAplicada ? [{
+          id: resumenTarifa.promoAplicada.id,
           reservaId: '',
-          codigoPromocionalId: (promoAplicada as any).promocionAplicada.id,
-          codigoPromocional: (promoAplicada as any).promocionAplicada.codigo,
-          descuentoMonto: Number((promoAplicada as any).descuentoAplicadoMonto || 0),
-          descuentoPorcentaje: (promoAplicada as any).promocionAplicada.tipoDescuento === 'PORCENTAJE' ? Number((promoAplicada as any).promocionAplicada.valorDescuento || 0) : null as any,
+          codigoPromocionalId: resumenTarifa.promoAplicada.id,
+          codigoPromocional: resumenTarifa.promoAplicada.codigo,
+          descuentoMonto: Number(resumenTarifa.descuentoPromo || 0),
+          descuentoPorcentaje: resumenTarifa.promoAplicada.tipoDescuento === 'PORCENTAJE' ? Number(resumenTarifa.promoAplicada.valorDescuento || 0) : null as any,
           fechaAplicacion: seedUtil.nowISO(),
           usuarioAplicoId: 'USR-MOISES-0001',
           createdAt: seedUtil.nowISO(),
@@ -333,10 +386,10 @@ const NuevaReserva: React.FC = () => {
           createdBy: 'USR-MOISES-0001',
           updatedBy: 'USR-MOISES-0001',
         }] : [],
-        subTotalAlojamientoSinImpuestos: Number(resumenTarifa.subtotal),
-        totalImpuestos: Number(resumenTarifa.igv),
-        totalDescuentos: Number(resumenTarifa.descuento),
-        montoTotalReserva: Number(resumenTarifa.total),
+        subTotalAlojamientoSinImpuestos: Number(resumenTarifa.subTotalSinImpuestos),
+        totalImpuestos: Number(resumenTarifa.montoImpuestos),
+        totalDescuentos: Number(resumenTarifa.descuentoPromo),
+        montoTotalReserva: Number(resumenTarifa.totalFinal),
         moneda: 'PEN',
         estado: origen === 'BOOKING' || origen === 'AGENCIA_VIAJES' ? 'CONFIRMADA' : 'PENDIENTE',
         historialCambios: [],
@@ -363,7 +416,7 @@ const NuevaReserva: React.FC = () => {
         servicioAdicionalSolicitadoIds: [],
         checkInInfo: null,
         checkOutInfo: null,
-        saldoPendiente: Number(resumenTarifa.total),
+        saldoPendiente: Number(resumenTarifa.totalFinal),
         estadoPago: origen === 'BOOKING' ? 'PAGADO_ANTICIPADO_TOTAL' : 'PAGO_PENDIENTE',
         fechaCreacion: seedUtil.nowISO(),
         fechaModificacion: seedUtil.nowISO(),
@@ -655,23 +708,89 @@ const NuevaReserva: React.FC = () => {
                   <IonCol size="12" sizeMd="6">
                     <IonCard>
                       <IonCardHeader>
+                        <IonCardTitle>Tarifas disponibles</IonCardTitle>
+                        <IonCardSubtitle>Selecciona una tarifa predefinida o usa precio manual</IonCardSubtitle>
+                      </IonCardHeader>
+                      <IonCardContent>
+                        {tarifasDisponiblesParaHab.length === 0 ? (
+                          <IonNote color="medium">Selecciona primero una habitación (Paso 2).</IonNote>
+                        ) : (
+                          <IonList lines="full">
+                            {tarifasDisponiblesParaHab.map((t: any, idx: number) => {
+                              const precio = Number(t.precioPorNoche || 0);
+                              const sel = tarifaSeleccionadaId
+                                ? t.id === tarifaSeleccionadaId
+                                : idx === tarifasDisponiblesParaHab.length - 1;
+                              const manualActivo = precioNocheManual.trim() !== '';
+                              return (
+                                <IonItem
+                                  key={t.id}
+                                  button={!manualActivo}
+                                  onClick={() => { if (!manualActivo) { setTarifaSeleccionadaId(t.id); setPrecioNocheManual(''); } }}
+                                  color={sel && !manualActivo ? 'primary' : undefined}
+                                  style={sel && !manualActivo ? { backgroundColor: '#e8f5e9' } : undefined}
+                                >
+                                  <IonLabel>
+                                    <h2>
+                                      <IonBadge color={sel && !manualActivo ? 'success' : 'medium'}>
+                                        {sel && !manualActivo ? '✓ ' : ''}{t.nombre || `Tarifa ${idx + 1}`}
+                                      </IonBadge>
+                                    </h2>
+                                    <p>{t.descripcion || `Tarifa tipo: ${t.tipoHabitacionId || 'general'}`}</p>
+                                  </IonLabel>
+                                  <IonLabel slot="end" style={{ textAlign: 'right' }}>
+                                    <b style={{ fontSize: 18 }}>S/ {precio.toFixed(2)}</b>
+                                    <p style={{ fontSize: 12 }}>/ noche</p>
+                                  </IonLabel>
+                                </IonItem>
+                              );
+                            })}
+                            <IonItem style={{ marginTop: 12 }}>
+                              <IonLabel position="stacked">
+                                ✏️ Precio manual (sobrescribe tarifa seleccionada)
+                              </IonLabel>
+                              <IonInput
+                                type="number"
+                                placeholder="Ej: 420.00"
+                                value={precioNocheManual}
+                                onIonInput={(e) => setPrecioNocheManual(e.detail.value || '')}
+                              />
+                            </IonItem>
+                            <IonNote color="medium" style={{ display: 'block', marginTop: 8 }}>
+                              💡 Para desactivar modo manual, borra el número del campo.
+                            </IonNote>
+                          </IonList>
+                        )}
+                      </IonCardContent>
+                    </IonCard>
+
+                    <IonCard style={{ marginTop: 12 }}>
+                      <IonCardHeader>
                         <IonCardTitle>Código promocional</IonCardTitle>
-                        <IonCardSubtitle>(opcional) Prueba: 3NOCHES50OFF o 10OFFWEB</IonCardSubtitle>
+                        <IonCardSubtitle>(opcional) Prueba: <b>3NOCHES50OFF</b> o <b>10OFFWEB</b></IonCardSubtitle>
                       </IonCardHeader>
                       <IonCardContent>
                         <IonItem>
                           <IonIcon icon={pricetags} slot="start" />
                           <IonInput placeholder="Ej: 10OFFWEB" value={codPromoInput} onIonInput={(e) => setCodPromoInput(e.detail.value!.toUpperCase())} />
                         </IonItem>
-                        <IonButton expand="block" color="tertiary" onClick={aplicarPromoYSumar} disabled={!habitacionSeleccionada} style={{ marginTop: 8 }}>
-                          <IonIcon icon={documentText} slot="start" />
-                          Calcular tarifa y aplicar promo
-                        </IonButton>
-                        {promoValidacionMsg && (
-                          <IonCard color={promoValidacionMsg.ok ? 'success' : 'danger'} style={{ marginTop: 12 }}>
+                        {codPromoInput.trim() && (
+                          <IonCard
+                            color={resumenTarifa?.promoValida ? 'success' : 'danger'}
+                            style={{ marginTop: 12 }}
+                          >
                             <IonCardContent style={{ color: 'white' }}>
-                              <IonIcon icon={promoValidacionMsg.ok ? checkmarkCircle : alertCircle} style={{ marginRight: 8 }} />
-                              {promoValidacionMsg.texto}
+                              <IonIcon
+                                icon={resumenTarifa?.promoValida ? checkmarkCircle : alertCircle}
+                                style={{ marginRight: 8 }}
+                              />
+                              {resumenTarifa?.promoValida
+                                ? `✅ Promo "${resumenTarifa.promoAplicada?.codigo}" aplicada: -S/ ${Number(resumenTarifa.descuentoPromo || 0).toFixed(2)} ${
+                                    resumenTarifa.promoAplicada?.tipoDescuento === 'PORCENTAJE'
+                                      ? `(${resumenTarifa.promoAplicada?.valorDescuento}%)`
+                                      : ''
+                                  }`
+                                : `Código "${codPromoInput.trim()}" no válido. Revisa fechas, mínimo de noches o monto.`}
                             </IonCardContent>
                           </IonCard>
                         )}
@@ -683,35 +802,47 @@ const NuevaReserva: React.FC = () => {
                       <IonCardHeader>
                         <IonCardTitle>Resumen económico</IonCardTitle>
                         <IonCardSubtitle>
-                          Habitación: {habitacionSeleccionada?.codigo || '(sin seleccionar)'} · {noches} noches
+                          Habitación: {habitacionSeleccionada?.codigo || '(sin seleccionar)'} · {noches} {noches === 1 ? 'noche' : 'noches'} · {adultos}A {ninos > 0 ? `${ninos}N` : ''}
                         </IonCardSubtitle>
                       </IonCardHeader>
                       <IonCardContent>
                         {!resumenTarifa ? (
-                          <IonNote color="medium">Selecciona habitación y pulsa "Calcular tarifa".</IonNote>
+                          <IonNote color="medium">Selecciona una habitación en el Paso 2 para ver el cálculo.</IonNote>
                         ) : (
                           <IonList lines="full">
+                            <IonItem>
+                              <IonLabel>Tarifa aplicada</IonLabel>
+                              <IonLabel slot="end" style={{ textAlign: 'right' }}>
+                                <IonBadge color={precioNocheManual.trim() ? 'warning' : 'primary'}>
+                                  {precioNocheManual.trim() ? 'MANUAL' : resumenTarifa.tarifaNombre?.slice(0, 20)}
+                                </IonBadge>
+                              </IonLabel>
+                            </IonItem>
                             <IonItem>
                               <IonLabel>Precio / noche</IonLabel>
                               <IonLabel slot="end"><b>S/ {Number(resumenTarifa.precioNoche).toFixed(2)}</b></IonLabel>
                             </IonItem>
                             <IonItem>
-                              <IonLabel>Subtotal alojamiento (sin impuestos)</IonLabel>
-                              <IonLabel slot="end">S/ {resumenTarifa.subtotal}</IonLabel>
+                              <IonLabel>Subtotal alojamiento ({noches} noches, sin impuestos)</IonLabel>
+                              <IonLabel slot="end">S/ {Number(resumenTarifa.subTotalSinImpuestos).toFixed(2)}</IonLabel>
                             </IonItem>
-                            <IonItem>
-                              <IonLabel>IGV 18% + Selva 5% (aproximado)</IonLabel>
-                              <IonLabel slot="end">S/ {Number(resumenTarifa.igv).toFixed(2)}</IonLabel>
-                            </IonItem>
-                            {Number(resumenTarifa.descuento) > 0 && (
+                            {resumenTarifa.impuestosDetalle.map((d: any) => (
+                              <IonItem key={d.impuesto?.id || Math.random()}>
+                                <IonLabel>{d.impuesto?.nombre || 'Impuesto'} ({d.impuesto?.valor || 0}%)</IonLabel>
+                                <IonLabel slot="end">S/ {Number(d.monto || 0).toFixed(2)}</IonLabel>
+                              </IonItem>
+                            ))}
+                            {Number(resumenTarifa.descuentoPromo) > 0 && (
                               <IonItem color="success">
-                                <IonLabel>Descuento promoción aplicado</IonLabel>
-                                <IonLabel slot="end" color="success">−S/ {resumenTarifa.descuento}</IonLabel>
+                                <IonLabel>🎁 Descuento promoción</IonLabel>
+                                <IonLabel slot="end" color="success">−S/ {Number(resumenTarifa.descuentoPromo).toFixed(2)}</IonLabel>
                               </IonItem>
                             )}
                             <IonItem lines="none">
                               <IonLabel style={{ fontSize: 20 }}><b>TOTAL A PAGAR</b></IonLabel>
-                              <IonLabel slot="end" color="primary" style={{ fontSize: 22 }}><b>S/ {resumenTarifa.total}</b></IonLabel>
+                              <IonLabel slot="end" color="primary" style={{ fontSize: 24 }}>
+                                <b>S/ {Number(resumenTarifa.totalFinal).toFixed(2)}</b>
+                              </IonLabel>
                             </IonItem>
                           </IonList>
                         )}
@@ -760,7 +891,7 @@ const NuevaReserva: React.FC = () => {
                           <IonItem><IonLabel>Check-in / Check-out</IonLabel><IonLabel slot="end">{checkin || '—'} → {checkout || '—'}</IonLabel></IonItem>
                           <IonItem><IonLabel>{noches} {noches === 1 ? 'noche' : 'noches'} · Pax</IonLabel><IonLabel slot="end">{adultos}A {ninos > 0 ? `${ninos}N` : ''}</IonLabel></IonItem>
                           <IonItem><IonLabel>Origen</IonLabel><IonLabel slot="end"><IonBadge>{origen}</IonBadge></IonLabel></IonItem>
-                          <IonItem lines="none"><IonLabel style={{ fontSize: 20 }}><b>TOTAL</b></IonLabel><IonLabel slot="end" color="primary" style={{ fontSize: 22 }}><b>S/ {resumenTarifa?.total || '0.00'}</b></IonLabel></IonItem>
+                          <IonItem lines="none"><IonLabel style={{ fontSize: 20 }}><b>TOTAL</b></IonLabel><IonLabel slot="end" color="primary" style={{ fontSize: 22 }}><b>S/ {Number(resumenTarifa?.totalFinal || 0).toFixed(2)}</b></IonLabel></IonItem>
                         </IonList>
                         <IonButton expand="block" color="primary" size="large" onClick={doCrearReserva} style={{ marginTop: 12 }}>
                           <IonIcon icon={checkmarkDone} slot="start" />
