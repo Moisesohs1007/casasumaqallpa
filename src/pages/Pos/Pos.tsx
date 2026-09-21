@@ -331,15 +331,32 @@ const PosPage: React.FC = () => {
           </IonRow>
         </IonGrid>
 
-        <IonFab slot="fixed" vertical="bottom" horizontal="end" style={{ margin: 16, zIndex: 9999, position: 'fixed', right: 24, bottom: 24 }}>
-          <IonFabButton
-            color="success"
-            onClick={() => setTomarComandaOpen(true)}
-            title="🧾 Nueva comanda / Room Service"
-          >
-            <IonIcon icon={fastFood} />
-          </IonFabButton>
-        </IonFab>
+        <button
+          onClick={() => setTomarComandaOpen(true)}
+          title="🧾 Nueva comanda / Room Service"
+          style={{
+            position: 'fixed',
+            right: 24,
+            bottom: 90,
+            width: 60,
+            height: 60,
+            borderRadius: '50%',
+            background: '#2dd36f',
+            color: '#fff',
+            fontSize: 26,
+            fontWeight: 900,
+            border: 'none',
+            boxShadow: '0 8px 20px rgba(45,211,111,.35), 0 4px 12px rgba(0,0,0,.18)',
+            cursor: 'pointer',
+            zIndex: 99999,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: 0,
+          }}
+        >
+          +
+        </button>
 
         <TomarComanda
           isOpen={tomarComandaOpen}
