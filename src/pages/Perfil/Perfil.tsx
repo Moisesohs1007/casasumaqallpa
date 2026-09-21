@@ -14,17 +14,64 @@ import {
   IonCardTitle,
   IonCardContent,
 } from '@ionic/react';
+import { Usuario, Rol, RolUsuario, ModuloPermiso, Moneda, AuditFields } from '../../types';
 import './Perfil.css';
 
-const PerfilPage: React.FC = () => {
-  const usuario = {
-    iniciales: 'MO',
-    nombre: 'Moises OHS',
-    rol: 'Administración',
-    email: 'moisesohs@gmail.com',
-    sede: 'Casa Sumaq Allpa',
-  };
+const nowIso = new Date().toISOString();
+const audit: AuditFields = { createdAt: nowIso, updatedAt: nowIso };
 
+const rolAdmin: Rol = {
+  id: 'rol-admin',
+  nombre: 'ADMINISTRACION' as RolUsuario,
+  descripcion: 'Rol de administración completa para Casa Sumaq Allpa',
+  nivelJerarquia: 90,
+  estado: 'ACTIVO',
+  permisos: Object.values([
+    'DASHBOARD',
+    'HABITACIONES',
+    'TARIFAS',
+    'RESERVAS',
+    'HUESPEDES',
+    'CHECKIN_CHECKOUT',
+    'FOLIOS',
+    'CAJA_PAGOS',
+    'FACTURACION_SUNAT',
+    'HOUSEKEEPING',
+    'MANTENIMIENTO',
+    'REPORTES',
+    'POS_FB',
+    'INVENTARIO',
+    'USUARIOS_ROLES',
+    'CONFIGURACION_SISTEMA',
+    'AUDITORIA',
+  ] as ModuloPermiso['mododo' extends never ? never : ModuloPermiso['modulo'][]).map(
+    (modulo) => ({ modulo: modulo as ModuloPermiso['modulo'], permiso: 'ADMIN' }) as ModuloPermiso,
+  ),
+  ...audit,
+};
+
+const usuario: Usuario = {
+  id: 'usr-actual',
+  uuid: 'usr-uuid-actual',
+  iniciales: 'MO',
+  nombres: 'Moises',
+  apellidos: 'OHS',
+  correoElectronico: 'moisesohs@gmail.com',
+  rolId: rolAdmin.id,
+  rol: rolAdmin,
+  estado: 'ACTIVO',
+  passwordHash: '__hidden__',
+  preferencias: {
+    idioma: 'es',
+    zonaHoraria: 'America/Lima',
+    monedaPorDefecto: 'PEN' as Moneda,
+    paginacionPorDefecto: 25,
+  },
+  ultimoAcceso: nowIso,
+  ...audit,
+};
+
+const PerfilPage: React.FC = () => {
   return (
     <IonPage>
       <IonHeader>
@@ -45,19 +92,24 @@ const PerfilPage: React.FC = () => {
               <div className="avatar-inner">{usuario.iniciales}</div>
             </IonAvatar>
             <div className="profile-info">
-              <IonCardTitle>{usuario.nombre}</IonCardTitle>
-              <IonBadge color="tertiary">{usuario.rol}</IonBadge>
+              <IonCardTitle>{usuario.nombres} {usuario.apellidos}</IonCardTitle>
+              <IonBadge color="tertiary">{String(usuario.rol?.nombre ?? 'Administración').replace('_', ' ')}</IonBadge>
             </div>
           </IonCardHeader>
           <IonCardContent>
             <p>
-              <strong>Sede:</strong> {usuario.sede}
+              <strong>Sede:</strong> Casa Sumaq Allpa
             </p>
             <p>
-              <strong>Email:</strong> {usuario.email}
+              <strong>Email:</strong> {usuario.correoElectronico}
             </p>
+            {usuario.ultimoAcceso ? (
+              <p>
+                <strong>Último acceso:</strong> {new Date(usuario.ultimoAcceso).toLocaleString('es-PE')}
+              </p>
+            ) : null}
             <p className="ion-text-color-danger">
-              Recuerda: verifica siempre el badge de iniciales antes de operaciones críticas.
+              Recuerda: verifica siempre el badge <strong>"{usuario.iniciales}"</strong> antes de operaciones críticas.
             </p>
           </IonCardContent>
         </IonCard>

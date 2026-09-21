@@ -16,10 +16,23 @@ import {
   IonItem,
   IonIcon,
 } from '@ionic/react';
-import { people, bed, restaurant, trendingUp } from 'ionicons/icons';
+import type { Color } from '@ionic/core';
+import { people, bed, restaurant, trendingUp, Icon } from 'ionicons/icons';
+import type { EstadoReserva, EstadoComanda, EstadoHabitacion, MetodoPago, Moneda, OrigenReserva, Usuario } from '../../types';
 import './Home.css';
 
-const HomePage: React.FC = () => {
+interface DashboardKpiItem {
+  id: string;
+  label: string;
+  value: number;
+  badge?: string;
+  icon: Icon;
+  color: Color;
+}
+
+interface HomePageProps {}
+
+const HomePage: React.FC<HomePageProps> = () => {
   const today = new Date().toLocaleDateString('es-PE', {
     weekday: 'long',
     year: 'numeric',
@@ -27,12 +40,27 @@ const HomePage: React.FC = () => {
     day: 'numeric',
   });
 
-  const dashboardItems = [
-    { id: 1, label: 'Llegadas hoy', value: 3, badge: '+1', icon: people, color: 'primary' },
-    { id: 2, label: 'Salidas hoy', value: 2, badge: '', icon: trendingUp, color: 'warning' },
-    { id: 3, label: 'Habitaciones ocupadas', value: 12, badge: '/15', icon: bed, color: 'tertiary' },
-    { id: 4, label: 'Comandas activas', value: 5, badge: '', icon: restaurant, color: 'success' },
+  const dashboardItems: DashboardKpiItem[] = [
+    { id: 'kpi-llegadas', label: 'Llegadas hoy', value: 3, badge: '+1', icon: people, color: 'primary' },
+    { id: 'kpi-salidas', label: 'Salidas hoy', value: 2, icon: trendingUp, color: 'warning' },
+    { id: 'kpi-hab', label: 'Habitaciones ocupadas', value: 12, badge: '/15', icon: bed, color: 'tertiary' },
+    { id: 'kpi-com', label: 'Comandas activas', value: 5, icon: restaurant, color: 'success' },
   ];
+
+  const sessionUsuario: Usuario = {
+    id: 'usr-actual',
+    uuid: 'usr-uuid-actual',
+    iniciales: 'MO',
+    nombres: 'Moises',
+    apellidos: 'OHS',
+    correoElectronico: 'moisesohs@gmail.com',
+    rolId: 'rol-admin',
+    estado: 'ACTIVO',
+    passwordHash: '__hidden__',
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  };
+  void sessionUsuario;
 
   return (
     <IonPage>
