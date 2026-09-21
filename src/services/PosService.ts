@@ -310,23 +310,26 @@ export const ComandaService = {
     const cargosFolioCreados: CargoFolio[] = [];
 
     // Insertar líneas
+    let numeroLineaFolio = 1;
     for (const linea of params.lineas) {
       const prod = CatalogoFBService.buscarProductoPorId(linea.productoId);
       if (!prod) continue;
       const presentacionId = linea.presentacionId || prod.presentacionesActivasIds[0] || '';
       const precio = prod.precioVentaBase;
-      const imps = prod.impuestosIds.map((impId) => {
+      const imps = (prod.impuestosIds && prod.impuestosIds.length ? prod.impuestosIds : ['IMP-IGV-18', 'IMP-SELVA-5']).map((impId) => {
         const imp = ImpuestoService.buscarPorId(impId);
-        if (!imp) return { impuestoId: impId, impuestoNombre: impId, montoImpuesto: 0 };
-        const base = linea.cantidad * precio / 1.23;
+        if (!imp) return { impuestoId: impId, impuestoNombre: impId || 'IMPUESTO', montoImpuesto: 0 };
+        const base = (linea.cantidad * precio) / 1.23;
         return {
           impuestoId,
-          impuestoNombre: imp.nombre,
+          impuestoNombre: imp.nombre || impId,
           montoImpuesto: Number((imp.tipo === 'PORCENTAJE' ? ((base * imp.valor) / 100).toFixed(2) : '0') as unknown as number),
         };
       });
+      const totalImpuestos = Number(imps.reduce((s, x) => s + Number(x.montoImpuesto || 0), 0).toFixed(2));
       const montoLinea = Number((linea.cantidad * precio).toFixed(2));
-      const subtotal = Number((montoLinea / 1.23).toFixed(2));
+      const subtotal = Number(Math.max(0, montoLinea - totalImpuestos).toFixed(2));
+      const montoImpuesto = totalImpuestos;
       const detalle = db.add<ComandaDetalle>(KEY_COMDET, {
         comandaId,
         numeroLinea: 1,
@@ -340,12 +343,12 @@ export const ComandaService = {
         observaciones: linea.observaciones || '',
         seleccionModificadores: linea.modificadoresAplicados || [],
         alergenosOmitidosIds: [],
-        impuestosIds: prod.impuestosIds,
+        impuestosIds: imps.map((i) => i.impuestoId),
         impuestosMontoDesglosado: imps as any,
         subtotal,
         montoLinea,
         estadoPreparacion: 'PENDIENTE',
-        estacionCocinaId: prod.estacionesCocinaIds[0] || null,
+        estacionCocinaId: prod.estacionesCocinaIds?.[0] || null,
         usuarioIdAsignadoEstacion: null,
         horaSolicitado: seedUtil.nowISO(),
         horaInicioPreparacion: null,
@@ -366,42 +369,64 @@ export const ComandaService = {
 
       // Si es ROOM_SERVICE con folio abierto → CREAR CARGO_AUTOMÁTICO al Folio
       if (esRoomService && folioId && tipoConsumoFinal === 'CARGO_A_HABITACION') {
-        const cargo = CargoFolioService.crear({
+        const nombreUsuario = (params.usuarioIdMozoApertura === 'USR-MOISES-0001') ? 'Moisés Ochoa' : String(params.usuarioIdMozoApertura || 'Recepción');
+        const cargoParams: any = {
           folioId,
-          tipo: 'CONSUMO_POS',
+          numeroLinea: numeroLineaFolio++,
+          fechaCargo: seedUtil.nowISO(),
           concepto: `${linea.cantidad}× ${prod.nombre} · ${mesa.codigo}`,
-          descripcion: `Comanda #${comandaSeed.numeroCorrelativo} · Hab ${mesa.codigo} · Mozo ${params.usuarioIdMozoApertura}. ${linea.observaciones || ''}`,
-          origen: 'COMANDA_POS',
-          referenciaId: detalle.id,
-          reservaId: params.reservaId,
+          tipoConcepto: 'CONSUMO_POS' as any,
+          categoria: prod.categoriaId || 'Comida y Bebida',
           habitacionId,
-          huespedId: params.huespedTitularId || (folioId ? FolioService.buscarPorId(folioId)?.huespedId : undefined),
-          productoInventarioId: null,
           comandaId,
+          conceptoDetalle: [
+            `Comanda #${comandaSeed.numeroCorrelativo}`,
+            `Hab: ${mesa.codigo}`,
+            `Mozo: ${nombreUsuario}`,
+            ...(linea.observaciones ? [`Obs: ${linea.observaciones}`] : []),
+          ],
+          cantidad: linea.cantidad,
+          unidadMedida: 'UND',
+          precioUnitario: precio,
+          descuentoMonto: 0,
+          descuentoPorcentaje: 0,
+          montoImpuesto,
+          impuestoPorcentaje: prod.impuestosIds?.length ? null : 23,
+          subtotal,
+          total: montoLinea,
+          moneda: puntoVenta.monedaPredeterminada,
+          cargoAuto: true,
+          origenCargo: 'ROOM_SERVICE',
+          nombreUsuarioAplicaCargo: nombreUsuario,
+          usuarioRegistroId: params.usuarioIdMozoApertura,
+          autorizadoPor: nombreUsuario,
+          anulado: false,
+          motivoAnulacion: '',
+          descripcion: `Comanda #${comandaSeed.numeroCorrelativo} · Hab ${mesa.codigo} · Mozo ${params.usuarioIdMozoApertura}. ${linea.observaciones || ''}`,
+          fechaAplicacion: seedUtil.nowISO(),
+          fechaVencimiento: null as any,
+          productoInventarioId: null,
           comandaDetalleId: detalle.id,
           cajaSesionId: null,
-          usuarioId: params.usuarioIdMozoApertura,
-          monto: montoLinea,
-          moneda: puntoVenta.monedaPredeterminada,
-          impuestosIds: prod.impuestosIds,
+          esAnulado: false,
+          comprobanteAsociadoId: null,
+          comentarios: `Cargo automático desde comanda #${comandaSeed.numeroCorrelativo}. Hab: ${habitacionId}.`,
+          reservaId: params.reservaId,
+          huespedId: params.huespedTitularId || (folioId ? FolioService.buscarPorId(folioId)?.huespedId : undefined),
+          referenciaId: detalle.id,
+          impuestosIds: imps.map((i) => i.impuestoId),
           impuestosMontoDesglosado: imps as any,
-          subtotal,
           descuentosIds: [],
           descuentosMontoDesglosado: [],
           propinaMonto: 0,
           estado: 'PENDIENTE_COBRO',
-          fechaCargo: seedUtil.nowISO(),
-          fechaAplicacion: seedUtil.nowISO(),
-          fechaVencimiento: null as any,
-          esAnulado: false,
-          motivoAnulacion: '',
-          comprobanteAsociadoId: null,
-          comentarios: `Cargo automático desde comanda #${comandaSeed.numeroCorrelativo}. Hab: ${habitacionId}.`,
+          usuarioId: params.usuarioIdMozoApertura,
           createdAt: seedUtil.nowISO(),
           updatedAt: seedUtil.nowISO(),
           createdBy: params.usuarioIdMozoApertura,
           updatedBy: params.usuarioIdMozoApertura,
-        } as Create<CargoFolio>);
+        };
+        const cargo = CargoFolioService.crear(cargoParams);
         cargosFolioCreados.push(cargo);
       }
     }
