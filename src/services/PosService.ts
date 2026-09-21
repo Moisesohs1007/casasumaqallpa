@@ -158,23 +158,23 @@ export const ComandaService = {
           (c.habitacion?.codigo || '').toLowerCase().includes(q)
       );
     }
-    return lista.map((c) => this.enriquecer(c));
+    return lista.map((c) => this._enriquecer(c));
   },
 
   buscarPorId(id: string): Comanda | undefined {
     const c = db.getById<Comanda>(KEY_COM, id);
-    return c ? this.enriquecer(c) : undefined;
+    return c ? this._enriquecer(c) : undefined;
   },
 
-  private enriquecer(c: Comanda): Comanda {
+  _enriquecer(c: Comanda): Comanda {
     c.detalles = db.findMany<ComandaDetalle>(KEY_COMDET, (d) => d.comandaId === c.id);
     if (c.mesaId && !c.mesa) c.mesa = MesaService.buscarPorId(c.mesaId);
     if (c.habitacionId && !c.habitacion) c.habitacion = (db.getById<any>('habitaciones', c.habitacionId));
     if (c.folioId && !c.folioId) { /* noop */ }
-    return this.recalcularTotalesEnMemoria(c);
+    return this._recalcularTotalesEnMemoria(c);
   },
 
-  private recalcularTotalesEnMemoria(c: Comanda): Comanda {
+  _recalcularTotalesEnMemoria(c: Comanda): Comanda {
     const detalles = c.detalles || [];
     const total = detalles.reduce((s, d) => s + Number(d.montoLinea || 0), 0);
     const subtotal = detalles.reduce((s, d) => s + Number(d.subtotal || 0), 0);
@@ -205,7 +205,7 @@ export const ComandaService = {
   recalcularTotales(id: string, updatedBy = 'system-comanda'): Comanda | undefined {
     const c = db.getById<Comanda>(KEY_COM, id);
     if (!c) return undefined;
-    const actualizados = this.recalcularTotalesEnMemoria({
+    const actualizados = this._recalcularTotalesEnMemoria({
       ...c,
       detalles: db.findMany<ComandaDetalle>(KEY_COMDET, (d) => d.comandaId === id),
     });

@@ -111,7 +111,7 @@ export const FolioService = {
         (f.reserva?.codigoReserva || '').toLowerCase().includes(q)
       );
     }
-    return lista.map((f) => this.enriquecer(f));
+    return lista.map((f) => this._enriquecer(f));
   },
 
   resumenCajaHoy(): {
@@ -134,7 +134,7 @@ export const FolioService = {
 
   buscarPorId(id: string): Folio | undefined {
     const f = db.getById<Folio>(KEY_FOLIO, id);
-    return f ? this.enriquecer(f) : undefined;
+    return f ? this._enriquecer(f) : undefined;
   },
 
   buscarPorHabitacionAbierta(habitacionId: string): Folio | undefined {
@@ -149,7 +149,7 @@ export const FolioService = {
     return this.listarTodos({ reservaId });
   },
 
-  private enriquecer(f: Folio): Folio {
+  _enriquecer(f: Folio): Folio {
     if (f && !f.huesped) {
       const h = HuespedService.buscarPorId(f.huespedId);
       if (h) f.huesped = h;
@@ -164,10 +164,10 @@ export const FolioService = {
     }
     f.cargos = CargoFolioService.listarPorFolio(f.id);
     f.pagos = PagoFolioService.listarPorFolio(f.id);
-    return this.recalcularTotalesEnMemoria(f);
+    return this._recalcularTotalesEnMemoria(f);
   },
 
-  private recalcularTotalesEnMemoria(f: Folio): Folio {
+  _recalcularTotalesEnMemoria(f: Folio): Folio {
     const cargos = f.cargos || [];
     const sub = cargos.reduce((s, c) => s + Number(c.subtotal || 0), 0);
     const imp = cargos.reduce((s, c) =>
@@ -198,7 +198,7 @@ export const FolioService = {
   recalcularTotales(folioId: string, updatedBy = 'system-recalc'): Folio | undefined {
     const f = db.getById<Folio>(KEY_FOLIO, folioId);
     if (!f) return undefined;
-    const recalculado = this.recalcularTotalesEnMemoria({
+    const recalculado = this._recalcularTotalesEnMemoria({
       ...f,
       cargos: CargoFolioService.listarPorFolio(f.id),
       pagos: PagoFolioService.listarPorFolio(f.id),
