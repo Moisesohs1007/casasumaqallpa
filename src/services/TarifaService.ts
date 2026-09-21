@@ -225,15 +225,35 @@ export const TarifaService = {
     totalConImpuestos: number;
     descuentoPromocionMonto: number;
     totalFinal: number;
-  } | null {
+  } {
     const { tipoHabitacionId, fechaCheckinISO, noches, codPromocionalAplicado } = params;
-    const tarifas = this.listarTodas({
+    let tarifas = this.listarTodas({
       tipoHabitacionId,
       estado: 'ACTIVO',
       vigentesEnFecha: fechaCheckinISO,
     });
-    if (tarifas.length === 0) return null;
-    const tarifa = tarifas[tarifas.length - 1]; // última (la más alta aplica general)
+    let tarifa: Tarifa;
+    if (tarifas.length === 0) {
+      const tipoHab = db.getById<any>('tiposHabitacion', tipoHabitacionId);
+      const impuestos = ImpuestoService.listarTodos();
+      tarifa = {
+        id: `TAR-DYNAMIC-${tipoHabitacionId}`,
+        tipoHabitacionId,
+        nombre: `Tarifa Base ${tipoHab?.nombre || 'Habitación'}`,
+        descripcion: 'Tarifa dinámica generada automáticamente (fallback)',
+        precioPorNoche: Number(tipoHab?.precioBaseNoche) || 350,
+        moneda: 'PEN',
+        impuestosIds: impuestos.length ? impuestos.map((i) => i.id) : [],
+        politicaCancelacionId: db.all<any>('politicasCancelacion')[0]?.id || 'POL-STANDARD',
+        estado: 'ACTIVO',
+        fechaInicioVigencia: seedUtil.addDaysISO(seedUtil.hoy(), -3650),
+        fechaFinVigencia: seedUtil.addDaysISO(seedUtil.hoy(), 3650),
+        politicaId: db.all<any>('politicasCancelacion')[0]?.id || 'POL-STANDARD',
+        ...seedUtil.auditSeed(),
+      } as any;
+    } else {
+      tarifa = tarifas[tarifas.length - 1]; // última (la más alta aplica general)
+    }
 
     // Factor temporada por NOCHE (simplificado: fecha check-in)
     const factorPorcentaje = TemporadaService.calcularFactorPorcentaje(fechaCheckinISO);
@@ -242,7 +262,7 @@ export const TarifaService = {
     const subTotal = Number((precioPorNoche * noches).toFixed(2));
 
     // Impuestos
-    const imps = tarifa.impuestosIds.map((id) => ImpuestoService.buscarPorId(id)).filter(Boolean) as ImpuestoTarifa[];
+    const imps = (tarifa.impuestosIds ?? []).map((id) => ImpuestoService.buscarPorId(id)).filter(Boolean) as ImpuestoTarifa[];
     const impuestosDetalle = imps.map((i) => {
       const porc = i.tipo === 'PORCENTAJE' ? i.valor : 0;
       return {
