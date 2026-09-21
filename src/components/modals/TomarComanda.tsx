@@ -5,7 +5,7 @@ import {
   IonSelect, IonSelectOption, IonText, IonTextarea, IonChip,
 } from '@ionic/react';
 import {
-  add, basket, bed, cafe, cart, cash, checkmarkCircle, close, closeCircle, cutlery,
+  add, basket, bed, cafe, cart, cash, checkmarkCircle, close, closeCircle,
   documentText, fastFood, informationCircle, person, remove, restaurantOutline, wine,
 } from 'ionicons/icons';
 import type { Comanda, Habitacion, Mesa, ProductoFB, Reserva } from '../../types';
@@ -67,7 +67,7 @@ const getOrCreateMesaRoomService = (habitacionId: string, codHab: string): Mesa 
 const iconoCategoria = (catId: string) => {
   if (catId.includes('DESAYUNO')) return fastFood;
   if (catId.includes('ENTRADA')) return restaurantOutline;
-  if (catId.includes('PLATO')) return cutlery;
+  if (catId.includes('PLATO')) return restaurantOutline;
   if (catId.includes('BEBIDAS-FRIAS')) return cart;
   if (catId.includes('BEBIDAS-CALIENTES')) return cafe;
   if (catId.includes('ALCOHOL') || catId.includes('BAR')) return wine;
