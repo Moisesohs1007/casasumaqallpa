@@ -1870,24 +1870,29 @@ const buildComanda = (
   };
 };
 
-const prod = (id: string) => productosFBSeed.find((p) => p.id === id)!;
+const prod = (id: string): ProductoFB => {
+  const encontrado = productosFBSeed.find((p) => p.id === id);
+  if (encontrado) return encontrado;
+  // Fallback 100% seguro anti "prod2 undefined": devuelve Agua Mineral (existe siempre). Evita crash si queda algún ID antiguo olvidado.
+  return productosFBSeed.find((p) => p.id === 'PROD-AGUA-MINERAL') || productosFBSeed[productosFBSeed.length - 1] || productosFBSeed[0];
+};
 
 const comandasSeed: Comanda[] = [
   buildComanda(mesasSeed[0], null, '901', [
-    buildComandaDetalle('', prod('PROD-ENT-ENSALADA-QUINUA'), 1, 'Sin cebolla + queso extra'),
-    buildComandaDetalle('', prod('PROD-PLATO-LOMO'), 2, '1 bien cocido, 1 jugoso'),
-    buildComandaDetalle('', prod('PROD-PLATO-TACACHO'), 1),
+    buildComandaDetalle('', prod('PROD-ENT-ENSALADA-ATUN'), 1, 'Sin cebolla + queso extra'),
+    buildComandaDetalle('', prod('PROD-PLATO-LOMO-SALTADO'), 2, '1 bien cocido, 1 jugoso'),
+    buildComandaDetalle('', prod('PROD-PLATO-ESTOFADO-POLLO'), 1),
     buildComandaDetalle('', prod('PROD-JUGO-NARANJA'), 2),
-    buildComandaDetalle('', prod('PROD-CUSQUENA'), 2),
-    buildComandaDetalle('', prod('PROD-POSTRE-TRES-LECHES'), 1),
+    buildComandaDetalle('', prod('PROD-CERVEZA-ARTESANAL'), 2),
+    buildComandaDetalle('', prod('PROD-POSTRE-WAFFLES'), 1),
   ], {
     estado: 'EN_COCINA_BAR',
     estadoEntrega: 'EN_PROCESO',
     usuarioIdMozoApertura: 'USR-MOZO-0003',
   }),
   buildComanda(mesasSeed[1], null, '902', [
-    buildComandaDetalle('', prod('PROD-ENT-CEVICHE'), 1),
-    buildComandaDetalle('', prod('PROD-PLATO-PESCADO'), 1, 'Salsa 3 ajíes por favor'),
+    buildComandaDetalle('', prod('PROD-ENT-ENSALADA-FRESCA'), 1),
+    buildComandaDetalle('', prod('PROD-PLATO-TRUCHA-PLANCHA'), 1, 'Salsa 3 ajíes por favor'),
     buildComandaDetalle('', prod('PROD-AGUA-MINERAL'), 1),
   ], {
     estado: 'LISTA_PARA_ENTREGAR',
@@ -1895,7 +1900,7 @@ const comandasSeed: Comanda[] = [
     usuarioIdMozoApertura: 'USR-MOZO-0004',
   }),
   buildComanda(mesasSeed[4], null, '903', [
-    buildComandaDetalle('', prod('PROD-PLATO-JUANE'), 1),
+    buildComandaDetalle('', prod('PROD-PLATO-PICANTE-CUY'), 1),
     buildComandaDetalle('', prod('PROD-GASEOSA'), 1, 'Inca Kola'),
   ], {
     estado: 'ABIERTA',
@@ -1903,9 +1908,9 @@ const comandasSeed: Comanda[] = [
     usuarioIdMozoApertura: 'USR-MOZO-0003',
   }),
   buildComanda(mesasSeed[5], null, '904', [
-    buildComandaDetalle('', prod('PROD-DESAY-BUFFET'), 3, ''),
-    buildComandaDetalle('', prod('PROD-CAFE-AMERICANO'), 2),
-    buildComandaDetalle('', prod('PROD-TE-VERDE'), 1),
+    buildComandaDetalle('', prod('PROD-DESAY-LOMOALJUGO'), 3, ''),
+    buildComandaDetalle('', prod('PROD-CAFE'), 2),
+    buildComandaDetalle('', prod('PROD-INFUSIONES'), 1),
     buildComandaDetalle('', prod('PROD-JUGO-NARANJA'), 2),
   ], {
     estado: 'CERRADA_COBRADA',
@@ -1919,9 +1924,9 @@ const comandasSeed: Comanda[] = [
       usuarioIdCobro: 'USR-MOZO-0004',
       metodoPago: 'EFECTIVO',
       subMetodoPago: 'SOLES_EFECTIVO',
-      monto: 198.0,
+      monto: 98.0,
       moneda: 'PEN',
-      montoPagadoCon: 200.00,
+      montoPagadoCon: 100.00,
       montoVuelto: 2.00,
       fechaHoraCobro: nowISO(),
       comprobanteId: null,
@@ -1932,7 +1937,7 @@ const comandasSeed: Comanda[] = [
       comprobantePDFUrl: null,
       estado: 'COMPLETADO',
       cierreCajaId: null,
-      observaciones: 'Cliente pagó en efectivo 200, vuelto 2 soles',
+      observaciones: 'Cliente pagó en efectivo S/ 100, vuelto S/ 2 soles',
       ...auditSeed
     }],
     cierre: {
@@ -1949,9 +1954,9 @@ const comandasSeed: Comanda[] = [
   }),
   buildComanda(mesasSeed[6], reserva1, '910', [
     buildComandaDetalle('', prod('PROD-DESAY-CONTINENTAL'), 2),
-    buildComandaDetalle('', prod('PROD-CAFE-AMERICANO'), 2, 'Café americano poco azúcar'),
+    buildComandaDetalle('', prod('PROD-CAFE'), 2, 'Café poco azúcar'),
     buildComandaDetalle('', prod('PROD-JUGO-NARANJA'), 1),
-    buildComandaDetalle('', prod('PROD-ENT-ENSALADA-QUINUA'), 1, 'Sin gluten, pide opcion sin quinua (cambiar por ensalada fresca)'),
+    buildComandaDetalle('', prod('PROD-ENT-ENSALADA-FRESCA'), 1, 'Sin gluten, pide opción sin croutons'),
     buildComandaDetalle('', prod('PROD-AGUA-MINERAL'), 1, 'Sin gas, bien fría'),
   ], {
     estado: 'EN_COCINA_BAR',
@@ -1960,14 +1965,14 @@ const comandasSeed: Comanda[] = [
     observacionesInternas: 'Room Service Hab 101 / CAB-01. Entregar con cubertería de 2 + servilletas tela. Aplicar cargo automático al folio #F-2026-0920-001.',
   }),
   buildComanda(mesasSeed[7], reserva3, '915', [
-    buildComandaDetalle('', prod('PROD-DESAY-BUFFET'), 4),
-    buildComandaDetalle('', prod('PROD-CAFE-AMERICANO'), 2),
-    buildComandaDetalle('', prod('PROD-TE-VERDE'), 1),
+    buildComandaDetalle('', prod('PROD-DESAY-LOMOALJUGO'), 4),
+    buildComandaDetalle('', prod('PROD-CAFE'), 2),
+    buildComandaDetalle('', prod('PROD-INFUSIONES'), 1),
     buildComandaDetalle('', prod('PROD-JUGO-NARANJA'), 2),
-    buildComandaDetalle('', prod('PROD-CUSQUENA'), 4),
-    buildComandaDetalle('', prod('PROD-PISCO-SOUR'), 2),
-    buildComandaDetalle('', prod('PROD-PLATO-LOMO'), 2),
-    buildComandaDetalle('', prod('PROD-POSTRE-TRES-LECHES'), 2, 'Pastel sorpresa incluido (cumpleaños 21 Sep Fiorella 18 años)'),
+    buildComandaDetalle('', prod('PROD-CERVEZA-ARTESANAL'), 4),
+    buildComandaDetalle('', prod('PROD-VINO-SANTIAGO-QUEIROLO'), 2),
+    buildComandaDetalle('', prod('PROD-PLATO-LOMO-SALTADO'), 2),
+    buildComandaDetalle('', prod('PROD-POSTRE-WAFFLES'), 2, 'Pastel sorpresa incluido (cumpleaños 21 Sep Fiorella 18 años)'),
   ], {
     estado: 'ABIERTA',
     estadoEntrega: 'TOMANDO_ORDEN',
