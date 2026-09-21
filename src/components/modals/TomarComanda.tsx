@@ -200,10 +200,32 @@ const TomarComanda: React.FC<Props> = ({ isOpen, onDismiss }) => {
   };
 
   const handleConfirmar = async () => {
-    if (!puedeConfirmar) return;
     setProcesando(true);
     setErrorMsg(null);
     try {
+      if (carrito.length === 0) {
+        throw new Error('⚠️ El carrito está vacío. Agrega al menos 1 producto.');
+      }
+      if (Number(totalCarrito) <= 0) {
+        throw new Error('⚠️ Total del carrito debe ser mayor a 0.');
+      }
+      if (tipoConsumo === 'MESA' && !mesaSeleccionadaId) {
+        // Scroll hacia arriba para mostrar el selector
+        try {
+          const contenedor = document.querySelector('.tomar-comanda-scroll-wrapper') as HTMLElement;
+          if (contenedor) contenedor.scrollTop = 0;
+        } catch { /* noop */ }
+        throw new Error('⚠️ Selecciona primero una MESA (campo arriba en el modal).');
+      }
+      if (tipoConsumo === 'CARGO_A_HABITACION' && !habitacionSeleccionadaId) {
+        // Scroll hacia arriba para mostrar el selector
+        try {
+          const contenedor = document.querySelector('.tomar-comanda-scroll-wrapper') as HTMLElement;
+          if (contenedor) contenedor.scrollTop = 0;
+        } catch { /* noop */ }
+        throw new Error('⚠️ Selecciona primero la HABITACIÓN CHECKED-IN (campo arriba en el modal, scroll arriba).');
+      }
+
       let mesaId = '';
       let habitacionId: string | undefined = undefined;
       let reservaId: string | undefined = undefined;
@@ -332,7 +354,7 @@ const TomarComanda: React.FC<Props> = ({ isOpen, onDismiss }) => {
           </button>
         </div>
 
-        <div style={{ flex: 1, overflowY: 'auto', background: '#f7f7f7', padding: 16 }}>
+        <div className="tomar-comanda-scroll-wrapper" style={{ flex: 1, overflowY: 'auto', background: '#f7f7f7', padding: 16 }}>
           {paso === 'orden' && (
             <>
               <IonCard style={{ marginBottom: 14 }}>
@@ -624,7 +646,7 @@ const TomarComanda: React.FC<Props> = ({ isOpen, onDismiss }) => {
                           <IonButton
                             expand="block"
                             color={tipoConsumo === 'CARGO_A_HABITACION' ? 'success' : 'primary'}
-                            disabled={!puedeConfirmar}
+                            disabled={procesando}
                             onClick={handleConfirmar}
                           >
                             {procesando
@@ -635,12 +657,21 @@ const TomarComanda: React.FC<Props> = ({ isOpen, onDismiss }) => {
                           </IonButton>
                         </IonCol>
                       </IonRow>
-                      {!puedeConfirmar && carrito.length > 0 && (
-                        <IonNote color="danger" style={{ display: 'block', marginTop: 8 }}>
-                          {tipoConsumo === 'CARGO_A_HABITACION'
-                            ? '⚠️ Falta seleccionar habitación CHECKED_IN.'
-                            : '⚠️ Falta seleccionar mesa.'}
-                        </IonNote>
+                      {errorMsg && (
+                        <IonItem color="danger" style={{ marginBottom: 10, marginTop: 12, borderRadius: 12 }}>
+                          <IonIcon icon={closeCircle} slot="start" />
+                          <IonLabel>{errorMsg}</IonLabel>
+                        </IonItem>
+                      )}
+                      {!errorMsg && !puedeConfirmar && carrito.length > 0 && (
+                        <IonItem color="warning" style={{ marginBottom: 10, marginTop: 12, borderRadius: 12 }}>
+                          <IonIcon icon={informationCircle} slot="start" />
+                          <IonLabel>
+                            {tipoConsumo === 'CARGO_A_HABITACION'
+                              ? '⚠️ Falta seleccionar una habitación CHECKED_IN (scroll hacia arriba en el modal).'
+                              : '⚠️ Falta seleccionar una mesa (scroll hacia arriba en el modal).'}
+                          </IonLabel>
+                        </IonItem>
                       )}
                     </IonCardContent>
                   </IonCard>
