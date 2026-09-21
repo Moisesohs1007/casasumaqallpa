@@ -182,36 +182,57 @@ const CheckinModal: React.FC<CheckinModalProps> = ({ isOpen, onDidDismiss, reser
       isOpen={isOpen}
       onDidDismiss={cerrar}
       onIonModalDidPresent={resetModal}
+      keepContentsMounted={true}
+      canDismiss={true}
+      backdropDismiss={false}
       style={{
         '--width': '92%',
         '--min-width': '320px',
-        '--max-width': '800px',
-        '--height': 'auto',
-        '--max-height': '72%',
+        '--max-width': '820px',
+        '--height': '82%',
         '--border-radius': '16px',
       }}
     >
-      <IonPage>
-        <IonHeader>
-          <IonToolbar color="success">
-            <IonButtons slot="start">
-              <IonButton onClick={cerrar}>
-                <IonIcon icon={closeOutline} slot="icon-only" />
-              </IonButton>
-            </IonButtons>
-            <IonTitle>
-              {paso === 1 ? 'Check-in · Confirmar datos' : 'Check-in · Exitoso'}
-            </IonTitle>
-            {paso === 2 && (
-              <IonButtons slot="end">
-                <IonButton strong onClick={cerrar}>
-                  Cerrar
-                </IonButton>
-              </IonButtons>
-            )}
-          </IonToolbar>
-        </IonHeader>
-        <IonContent>
+      <div style={{ display: 'flex', flexDirection: 'column', width: '100%', height: '100%', overflow: 'hidden' }}>
+        {/* HEADER (sticky) */}
+        <div
+          style={{
+            background: '#2dd36f',
+            color: 'white',
+            padding: '10px 14px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 8,
+            flexShrink: 0,
+          }}
+        >
+          <IonButton
+            fill="clear"
+            color="light"
+            onClick={cerrar}
+            style={{ margin: 0, padding: 0, minWidth: 32, width: 32, height: 32 }}
+          >
+            <IonIcon icon={closeOutline} slot="icon-only" style={{ color: 'white', fontSize: 20 }} />
+          </IonButton>
+          <div style={{ flex: 1, fontWeight: 600, fontSize: 16, textAlign: 'center', color: 'white' }}>
+            {paso === 1 ? 'Check-in · Confirmar datos' : 'Check-in · Exitoso'}
+          </div>
+          {paso === 2 && (
+            <IonButton
+              fill="clear"
+              color="light"
+              strong
+              onClick={cerrar}
+              style={{ margin: 0, color: 'white', padding: '0 10px', fontWeight: 600 }}
+            >
+              Cerrar
+            </IonButton>
+          )}
+          {paso !== 2 && <div style={{ width: 70 }} />}
+        </div>
+
+        {/* CONTENT (scrollable) */}
+        <div style={{ flex: 1, overflowY: 'auto', background: '#f7f7f7', padding: 16 }}>
           {!reserva && (
             <IonList>
               <IonItem>
@@ -220,7 +241,7 @@ const CheckinModal: React.FC<CheckinModalProps> = ({ isOpen, onDidDismiss, reser
             </IonList>
           )}
           {reserva && paso === 1 && (
-            <IonGrid style={{ padding: 20 }}>
+            <IonGrid style={{ padding: 0 }}>
               <IonRow>
                 <IonCol size="12">
                   <IonCard>
@@ -378,7 +399,7 @@ const CheckinModal: React.FC<CheckinModalProps> = ({ isOpen, onDidDismiss, reser
           )}
 
           {reserva && paso === 2 && resultado && (
-            <IonGrid style={{ padding: 20 }}>
+            <IonGrid style={{ padding: 0 }}>
               <IonRow>
                 <IonCol size="12">
                   <IonCard color="success" className="ion-text-left">
@@ -387,7 +408,7 @@ const CheckinModal: React.FC<CheckinModalProps> = ({ isOpen, onDidDismiss, reser
                         <IonIcon icon={checkmarkCircle} /> Check-in exitoso
                       </h2>
                       <p style={{ fontSize: 16 }}>
-                        ✅ Reserva #{(resultado.reservaActualizada as any)?.codigo || (reserva as any).codigo} pasa a estado
+                        ✅ Reserva #{(resultado.reservaActualizada as any)?.codigo || (reserva as any).codigoReserva || (reserva as any).codigo} pasa a estado
                         {' '}<IonBadge color="light" style={{ fontSize: 16 }}>{(resultado.reservaActualizada as any)?.estado || 'CHECKED_IN'}</IonBadge>
                       </p>
                       {huesped && (
@@ -395,9 +416,9 @@ const CheckinModal: React.FC<CheckinModalProps> = ({ isOpen, onDidDismiss, reser
                           👤 Huésped: <strong>{huesped.nombres} {huesped.apellidos}</strong>
                         </p>
                       )}
-                      {habitacion && (
+                      {habitacionPrincipal && (
                         <p style={{ fontSize: 16 }}>
-                          🛏️ Habitación ocupada: <strong>{(habitacion as any).codigo}</strong>
+                          🛏️ Habitación ocupada: <strong>{habitacionesList.map((h: any) => h.codigo || h.nombre).filter(Boolean).join(' + ')}</strong>
                         </p>
                       )}
                       {resultado.folio && (
@@ -424,8 +445,8 @@ const CheckinModal: React.FC<CheckinModalProps> = ({ isOpen, onDidDismiss, reser
               </IonRow>
             </IonGrid>
           )}
-        </IonContent>
-      </IonPage>
+        </div>
+      </div>
     </IonModal>
   );
 };
