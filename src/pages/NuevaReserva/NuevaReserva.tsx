@@ -5,7 +5,7 @@ import {
   IonItem, IonLabel, IonList, IonNote, IonPage, IonRow, IonSelect, IonSelectOption,
   IonTitle, IonToolbar, IonAlert, IonTextarea, IonChip, IonBadge, useIonViewWillEnter,
 } from '@ionic/react';
-import { addCircleOutline, arrowForwardOutline, checkmark, closeOutline, bed, checkmarkDone, person, cash, ticket, calendar, time, documentText, pricetags, checkmarkCircle, alertCircle, arrowBackOutline } from 'ionicons/icons';
+import { addCircle, addCircleOutline, arrowForwardOutline, checkmark, closeOutline, bed, checkmarkDone, person, cash, ticket, calendar, time, documentText, pricetags, checkmarkCircle, alertCircle, arrowBackOutline } from 'ionicons/icons';
 
 import {
   HuespedService,
@@ -436,41 +436,74 @@ const NuevaReserva: React.FC = () => {
   };
 
   useIonViewWillEnter(() => {
-    if (reservaCreada) {
-      setBuscarTipoDoc('DNI');
-      setBuscarDoc('');
-      setBuscarTexto('');
-      setHuespedEncontrado(null);
-      setBusquedas([]);
-      setNuevoHuesped({
-        tipoDocumento: 'DNI',
-        numeroDocumento: '',
-        nombres: '',
-        apellidos: '',
-        nacionalidad: 'PERU',
-        telefonoCelular: '',
-        email: '',
-        direccion: '',
-      });
-      setHuespedFinal(null);
-      setCheckin(hoyMas(1));
-      setCheckout(hoyMas(4));
-      setAdultos(2);
-      setNinos(0);
-      setHabitacionesDisponibles([]);
-      setHabitacionSeleccionada(null);
-      setCodPromoInput('');
-      setPrecioNocheManual('');
-      setTarifaSeleccionadaId(null);
-      setPromoValidacionMsg(null);
-      setOrigen('WEB_OFICIAL');
-      setNotasInternas('');
-      setObservacionesHuesped('');
-      setReservaCreada(null);
-      setErrorMsg(null);
-      setPaso(1);
-    }
+    setBuscarTipoDoc('DNI');
+    setBuscarDoc('');
+    setBuscarTexto('');
+    setHuespedEncontrado(null);
+    setBusquedas([]);
+    setNuevoHuesped({
+      tipoDocumento: 'DNI',
+      numeroDocumento: '',
+      nombres: '',
+      apellidos: '',
+      nacionalidad: 'PERU',
+      telefonoCelular: '',
+      email: '',
+      direccion: '',
+    });
+    setHuespedFinal(null);
+    setCheckin(hoyMas(1));
+    setCheckout(hoyMas(4));
+    setAdultos(2);
+    setNinos(0);
+    setHabitacionesDisponibles([]);
+    setHabitacionSeleccionada(null);
+    setCodPromoInput('');
+    setPrecioNocheManual('');
+    setTarifaSeleccionadaId(null);
+    setPromoValidacionMsg(null);
+    setOrigen('WEB_OFICIAL');
+    setNotasInternas('');
+    setObservacionesHuesped('');
+    setReservaCreada(null);
+    setErrorMsg(null);
+    setPaso(1);
   });
+
+  const limpiarYCargarNuevoFormulario = () => {
+    setBuscarTipoDoc('DNI');
+    setBuscarDoc('');
+    setBuscarTexto('');
+    setHuespedEncontrado(null);
+    setBusquedas([]);
+    setNuevoHuesped({
+      tipoDocumento: 'DNI',
+      numeroDocumento: '',
+      nombres: '',
+      apellidos: '',
+      nacionalidad: 'PERU',
+      telefonoCelular: '',
+      email: '',
+      direccion: '',
+    });
+    setHuespedFinal(null);
+    setCheckin(hoyMas(1));
+    setCheckout(hoyMas(4));
+    setAdultos(2);
+    setNinos(0);
+    setHabitacionesDisponibles([]);
+    setHabitacionSeleccionada(null);
+    setCodPromoInput('');
+    setPrecioNocheManual('');
+    setTarifaSeleccionadaId(null);
+    setPromoValidacionMsg(null);
+    setOrigen('WEB_OFICIAL');
+    setNotasInternas('');
+    setObservacionesHuesped('');
+    setReservaCreada(null);
+    setErrorMsg(null);
+    setPaso(1);
+  };
 
   return (
     <IonPage>
@@ -503,6 +536,12 @@ const NuevaReserva: React.FC = () => {
                 <p><b>Estado:</b> <IonBadge color="warning">{reservaCreada.estado}</IonBadge> &nbsp; <b>Origen:</b> <IonBadge>{reservaCreada.origen}</IonBadge></p>
                 <p><b>Check-in:</b> {reservaCreada.fechaCheckin.slice(0, 10)} &nbsp; <b>Check-out:</b> {reservaCreada.fechaCheckout.slice(0, 10)}</p>
                 <IonRow className="ion-justify-content-end">
+                  <IonCol size="12" sizeMd="4">
+                    <IonButton expand="block" fill="outline" color="light" onClick={limpiarYCargarNuevoFormulario}>
+                      <IonIcon icon={addCircle} slot="start" />
+                      Crear otra reserva
+                    </IonButton>
+                  </IonCol>
                   <IonCol size="12" sizeMd="4">
                     <IonButton expand="block" color="light" routerLink="/reservas">
                       <IonIcon icon={calendar} slot="start" />
