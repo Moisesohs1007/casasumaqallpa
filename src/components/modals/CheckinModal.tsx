@@ -2,7 +2,8 @@ import React, { useState } from 'react';
 import {
   IonButton, IonButtons, IonCol, IonContent, IonGrid, IonHeader, IonIcon, IonInput,
   IonItem, IonLabel, IonList, IonModal, IonPage, IonRow, IonTextarea, IonTitle, IonToolbar,
-  IonCard, IonCardHeader, IonCardSubtitle, IonCardContent, IonBadge, IonNote, IonAlert,
+  IonCard, IonCardHeader, IonCardTitle, IonCardSubtitle, IonCardContent, IonBadge, IonNote, IonAlert,
+  IonSelect, IonSelectOption,
 } from '@ionic/react';
 import { checkmark, closeOutline, calendar, bed, key, person, cash, pricetags, alertCircle, checkmarkCircle } from 'ionicons/icons';
 import type { Reserva, Huesped, Habitacion, Folio } from '../../types';
