@@ -26,7 +26,7 @@ const rolAdmin: Rol = {
   descripcion: 'Rol de administración completa para Casa Sumaq Allpa',
   nivelJerarquia: 90,
   estado: 'ACTIVO',
-  permisos: Object.values([
+  permisos: ([
     'DASHBOARD',
     'HABITACIONES',
     'TARIFAS',
@@ -44,9 +44,10 @@ const rolAdmin: Rol = {
     'USUARIOS_ROLES',
     'CONFIGURACION_SISTEMA',
     'AUDITORIA',
-  ] as ModuloPermiso['mododo' extends never ? never : ModuloPermiso['modulo'][]).map(
-    (modulo) => ({ modulo: modulo as ModuloPermiso['modulo'], permiso: 'ADMIN' }) as ModuloPermiso,
-  ),
+  ] as Array<ModuloPermiso['modulo']>).map((modulo) => ({
+    modulo,
+    permiso: 'ADMIN' as const,
+  })) as ModuloPermiso[],
   ...audit,
 };
 
