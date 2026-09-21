@@ -8,7 +8,7 @@ import {
 } from '@ionic/react';
 import {
   arrowBack, calendar, bed, person, pricetags, alertCircle, logIn, create, trash,
-  checkmarkCircle, cash, documentText,
+  checkmarkCircle, cash, documentText, closeOutline,
 } from 'ionicons/icons';
 import type { Color } from '@ionic/core';
 import type { EstadoReserva, Reserva, Huesped, Habitacion, Folio } from '../../types';
@@ -107,13 +107,13 @@ const ReservaDetalle: React.FC = () => {
     : null;
   const codHab = habitacion ? (habitacion as any).codigo : hab0?.habitacionId || '—';
   const noches = r?.noches ?? r?.totalNoches ?? 0;
-  const adultos = r?.adultosTotal ?? hab0?.adultos ?? 0;
-  const ninos = r?.ninosTotal ?? hab0?.ninos ?? 0;
+  const adultos = r?.adultosTotal ?? r?.totalAdultos ?? hab0?.adultos ?? 0;
+  const ninos = r?.ninosTotal ?? r?.totalNinos ?? hab0?.ninos ?? 0;
   const pax = adultos + ninos;
-  const subTotal = r?.subTotalAlojamiento ?? hab0?.precioTotalReservaHabitacion ?? 0;
-  const impuestos = r?.impuestos ?? 0;
-  const descuentos = r?.descuentos ?? 0;
-  const total = r?.totalReserva ?? (subTotal + (impuestos || 0) - (descuentos || 0));
+  const subTotal = r?.subTotalAlojamiento ?? r?.subTotalSinImpuestos ?? hab0?.precioTotalReservaHabitacion ?? 0;
+  const impuestos = r?.impuestos ?? r?.totalImpuestos ?? 0;
+  const descuentos = r?.descuentos ?? r?.descuentosTotal ?? 0;
+  const total = r?.totalReserva ?? r?.montoTotalReserva ?? (subTotal + (impuestos || 0) - (descuentos || 0));
   const promo = r?.codigoPromocionalAplicado ?? r?.promocionAplicada?.codigo ?? null;
   const checkin = (r?.fechaCheckin || r?.fechaCheckIn || '').slice(0, 10);
   const checkout = (r?.fechaCheckout || r?.fechaCheckOut || '').slice(0, 10);
@@ -172,6 +172,14 @@ const ReservaDetalle: React.FC = () => {
           </IonButtons>
           <IonTitle>Detalle Reserva #{r?.codigo || r?.codigoReserva || id}</IonTitle>
           <IonButtons slot="end">
+            <IonButton
+              onClick={() => router.push('/reservas', 'back')}
+              fill="clear"
+              color="light"
+              title="Cerrar y volver a la lista"
+            >
+              <IonIcon icon={closeOutline} slot="icon-only" />
+            </IonButton>
             {puedeModificarse && (
               <IonButton disabled>
                 <IonIcon icon={create} slot="icon-only" />
