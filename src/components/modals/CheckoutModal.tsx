@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import {
-  IonBadge, IonButton, IonCard, IonCardContent, IonCardHeader, IonCardSubtitle, IonCardTitle,
+  IonAlert, IonBadge, IonButton, IonCard, IonCardContent, IonCardHeader, IonCardSubtitle, IonCardTitle,
   IonCol, IonIcon, IonInput, IonItem, IonLabel, IonModal, IonNote, IonRow, IonSelect, IonSelectOption,
   IonText, IonTextarea,
 } from '@ionic/react';
@@ -27,6 +27,7 @@ const CheckoutModal: React.FC<Props> = ({ isOpen, onDismiss, reservaId }) => {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [reserva, setReserva] = useState<Reserva | undefined>(undefined);
   const [folio, setFolio] = useState<Folio | undefined>(undefined);
+  const [confirmarEarlyOpen, setConfirmarEarlyOpen] = useState(false);
 
   const [montoAdelanto, setMontoAdelanto] = useState<string>('0');
   const [montoPagoFinal, setMontoPagoFinal] = useState<string>('0');
@@ -90,8 +91,24 @@ const CheckoutModal: React.FC<Props> = ({ isOpen, onDismiss, reservaId }) => {
   const saldoPendiente = Math.max(0, totalReserva - totalPagado);
   const puedeConfirmar = !procesando && reserva && pagoFinal >= 0;
 
-  const handleConfirmar = async () => {
+  // Detecta si check-out es ANTES de la fecha salida programada (EARLY CHECK-OUT).
+  // Solo en ese caso se muestra alerta de doble confirmación anti-error.
+  const fechaCheckoutProgramada = new Date((reserva as any)?.fechaCheckout || (reserva as any)?.fechaCheckOut || 0);
+  const fechaHoy = new Date();
+  const diffMs = fechaCheckoutProgramada.getTime() - fechaHoy.getTime();
+  const horasFaltantes = diffMs / (1000 * 60 * 60);
+  const esEarlyCheckOut = !!reserva && horasFaltantes > 6; // > 6h antes = se considera anticipado
+  const nochesNoUsadas = esEarlyCheckOut
+    ? Math.max(0, Math.ceil((horasFaltantes - 12) / 24))
+    : 0;
+
+  const handleConfirmar = async (skipEarlyCheck = false) => {
     if (!puedeConfirmar || !reserva?.id || !folio?.id) return;
+    // Si es early y no se confirmó todavía, mostrar alerta anti-error y NO ejecutar
+    if (esEarlyCheckOut && !skipEarlyCheck) {
+      setConfirmarEarlyOpen(true);
+      return;
+    }
     setProcesando(true);
     setErrorMsg(null);
     try {
@@ -249,6 +266,17 @@ const CheckoutModal: React.FC<Props> = ({ isOpen, onDismiss, reservaId }) => {
                         </IonNote>
                       </IonLabel>
                     </IonItem>
+                    {esEarlyCheckOut && (
+                      <IonItem color="warning" lines="none" style={{ marginTop: 8, borderRadius: 8 }}>
+                        <IonIcon icon={informationCircle} color="warning" slot="start" />
+                        <IonLabel>
+                          <strong>⚠️ SALIDA ANTICIPADA</strong>
+                          <IonNote style={{ display: 'block' }}>
+                            Faltan ~{Math.round(horasFaltantes)} horas (~{nochesNoUsadas} noche(s) no usadas) para la fecha de salida programada. Se solicitará confirmación extra al pulsar "Confirmar Check-out".
+                          </IonNote>
+                        </IonLabel>
+                      </IonItem>
+                    )}
                   </IonCardContent>
                 </IonCard>
 
@@ -401,6 +429,33 @@ const CheckoutModal: React.FC<Props> = ({ isOpen, onDismiss, reservaId }) => {
             </IonCard>
           )}
         </div>
+
+        <IonAlert
+          isOpen={confirmarEarlyOpen}
+          onDidDismiss={() => setConfirmarEarlyOpen(false)}
+          header="⚠️ Salida anticipada detectada"
+          subHeader={`${reserva ? `#${reserva.codigoReserva}` : ''} · Cliente sale antes de lo programado`}
+          message={
+            esEarlyCheckOut
+              ? `Faltan aproximadamente ${Math.round(horasFaltantes)} horas (~${nochesNoUsadas} noche(s) no usadas) para la fecha de salida reservada. ¿Estás 100% seguro que deseas cerrar este Check-out ahora? El folio se cerrará y NO podrá reabrirse desde este botón (tendrás que editar manualmente si es un error).`
+              : ''
+          }
+          buttons={[
+            {
+              text: 'VOLVER · NO HACER CHECK-OUT',
+              role: 'cancel',
+              handler: () => setConfirmarEarlyOpen(false),
+            },
+            {
+              text: 'SÍ, QUIERO HACER EARLY CHECK-OUT',
+              role: 'destructive',
+              handler: () => {
+                setConfirmarEarlyOpen(false);
+                handleConfirmar(true);
+              },
+            },
+          ]}
+        />
       </div>
     </IonModal>
   );
