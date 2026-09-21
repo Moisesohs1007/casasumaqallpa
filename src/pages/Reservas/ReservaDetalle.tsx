@@ -4,7 +4,7 @@ import {
   IonBackButton, IonButton, IonButtons, IonCard, IonCardContent, IonCardHeader,
   IonCardSubtitle, IonCardTitle, IonCol, IonContent, IonGrid, IonHeader, IonIcon,
   IonItem, IonLabel, IonList, IonNote, IonPage, IonRow, IonTitle, IonToolbar,
-  IonBadge, IonChip, IonAlert, useIonViewWillEnter, useIonRouter,
+  IonBadge, IonChip, IonAlert, useIonViewWillEnter, useIonRouter, useIonToast,
 } from '@ionic/react';
 import {
   arrowBack, calendar, bed, person, pricetags, alertCircle, logIn, create, trash,
@@ -14,6 +14,7 @@ import type { Color } from '@ionic/core';
 import type { EstadoReserva, Reserva, Huesped, Habitacion, Folio } from '../../types';
 import { ReservaService, HuespedService, HabitacionService, FolioService } from '../../services';
 import CheckinModal from '../../components/modals/CheckinModal';
+import CheckoutModal from '../../components/modals/CheckoutModal';
 import './Reservas.css';
 
 const USUARIO_ACTUAL = { id: 'USR-MOISES-0001', nombres: 'Moisés', apellidos: 'Ochoa' };
@@ -52,9 +53,11 @@ const ReservaDetalle: React.FC = () => {
   const [confirmarCancelarOpen, setConfirmarCancelarOpen] = useState(false);
   const [motivoCancelacion, setMotivoCancelacion] = useState<string>('');
   const [checkinOpen, setCheckinOpen] = useState(false);
+  const [checkoutOpen, setCheckoutOpen] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [folioVinculado, setFolioVinculado] = useState<Folio | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
+  const [presentToast] = useIonToast();
 
   const cargar = (reservaId: string) => {
     const r: any = ReservaService.buscarPorId(reservaId);
@@ -94,6 +97,8 @@ const ReservaDetalle: React.FC = () => {
     setErrorMsg(null);
     setSuccessMsg(null);
     setMotivoCancelacion('');
+    setCheckinOpen(false);
+    setCheckoutOpen(false);
   });
 
   const r: any = reserva;
@@ -325,13 +330,32 @@ const ReservaDetalle: React.FC = () => {
                         </IonButton>
                       </IonCol>
                       <IonCol size="12" sizeMd="3">
-                        <IonButton expand="block" color="primary" disabled={!puedeCheckoutarse}>
+                        <IonButton
+                          expand="block"
+                          color="primary"
+                          disabled={!puedeCheckoutarse}
+                          onClick={() => {
+                            if (puedeCheckoutarse) setCheckoutOpen(true);
+                          }}
+                        >
                           <IonIcon icon={cash} slot="start" />
                           CHECK-OUT
                         </IonButton>
                       </IonCol>
                       <IonCol size="12" sizeMd="3">
-                        <IonButton expand="block" color="secondary" disabled={!puedeModificarse}>
+                        <IonButton
+                          expand="block"
+                          color="secondary"
+                          disabled={!puedeModificarse}
+                          onClick={() => {
+                            presentToast({
+                              message: '🛠️ Funcionalidad "Modificar Reserva" próximamente. Por ahora edita manualmente desde Nueva Reserva si deseas actualizar datos.',
+                              duration: 2800,
+                              color: 'warning',
+                              position: 'top',
+                            });
+                          }}
+                        >
                           <IonIcon icon={create} slot="start" />
                           MODIFICAR
                         </IonButton>
@@ -441,6 +465,16 @@ const ReservaDetalle: React.FC = () => {
           }}
           reservaId={r?.id || id || null}
           usuarioActual={USUARIO_ACTUAL}
+        />
+
+        <CheckoutModal
+          isOpen={checkoutOpen}
+          onDismiss={() => {
+            setCheckoutOpen(false);
+            if (r?.id) cargar(r.id);
+            else if (id) cargar(id);
+          }}
+          reservaId={r?.id || id || ''}
         />
       </IonContent>
     </IonPage>
