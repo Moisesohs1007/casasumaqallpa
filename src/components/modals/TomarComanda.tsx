@@ -125,19 +125,23 @@ const TomarComanda: React.FC<Props> = ({ isOpen, onDismiss }) => {
   }, [categoriaFiltroId, busqueda, isOpen]);
 
   const habitacionesCheckedIn = useMemo(() => {
-    const reservas = (ReservaService.listarTodas() as Reserva[]).filter(
-      (r) => r.estado === 'CHECKED_IN' || (r.estado as any) === 'CHECKIN'
-    );
+    const reservas = (ReservaService.listarTodas() as Reserva[]).filter((r) => {
+      const e = String(r.estado || '').toUpperCase().replace(/[^A-Z]/g, '');
+      // Cualquier variante (CHECKED_IN / CHECKIN / CHECK_IN / YAENCHECKIN) → se considera check-in activo
+      return e.includes('CHECKIN') || e.includes('CHECKEDIN');
+    });
     const lista: Array<{ reserva: Reserva; habitacion: Habitacion; huespedNombre: string }> = [];
     for (const r of reservas) {
-      const hab0 = r.habitaciones?.[0] as any;
-      if (!hab0) continue;
+      const habs = (r.habitaciones || []) as any[];
+      if (habs.length === 0) continue;
+      const hab0 = habs[0] as any;
       const habId = hab0.habitacionId || hab0.habitacion?.id;
       if (!habId) continue;
       const hab = HabitacionService.buscarPorId(habId) as any;
-      const huesped = (r as any).huesped ?? hab0.habitacion?.huesped ?? null;
-      const huespedNombre = huesped ? `${huesped.nombres} ${huesped.apellidos}` : `Titular #${(r as any).huespedTitularId || (r as any).huespedId}`;
-      lista.push({ reserva: r, habitacion: hab ?? hab0.habitacion ?? hab0, huespedNombre });
+      const huesped = (r as any).huesped ?? (r as any).huespedTitular ?? hab0.habitacion?.huesped ?? null;
+      const huespedNombre = huesped ? `${huesped.nombres ?? ''} ${huesped.apellidos ?? ''}`.trim() || `Titular` : `Titular #${(r as any).huespedTitularId || (r as any).huespedId}`;
+      const codHab = hab?.codigo || hab0?.codigo || habId;
+      lista.push({ reserva: r, habitacion: hab ?? hab0.habitacion ?? { ...hab0, id: habId, codigo: codHab }, huespedNombre });
     }
     return lista;
   }, [isOpen]);
@@ -387,7 +391,7 @@ const TomarComanda: React.FC<Props> = ({ isOpen, onDismiss }) => {
                             label="Selecciona habitación CHECKED-IN *"
                             labelPlacement="stacked"
                             placeholder="— Selecciona habitación ocupada —"
-                            interface="action-sheet"
+                            interface="popover"
                             value={habitacionSeleccionadaId}
                             onIonChange={(e) => setHabitacionSeleccionadaId(e.detail.value)}
                           >
@@ -421,7 +425,7 @@ const TomarComanda: React.FC<Props> = ({ isOpen, onDismiss }) => {
                             label="Selecciona mesa *"
                             labelPlacement="stacked"
                             placeholder="— Escoge mesa libre / ocupada —"
-                            interface="action-sheet"
+                            interface="popover"
                             value={mesaSeleccionadaId}
                             onIonChange={(e) => setMesaSeleccionadaId(e.detail.value)}
                           >
