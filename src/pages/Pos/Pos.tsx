@@ -1,3 +1,4 @@
+import React, { useState } from 'react';
 import {
   IonContent,
   IonHeader,
@@ -15,9 +16,11 @@ import {
   IonBadge,
   IonLabel,
   IonChip,
+  IonFab, IonFabButton, IonFabList, IonIcon,
 } from '@ionic/react';
 import type { Color } from '@ionic/core';
-import { checkmarkCircle, alert, timeOutline, Icon } from 'ionicons/icons';
+import { checkmarkCircle, alert, timeOutline, Icon, add } from 'ionicons/icons';
+import TomarComanda from '../../components/modals/TomarComanda';
 import {
   PuntoVenta,
   TipoPuntoVenta,
@@ -262,6 +265,7 @@ const comandaBadge: Record<EstadoComandaLabel, ComandaBadgeCfg> = {
 };
 
 const PosPage: React.FC = () => {
+  const [tomarComandaOpen, setTomarComandaOpen] = useState(false);
   return (
     <IonPage>
       <IonHeader>
@@ -326,6 +330,26 @@ const PosPage: React.FC = () => {
             ))}
           </IonRow>
         </IonGrid>
+
+        <IonFab slot="fixed" vertical="bottom" horizontal="end" style={{ margin: 16, zIndex: 10 }}>
+          <IonFabButton color="success" onClick={() => setTomarComandaOpen(true)}>
+            <IonIcon icon={add} />
+          </IonFabButton>
+          <IonFabList side="top">
+            <IonFabButton
+              color="primary"
+              onClick={() => setTomarComandaOpen(true)}
+              title="Nueva comanda / Room Service"
+            >
+              <IonIcon icon={fastFood} />
+            </IonFabButton>
+          </IonFabList>
+        </IonFab>
+
+        <TomarComanda
+          isOpen={tomarComandaOpen}
+          onDismiss={() => setTomarComandaOpen(false)}
+        />
       </IonContent>
     </IonPage>
   );
