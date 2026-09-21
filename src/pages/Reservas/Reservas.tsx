@@ -1,4 +1,5 @@
-import { IonContent, IonHeader, IonPage, IonTitle, IonToolbar, IonList, IonItem, IonLabel, IonBadge } from '@ionic/react';
+import { IonContent, IonHeader, IonPage, IonTitle, IonToolbar, IonList, IonItem, IonLabel, IonBadge, IonFab, IonFabButton, IonIcon, useIonRouter } from '@ionic/react';
+import { addCircle } from 'ionicons/icons';
 import type { Color } from '@ionic/core';
 import {
   Reserva,
@@ -204,6 +205,7 @@ const estadoLabel: Record<EstadoReserva, string> = {
 };
 
 const ReservasPage: React.FC = () => {
+  const router = useIonRouter();
   return (
     <IonPage>
       <IonHeader>
@@ -245,6 +247,12 @@ const ReservasPage: React.FC = () => {
             );
           })}
         </IonList>
+
+        <IonFab slot="fixed" vertical="bottom" horizontal="end" style={{ marginBottom: 90, marginRight: 10 }}>
+          <IonFabButton color="primary" onClick={() => router.push('/reservas/nueva', 'forward')}>
+            <IonIcon icon={addCircle} />
+          </IonFabButton>
+        </IonFab>
       </IonContent>
     </IonPage>
   );

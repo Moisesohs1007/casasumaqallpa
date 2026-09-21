@@ -14,6 +14,7 @@ import { Redirect, Route } from 'react-router-dom';
 
 import HomePage from './pages/Home/Home';
 import ReservasPage from './pages/Reservas/Reservas';
+import NuevaReservaPage from './pages/NuevaReserva/NuevaReserva';
 import HabitacionesPage from './pages/Habitaciones/Habitaciones';
 import PosPage from './pages/Pos/Pos';
 import PerfilPage from './pages/Perfil/Perfil';
@@ -34,6 +35,9 @@ const App: React.FC = () => {
             </Route>
             <Route exact path="/reservas">
               <ReservasPage />
+            </Route>
+            <Route exact path="/reservas/nueva">
+              <NuevaReservaPage />
             </Route>
             <Route exact path="/habitaciones">
               <HabitacionesPage />
