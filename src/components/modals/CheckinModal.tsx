@@ -35,12 +35,12 @@ const CheckinModal: React.FC<CheckinModalProps> = ({ isOpen, onDidDismiss, reser
     folio?: Folio;
   } | null>(null);
 
-  const reserva = reservaId ? ReservaService.buscarPorId(reservaId) as Reserva | undefined : undefined;
+  const reserva = (reservaId ? (ReservaService.buscarPorId(reservaId) ?? undefined) : undefined) as (Reserva | undefined);
   const huesped: Huesped | undefined = reserva
-    ? ((reserva as any).huespedTitular ?? (reserva as any).huesped ?? HuespedService.buscarPorId((reserva as any).huespedTitularId || (reserva as any).huespedId) as any)
+    ? ((reserva as any).huespedTitular ?? (reserva as any).huesped ?? (HuespedService.buscarPorId((reserva as any).huespedTitularId || (reserva as any).huespedId) ?? undefined) as any)
     : undefined;
-  const habitacionesList: Habitacion[] = (reserva ? ((reserva as any).habitaciones || []).map((hr: any) => {
-    const hab = HabitacionService.buscarPorId(hr.habitacionId || hr?.habitacion?.id) as any;
+  const habitacionesList: Habitacion[] = (reserva ? (((reserva as any).habitaciones ?? []) as any[]).map((hr: any) => {
+    const hab = (HabitacionService.buscarPorId(hr?.habitacionId || hr?.habitacion?.id) ?? undefined) as any;
     return hab ?? hr?.habitacion;
   }).filter(Boolean) : []) as Habitacion[];
   const habitacionPrincipal: Habitacion | undefined = habitacionesList[0];
@@ -49,41 +49,43 @@ const CheckinModal: React.FC<CheckinModalProps> = ({ isOpen, onDidDismiss, reser
   // Calcular noches segun los nombres reales del seed (SOLO ?? para evitar error Babel parens)
   const checkinDateInternal =
     (
-      ((reserva as any)?.fechaCheckin) ??
-      ((reserva as any)?.fechaCheckIn) ??
-      ((reserva as any)?.habitaciones?.[0]?.fechaCheckin) ??
-      ((reserva as any)?.habitaciones?.[0]?.fechaCheckinPropuesto) ??
+      (reserva as any)?.fechaCheckin ??
+      (reserva as any)?.fechaCheckIn ??
+      (reserva as any)?.habitaciones?.[0]?.fechaCheckin ??
+      (reserva as any)?.habitaciones?.[0]?.fechaCheckinPropuesto ??
       ''
     ).toString().slice(0, 10);
   const checkoutDateInternal =
     (
-      ((reserva as any)?.fechaCheckout) ??
-      ((reserva as any)?.fechaCheckOut) ??
-      ((reserva as any)?.habitaciones?.[0]?.fechaCheckout) ??
-      ((reserva as any)?.habitaciones?.[0]?.fechaCheckoutPropuesto) ??
+      (reserva as any)?.fechaCheckout ??
+      (reserva as any)?.fechaCheckOut ??
+      (reserva as any)?.habitaciones?.[0]?.fechaCheckout ??
+      (reserva as any)?.habitaciones?.[0]?.fechaCheckoutPropuesto ??
       ''
     ).toString().slice(0, 10);
   const checkinDate = checkinDateInternal;
   const checkoutDate = checkoutDateInternal;
 
   const nochesInternal =
-    Number((reserva as any)?.noches ??
+    Number(
+      (reserva as any)?.noches ??
       (reserva as any)?.totalNoches ??
-      (reserva as any)?.habitaciones?.reduce((acc: number, hr: any) => Math.max(acc, Number(hr.totalNoches || hr.noches || 0)), 0) ??
+      (reserva as any)?.habitaciones?.reduce?.((acc: number, hr: any) => Math.max(acc, Number(hr?.totalNoches || hr?.noches || 0)), 0) ??
       (checkinDate && checkoutDate
         ? Math.max(1, Math.round(
             (new Date(checkoutDate).getTime() - new Date(checkinDate).getTime()) / (1000 * 60 * 60 * 24)
           ))
-        : 0));
+        : 0)
+    );
   const noches = nochesInternal;
 
   // Calcular TOTAL sumando todas las habitaciones (porque R-1004 tiene 2)
   const subtotalBase =
     Number((reserva as any)?.subTotalAlojamiento) ||
     Number((reserva as any)?.subTotal) ||
-    ((reserva as any).habitaciones?.reduce((acc: number, hr: any) => {
-      const precioNoche = Number(hr.precioBaseAcordadoPorNoche || hr.precioPorNoche || hr.precioAcordadoPorNoche || 0);
-      const n = Number(hr.totalNoches || hr.noches || noches || 0);
+    ((reserva as any)?.habitaciones?.reduce?.((acc: number, hr: any) => {
+      const precioNoche = Number(hr?.precioBaseAcordadoPorNoche || hr?.precioPorNoche || hr?.precioAcordadoPorNoche || 0);
+      const n = Number(hr?.totalNoches || hr?.noches || noches || 0);
       return acc + precioNoche * n;
     }, 0) || 0);
   const impuestosTotal = Number((reserva as any)?.impuestos) || Math.round(subtotalBase * 0.18 + subtotalBase * 0.05);
@@ -92,7 +94,7 @@ const CheckinModal: React.FC<CheckinModalProps> = ({ isOpen, onDidDismiss, reser
     Number((reserva as any)?.totalReserva) ||
     Number((reserva as any)?.total) ||
     Number((reserva as any)?.montoTotal) ||
-    ((reserva as any).habitaciones?.reduce((acc: number, hr: any) => acc + Number(hr.precioTotalReservaHabitacion || hr.precioTotal || 0), 0)) ||
+    ((reserva as any)?.habitaciones?.reduce?.((acc: number, hr: any) => acc + Number(hr?.precioTotalReservaHabitacion || hr?.precioTotal || 0), 0)) ||
     Math.max(0, subtotalBase + impuestosTotal - descuentosTotal) ||
     0;
   const total = Number(rawTotal) || 0;
