@@ -289,9 +289,22 @@ const ReservaDetalle: React.FC = () => {
                             </IonItem>
                             <div style={{ marginTop: 12 }}>
                               {folioVinculado ? (
-                                <IonChip color="warning" outline>
+                                <IonChip
+                                  color="warning"
+                                  outline
+                                  onClick={() => router.push(`/folio/${folioVinculado.id}`)}
+                                  style={{
+                                    cursor: 'pointer',
+                                    padding: '10px 14px',
+                                    border: '1px solid #d97706',
+                                    fontWeight: 700,
+                                    fontSize: 14,
+                                    background: '#fffbeb',
+                                    height: 'auto',
+                                  }}
+                                >
                                   <IonIcon icon={documentText} />
-                                  Folio F-{String(folioVinculado.id).slice(-4).toUpperCase()} · Saldo pendiente S/ {(Number((folioVinculado as any).saldoPendiente ?? total) || 0).toFixed(2)}
+                                  👉 Folio F-{String((folioVinculado as any).codigo || (folioVinculado as any).numeroFolio || folioVinculado.id).slice(-4).toUpperCase()} · Clic aquí VER CUENTA GENERAL · Saldo pendiente S/ {(Number((folioVinculado as any).saldoPendiente ?? (folioVinculado as any).totalFolio ?? total) || 0).toFixed(2)}
                                 </IonChip>
                               ) : (
                                 <IonNote>Sin folio abierto (se creará automáticamente al hacer Check-in).</IonNote>

@@ -19,6 +19,7 @@ import ReservaDetallePage from './pages/Reservas/ReservaDetalle';
 import HabitacionesPage from './pages/Habitaciones/Habitaciones';
 import PosPage from './pages/Pos/Pos';
 import PerfilPage from './pages/Perfil/Perfil';
+import FolioPage from './pages/Folio/Folio';
 
 setupIonicReact({
   mode: 'md',
@@ -42,6 +43,9 @@ const App: React.FC = () => {
             </Route>
             <Route exact path="/reservas/:id">
               <ReservaDetallePage />
+            </Route>
+            <Route exact path="/folio/:id">
+              <FolioPage />
             </Route>
             <Route exact path="/habitaciones">
               <HabitacionesPage />
