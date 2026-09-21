@@ -86,6 +86,12 @@ const NuevaReserva: React.FC = () => {
   const [ninos, setNinos] = useState<number>(0);
   const [habitacionesDisponibles, setHabitacionesDisponibles] = useState<Habitacion[]>([]);
   const [habitacionSeleccionada, setHabitacionSeleccionada] = useState<Habitacion | null>(null);
+  const noches = useMemo(() => {
+    if (!checkin || !checkout) return 0;
+    return Math.max(1, Math.round(
+      (new Date(checkout).getTime() - new Date(checkin).getTime()) / (1000 * 60 * 60 * 24)
+    ));
+  }, [checkin, checkout]);
 
   // ====== Paso 3: Tarifa + Promo (con lista seleccionable + override manual) ======
   const [codPromoInput, setCodPromoInput] = useState('');
@@ -200,13 +206,6 @@ const NuevaReserva: React.FC = () => {
   const [observacionesHuesped, setObservacionesHuesped] = useState('');
   const [reservaCreada, setReservaCreada] = useState<Reserva | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
-
-  const noches = useMemo(() => {
-    if (!checkin || !checkout) return 0;
-    return Math.max(1, Math.round(
-      (new Date(checkout).getTime() - new Date(checkin).getTime()) / (1000 * 60 * 60 * 24)
-    ));
-  }, [checkin, checkout]);
 
   // ===== Acciones Paso 1 =====
   const doBuscarPorDoc = () => {
