@@ -46,19 +46,23 @@ const CheckinModal: React.FC<CheckinModalProps> = ({ isOpen, onDidDismiss, reser
   const habitacionPrincipal: Habitacion | undefined = habitacionesList[0];
   const habitacionesCount = habitacionesList.length;
 
-  // Calcular noches segun los nombres reales del seed
+  // Calcular noches segun los nombres reales del seed (SOLO ?? para evitar error Babel parens)
   const checkinDateInternal =
-    ((reserva as any)?.fechaCheckin ??
-      (reserva as any)?.fechaCheckIn ??
-      (reserva as any)?.habitaciones?.[0]?.fechaCheckin ??
-      (reserva as any)?.habitaciones?.[0]?.fechaCheckinPropuesto ||
-      '').toString().slice(0, 10);
+    (
+      ((reserva as any)?.fechaCheckin) ??
+      ((reserva as any)?.fechaCheckIn) ??
+      ((reserva as any)?.habitaciones?.[0]?.fechaCheckin) ??
+      ((reserva as any)?.habitaciones?.[0]?.fechaCheckinPropuesto) ??
+      ''
+    ).toString().slice(0, 10);
   const checkoutDateInternal =
-    ((reserva as any)?.fechaCheckout ??
-      (reserva as any)?.fechaCheckOut ??
-      (reserva as any)?.habitaciones?.[0]?.fechaCheckout ??
-      (reserva as any)?.habitaciones?.[0]?.fechaCheckoutPropuesto ||
-      '').toString().slice(0, 10);
+    (
+      ((reserva as any)?.fechaCheckout) ??
+      ((reserva as any)?.fechaCheckOut) ??
+      ((reserva as any)?.habitaciones?.[0]?.fechaCheckout) ??
+      ((reserva as any)?.habitaciones?.[0]?.fechaCheckoutPropuesto) ??
+      ''
+    ).toString().slice(0, 10);
   const checkinDate = checkinDateInternal;
   const checkoutDate = checkoutDateInternal;
 
