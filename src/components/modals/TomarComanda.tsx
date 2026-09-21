@@ -8,6 +8,9 @@ import {
   add, basket, bed, cafe, cart, cash, checkmarkCircle, close, closeCircle,
   documentText, fastFood, informationCircle, person, remove, restaurantOutline, wine,
 } from 'ionicons/icons';
+// Ionic 8 workaround: asegurarse de importar el type IconId tambien (error "IconId is not defined" en Consola Vite)
+import type { Icon as IonicIconDef } from 'ionicons/components';
+void (0 && (IonicIconDef as any));
 import type { Comanda, Habitacion, Mesa, ProductoFB, Reserva } from '../../types';
 import {
   CatalogoFBService, ComandaService, HabitacionService, MesaService, ReservaService, FolioService,
@@ -64,16 +67,16 @@ const getOrCreateMesaRoomService = (habitacionId: string, codHab: string): Mesa 
   }
 };
 
-const iconoCategoria = (catId: string) => {
-  if (catId.includes('DESAYUNO')) return fastFood;
-  if (catId.includes('ENTRADA')) return restaurantOutline;
-  if (catId.includes('PLATO')) return restaurantOutline;
-  if (catId.includes('BEBIDAS-FRIAS')) return cart;
-  if (catId.includes('BEBIDAS-CALIENTES')) return cafe;
-  if (catId.includes('ALCOHOL') || catId.includes('BAR')) return wine;
-  if (catId.includes('POSTRE')) return basket;
-  if (catId.includes('MINIBAR')) return wine;
-  return restaurantOutline;
+const emojiCategoria = (catId: string) => {
+  if (catId.includes('DESAYUNO')) return '🌮';
+  if (catId.includes('ENTRADA')) return '🥗';
+  if (catId.includes('PLATO')) return '🍽️';
+  if (catId.includes('BEBIDAS-FRIAS')) return '🥤';
+  if (catId.includes('BEBIDAS-CALIENTES')) return '☕';
+  if (catId.includes('ALCOHOL') || catId.includes('BAR')) return '🍷';
+  if (catId.includes('POSTRE')) return '🍰';
+  if (catId.includes('MINIBAR')) return '🧃';
+  return '🍴';
 };
 
 const TomarComanda: React.FC<Props> = ({ isOpen, onDismiss }) => {
@@ -468,7 +471,7 @@ const TomarComanda: React.FC<Props> = ({ isOpen, onDismiss }) => {
                             onClick={() => setCategoriaFiltroId(cat.id)}
                             style={{ cursor: 'pointer', fontWeight: categoriaFiltroId === cat.id ? 800 : 500 }}
                           >
-                            <IonIcon icon={iconoCategoria(cat.id)} slot="start" />
+                            <span slot="start" style={{ fontSize: 16, marginRight: 4 }}>{emojiCategoria(cat.id)}</span>
                             {cat.nombre}
                           </IonChip>
                         ))}
@@ -495,7 +498,7 @@ const TomarComanda: React.FC<Props> = ({ isOpen, onDismiss }) => {
                                   borderTopLeftRadius: 12,
                                   borderTopRightRadius: 12,
                                 }}>
-                                  <IonIcon icon={iconoCategoria(prod.categoriaId)} color="success" />
+                                  <span style={{ fontSize: 44 }}>{emojiCategoria(prod.categoriaId)}</span>
                                 </div>
                                 <IonCardContent style={{ padding: 12 }}>
                                   <IonCardTitle style={{ fontSize: 15, margin: 0, fontWeight: 800, lineHeight: 1.2 }}>
