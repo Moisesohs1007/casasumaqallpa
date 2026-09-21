@@ -41,7 +41,7 @@ export const HabitacionService = {
 
     if (params?.capacidadMinimaPax) {
       lista = lista.filter((h) => {
-        const tipo = h.tipoHabitacion || this.buscarTipoPorId(h.tipoHabitacionId);
+        const tipo = h.tipoHabitacion || HabitacionService.buscarTipoPorId(h.tipoHabitacionId);
         const cap = (tipo?.capacidadAdultos || 0) + (tipo?.capacidadNinos || 0);
         return cap >= params.capacidadMinimaPax!;
       });
@@ -54,6 +54,7 @@ export const HabitacionService = {
       for (const r of reservas) {
         if (r.estado === 'CANCELADA') continue;
         if (r.estado === 'CHECKED_OUT') continue;
+        if (!Array.isArray(r.habitaciones)) continue;
         const superposicion =
           seedUtil.addDaysISO(checkinISO, 0) < r.fechaCheckout &&
           checkoutISO > seedUtil.addDaysISO(r.fechaCheckin, 0);

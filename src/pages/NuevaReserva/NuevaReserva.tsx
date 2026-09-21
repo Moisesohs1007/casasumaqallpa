@@ -204,7 +204,6 @@ const NuevaReserva: React.FC = () => {
     const list = HabitacionService.listarTodas({
       disponiblesParaFechas: { checkinISO: `${checkin}T15:00:00.000Z`, checkoutISO: `${checkout}T11:00:00.000Z` },
       capacidadMinimaPax: adultos + ninos,
-      estado: 'LIBRE',
     });
     setHabitacionesDisponibles(list);
     setHabitacionSeleccionada(
