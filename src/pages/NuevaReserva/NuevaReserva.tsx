@@ -625,10 +625,17 @@ const NuevaReserva: React.FC = () => {
                                 <IonLabel>
                                   <h2>
                                     <IonBadge color={habitacionSeleccionada?.id === h.id ? 'success' : 'primary'}>{h.codigo}</IonBadge> &nbsp;
-                                    {h.nombre}
+                                    {h.nombre || h.codigo}
                                   </h2>
-                                  <p>Tipo: {h.tipoHabitacion?.nombre} &nbsp; · &nbsp; Pax: {h.capacidadMaximaPax} max &nbsp; · &nbsp; Vista: {h.vista}</p>
-                                  <p>Camas: {h.camas.map((c: any) => `${c.cantidad}x ${c.tipoCama}`).join(' · ')}</p>
+                                  <p>
+                                    Tipo: {h.tipoHabitacion?.nombre || h.tipoHabitacionId} &nbsp; · &nbsp;
+                                    Pax: {h.capacidadMaximaPax || h.tipoHabitacion?.capacidadAdultos || '?'} max &nbsp; · &nbsp;
+                                    Vista: {h.vistaEfectiva || h.vista || 'N/D'}
+                                  </p>
+                                  <p>Camas: {(h.camas ?? []).length
+                                    ? (h.camas ?? []).map((c: any) => `${c.cantidad ?? 1}x ${c.tipoCama ?? c.tipo ?? 'cama'}`).join(' · ')
+                                    : 'N/D'}
+                                  </p>
                                 </IonLabel>
                                 {habitacionSeleccionada?.id === h.id && <IonIcon icon={checkmarkCircle} color="success" slot="end" />}
                               </IonItem>
