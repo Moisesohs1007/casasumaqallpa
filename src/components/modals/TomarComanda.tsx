@@ -65,13 +65,17 @@ const getOrCreateMesaRoomService = (habitacionId: string, codHab: string): Mesa 
 };
 
 const emojiCategoria = (catId: string) => {
-  if (catId.includes('DESAYUNO')) return '🌮';
+  if (catId.includes('DESAYUNO')) return '🥣';
+  if (catId.includes('JUGO')) return '🥤';
+  if (catId.includes('SANDWICH') || catId.includes('TRIPLE') || catId.includes('SANGUCH')) return '🥪';
   if (catId.includes('ENTRADA')) return '🥗';
-  if (catId.includes('PLATO')) return '🍽️';
-  if (catId.includes('BEBIDAS-FRIAS')) return '🥤';
-  if (catId.includes('BEBIDAS-CALIENTES')) return '☕';
-  if (catId.includes('ALCOHOL') || catId.includes('BAR')) return '🍷';
-  if (catId.includes('POSTRE')) return '🍰';
+  if (catId.includes('SOPA') || catId.includes('CALDO') || catId.includes('CREMA')) return '🍲';
+  if (catId.includes('PLATO') || catId.includes('PRINCIPAL')) return '🍽️';
+  if (catId.includes('PIZZA')) return '🍕';
+  if (catId.includes('BEBIDAS-FRIAS') || catId === 'CAT-BEBIDAS-FRIAS') return '🧊';
+  if (catId.includes('BEBIDAS-CALIENTES') || catId === 'CAT-BEBIDAS-CALIENTES') return '☕';
+  if (catId.includes('ALCOHOL') || catId.includes('BAR') || catId.includes('CERVE') || catId.includes('VINO')) return '🍻';
+  if (catId.includes('POSTRE') || catId.includes('HELADO') || catId.includes('WAFFLE') || catId.includes('CREPE') || catId.includes('CORCHO')) return '🍰';
   if (catId.includes('MINIBAR')) return '🧃';
   return '🍴';
 };

@@ -59,14 +59,17 @@ const alergenosSeed: AlergenoProducto[] = [
 const estacionesCocinaSeed: EstacionCocinaFK[] = ['COCINA_FRIOS', 'COCINA_CALIENTES', 'GRILL_PARRILLA', 'BAR', 'PASTELERIA_POSTRES'];
 
 const categoriasFBSeed: CategoriaFB[] = [
-  { id: 'CAT-DESAYUNOS', nombre: '🥐 Desayunos', orden: 1, descripcion: 'Buffet y desayunos a la carta', estado: 'ACTIVO', ...auditSeed },
-  { id: 'CAT-ENTRADAS', nombre: '🥗 Entradas', orden: 2, descripcion: 'Anticuchos, ensaladas, ceviche', estado: 'ACTIVO', ...auditSeed },
-  { id: 'CAT-PLATOS', nombre: '🍽️ Platos Principales', orden: 3, descripcion: 'Criollo, Marino, Amazónico', estado: 'ACTIVO', ...auditSeed },
-  { id: 'CAT-BEBIDAS-FRIAS', nombre: '🥤 Bebidas Frías', orden: 4, descripcion: 'Jugos, refrescos, agua, hielo', estado: 'ACTIVO', ...auditSeed },
-  { id: 'CAT-BEBIDAS-CALIENTES', nombre: '☕ Bebidas Calientes', orden: 5, descripcion: 'Café, té, infusiones, chocolate', estado: 'ACTIVO', ...auditSeed },
-  { id: 'CAT-ALCOHOL', nombre: '🍺 Bar', orden: 6, descripcion: 'Cerveza, vino, cocteles, piscos', estado: 'ACTIVO', ...auditSeed },
-  { id: 'CAT-POSTRES', nombre: '🍰 Postres', orden: 7, descripcion: 'Tres leches, mazamorra, helados', estado: 'ACTIVO', ...auditSeed },
-  { id: 'CAT-MINIBAR', nombre: '🧃 Minibar', orden: 8, descripcion: 'Consumo dentro de habitación', estado: 'ACTIVO', ...auditSeed },
+  { id: 'CAT-DESAYUNOS', nombre: '🥣 Desayunos', orden: 1, descripcion: 'Servicio de 6 a.m. a 9 a.m. · Incluye Jugo, Café, Té de cortesía', estado: 'ACTIVO', ...auditSeed },
+  { id: 'CAT-JUGOS', nombre: '🥤 Jugos Naturales', orden: 2, descripcion: 'Jugos recién exprimidos (Papaya, Piña, Naranja, Fresa)', estado: 'ACTIVO', ...auditSeed },
+  { id: 'CAT-BEBIDAS-FRIAS', nombre: '🧊 Bebidas Frías', orden: 3, descripcion: 'Agua mineral, Gaseosa 1/2L, Gatorade, Chicha Morada 1L, Limonada 1L, Maracuyá 1L', estado: 'ACTIVO', ...auditSeed },
+  { id: 'CAT-BEBIDAS-CALIENTES', nombre: '☕ Bebidas Calientes', orden: 4, descripcion: 'Infusiones (7 variedades), Café, Cappuccino, Chocolate con Leche, Leche', estado: 'ACTIVO', ...auditSeed },
+  { id: 'CAT-BEBIDAS-ALCOHOL', nombre: '🍻 Bebidas (Cerveza/Vino)', orden: 5, descripcion: 'Cerveza Artesanal 15, Vino Santiago Queirolo 25, Calientito Tradicional 20 (cortesía: Boca, Magdalena y borgoñita)', estado: 'ACTIVO', ...auditSeed },
+  { id: 'CAT-SANDWICH', nombre: '🥪 Sandwich', orden: 6, descripcion: 'Sándwiches fríos y calientes (Queso, Huevo, Aceituna, Pollo a la plancha)', estado: 'ACTIVO', ...auditSeed },
+  { id: 'CAT-ENTRADAS', nombre: '🥗 Entradas', orden: 7, descripcion: 'Almuerzo y/o Cena · Ensalada Fresca, Ensalada de Atún, Papa a la Huancaína, Tequeños', estado: 'ACTIVO', ...auditSeed },
+  { id: 'CAT-SOPAS', nombre: '🍲 Sopas', orden: 8, descripcion: 'Caldo de Gallina 25, Sopa a la Minuta 20, Sopa de Papa Cashqui 15, Crema de Zapallo 15', estado: 'ACTIVO', ...auditSeed },
+  { id: 'CAT-PLATOS', nombre: '🍽️ Platos Principales', orden: 9, descripcion: 'Almuerzo y/o Cena · Criollo, Marino, Amazónico · Lomo Saltado 30, Picante de Cuy 35, Trucha Frita 32', estado: 'ACTIVO', ...auditSeed },
+  { id: 'CAT-PIZZAS', nombre: '🍕 Pizzas', orden: 10, descripcion: 'Pizza Personal (Americana 29, Hawaiana 30, Pepperoni 32). Tamaño Mediana = adicional S/ 12', estado: 'ACTIVO', ...auditSeed },
+  { id: 'CAT-POSTRES', nombre: '🍰 Postres', orden: 11, descripcion: 'Waffles 15, Crepe con Helados 15, Ensalada de Frutas 15, Helados 7. Derecho Corcho S/ 10 botella de vino', estado: 'ACTIVO', ...auditSeed },
 ];
 
 const presentacionesBase = (productoId: string, precio: number, unidad = 'Porción'): PresentacionProducto[] => {
@@ -77,118 +80,331 @@ const presentacionesBase = (productoId: string, precio: number, unidad = 'Porci�
 };
 
 const productosFBSeedBase: Array<Omit<ProductoFB, 'presentacionesIds' | 'presentacionesActivasIds' | 'modificadoresIds' | 'alergenosIds' | 'impuestosIds' | 'estacionesCocinaIds'>> = [
+  /* ================ 🥣 DESAYUNOS (Orden 1) ================ */
   {
-    id: 'PROD-DESAY-BUFFET', categoriaId: 'CAT-DESAYUNOS', codigo: 'DES001', nombre: 'Desayuno Buffet Completo',
-    descripcion: 'Jugo natural, frutas frescas, panes, embutidos, huevos a gusto, café infusión, marmitas amazónicas',
-    precioVentaBase: 45.00, costoAproximado: 18.00, moneda: 'PEN',
+    id: 'PROD-DESAY-LOMOALJUGO', categoriaId: 'CAT-DESAYUNOS', codigo: 'DES001', nombre: 'Lomo al Jugo',
+    descripcion: '2 Panes, Jugo, Café. Desayuno criollo caliente.',
+    precioVentaBase: 20.00, costoAproximado: 8.00, moneda: 'PEN',
     permiteModificadores: true, requierePreparacion: true, estado: 'ACTIVO', ...auditSeed
   },
   {
-    id: 'PROD-DESAY-CONTINENTAL', categoriaId: 'CAT-DESAYUNOS', codigo: 'DES002', nombre: 'Desayuno Continental',
-    descripcion: 'Café/té, 2 panes con mantequilla y mermelada, 1 jugo, 1 fruta',
-    precioVentaBase: 28.00, costoAproximado: 11.00, moneda: 'PEN',
+    id: 'PROD-DESAY-CONTINENTAL', categoriaId: 'CAT-DESAYUNOS', codigo: 'DES002', nombre: 'Continental',
+    descripcion: '2 Panes, fiambres (jamón+queso), fruta o ensalada, Jugo, Café.',
+    precioVentaBase: 20.00, costoAproximado: 7.50, moneda: 'PEN',
     permiteModificadores: true, requierePreparacion: true, estado: 'ACTIVO', ...auditSeed
   },
   {
-    id: 'PROD-ENT-ENSALADA-QUINUA', categoriaId: 'CAT-ENTRADAS', codigo: 'ENT101', nombre: 'Ensalada de Quinua Amazónica',
-    descripcion: 'Quinua real, aguacate, tomate cherry, cebolla, cilantro, pechuga de pollo opcional, llimeña',
+    id: 'PROD-DESAY-AMERICANO', categoriaId: 'CAT-DESAYUNOS', codigo: 'DES003', nombre: 'Americano',
+    descripcion: '2 Tortillas, Manzanilla, mermelada, Jugo, Café.',
+    precioVentaBase: 15.00, costoAproximado: 5.50, moneda: 'PEN',
+    permiteModificadores: true, requierePreparacion: true, estado: 'ACTIVO', ...auditSeed
+  },
+  {
+    id: 'PROD-DESAY-REGIONAL-YUNGAINO', categoriaId: 'CAT-DESAYUNOS', codigo: 'DES004', nombre: 'Regional - Yungaino',
+    descripcion: '2 Panes, 1 tamal (relleno de chicharrón o cojo). Jugo, Café.',
+    precioVentaBase: 20.00, costoAproximado: 8.00, moneda: 'PEN',
+    permiteModificadores: true, requierePreparacion: true, estado: 'ACTIVO', ...auditSeed
+  },
+
+  /* ================ 🥤 JUGOS NATURALES (Orden 2) ================ */
+  {
+    id: 'PROD-JUGO-PAPAYA', categoriaId: 'CAT-JUGOS', codigo: 'JUG001', nombre: 'Jugo de Papaya',
+    descripcion: 'Papaya natural recién licuada.',
+    precioVentaBase: 6.00, costoAproximado: 2.20, moneda: 'PEN',
+    permiteModificadores: true, requierePreparacion: false, estado: 'ACTIVO', ...auditSeed
+  },
+  {
+    id: 'PROD-JUGO-PINA', categoriaId: 'CAT-JUGOS', codigo: 'JUG002', nombre: 'Jugo de Piña',
+    descripcion: 'Piña natural fresca.',
+    precioVentaBase: 6.00, costoAproximado: 2.20, moneda: 'PEN',
+    permiteModificadores: true, requierePreparacion: false, estado: 'ACTIVO', ...auditSeed
+  },
+  {
+    id: 'PROD-JUGO-NARANJA', categoriaId: 'CAT-JUGOS', codigo: 'JUG003', nombre: 'Jugo de Naranja',
+    descripcion: 'Exprimido al momento.',
+    precioVentaBase: 7.00, costoAproximado: 2.60, moneda: 'PEN',
+    permiteModificadores: true, requierePreparacion: false, estado: 'ACTIVO', ...auditSeed
+  },
+  {
+    id: 'PROD-JUGO-FRESA', categoriaId: 'CAT-JUGOS', codigo: 'JUG004', nombre: 'Jugo de Fresa',
+    descripcion: 'Fresas naturales licuadas.',
+    precioVentaBase: 7.00, costoAproximado: 2.60, moneda: 'PEN',
+    permiteModificadores: true, requierePreparacion: false, estado: 'ACTIVO', ...auditSeed
+  },
+
+  /* ================ 🧊 BEBIDAS FRÍAS (Orden 3) ================ */
+  {
+    id: 'PROD-AGUA-MINERAL', categoriaId: 'CAT-BEBIDAS-FRIAS', codigo: 'BEB401', nombre: 'Agua Mineral',
+    descripcion: 'Agua mineral sin gas, S/ 3.00.',
+    precioVentaBase: 3.00, costoAproximado: 1.20, moneda: 'PEN',
+    permiteModificadores: false, requierePreparacion: false, estado: 'ACTIVO', ...auditSeed
+  },
+  {
+    id: 'PROD-GASEOSA', categoriaId: 'CAT-BEBIDAS-FRIAS', codigo: 'BEB402', nombre: 'Gaseosa (1/2 L)',
+    descripcion: 'Inca Kola / Coca Cola / Sprite, 500ml. Especificar marca en observaciones.',
+    precioVentaBase: 5.00, costoAproximado: 2.00, moneda: 'PEN',
+    permiteModificadores: false, requierePreparacion: false, estado: 'ACTIVO', ...auditSeed
+  },
+  {
+    id: 'PROD-GATORADE', categoriaId: 'CAT-BEBIDAS-FRIAS', codigo: 'BEB403', nombre: 'Gatorade (1L)',
+    descripcion: 'Bebida isotónica 1 Litro.',
+    precioVentaBase: 4.00, costoAproximado: 1.60, moneda: 'PEN',
+    permiteModificadores: false, requierePreparacion: false, estado: 'ACTIVO', ...auditSeed
+  },
+  {
+    id: 'PROD-CHICHA-MORADA-1L', categoriaId: 'CAT-BEBIDAS-FRIAS', codigo: 'BEB404', nombre: 'Chicha Morada (1L)',
+    descripcion: 'Chicha morada tradicional.',
+    precioVentaBase: 14.00, costoAproximado: 5.00, moneda: 'PEN',
+    permiteModificadores: true, requierePreparacion: false, estado: 'ACTIVO', ...auditSeed
+  },
+  {
+    id: 'PROD-LIMONADA-1L', categoriaId: 'CAT-BEBIDAS-FRIAS', codigo: 'BEB405', nombre: 'Limonada (1L)',
+    descripcion: 'Limonada natural 1 litro.',
+    precioVentaBase: 14.00, costoAproximado: 5.00, moneda: 'PEN',
+    permiteModificadores: true, requierePreparacion: false, estado: 'ACTIVO', ...auditSeed
+  },
+  {
+    id: 'PROD-MARACUYA-1L', categoriaId: 'CAT-BEBIDAS-FRIAS', codigo: 'BEB406', nombre: 'Maracuyá (1L)',
+    descripcion: 'Jugo de maracuyá 1 litro.',
+    precioVentaBase: 14.00, costoAproximado: 5.00, moneda: 'PEN',
+    permiteModificadores: true, requierePreparacion: false, estado: 'ACTIVO', ...auditSeed
+  },
+
+  /* ================ ☕ BEBIDAS CALIENTES (Orden 4) ================ */
+  {
+    id: 'PROD-INFUSIONES', categoriaId: 'CAT-BEBIDAS-CALIENTES', codigo: 'BEB501', nombre: 'Infusiones',
+    descripcion: '7 variedades: Té, Anís, Manzanillo, Cedrón, Hierba luisa, Muña, Café tostado. S/ 3.00',
+    precioVentaBase: 3.00, costoAproximado: 1.10, moneda: 'PEN',
+    permiteModificadores: true, requierePreparacion: false, estado: 'ACTIVO', ...auditSeed
+  },
+  {
+    id: 'PROD-CAFE', categoriaId: 'CAT-BEBIDAS-CALIENTES', codigo: 'BEB502', nombre: 'Café',
+    descripcion: 'Café tradicional peruano. S/ 5.00',
+    precioVentaBase: 5.00, costoAproximado: 1.80, moneda: 'PEN',
+    permiteModificadores: true, requierePreparacion: false, estado: 'ACTIVO', ...auditSeed
+  },
+  {
+    id: 'PROD-CAPPUCCINO', categoriaId: 'CAT-BEBIDAS-CALIENTES', codigo: 'BEB503', nombre: 'Cappuccino',
+    descripcion: 'Café + leche espumada. S/ 8.50',
+    precioVentaBase: 8.50, costoAproximado: 3.20, moneda: 'PEN',
+    permiteModificadores: true, requierePreparacion: false, estado: 'ACTIVO', ...auditSeed
+  },
+  {
+    id: 'PROD-CHOCOLATE-CON-LECHE', categoriaId: 'CAT-BEBIDAS-CALIENTES', codigo: 'BEB504', nombre: 'Chocolate con Leche',
+    descripcion: 'Chocolate caliente con leche. S/ 7.00',
+    precioVentaBase: 7.00, costoAproximado: 2.60, moneda: 'PEN',
+    permiteModificadores: true, requierePreparacion: false, estado: 'ACTIVO', ...auditSeed
+  },
+  {
+    id: 'PROD-LECHE', categoriaId: 'CAT-BEBIDAS-CALIENTES', codigo: 'BEB505', nombre: 'Leche',
+    descripcion: 'Leche entera tibia. S/ 5.50',
+    precioVentaBase: 5.50, costoAproximado: 2.00, moneda: 'PEN',
+    permiteModificadores: true, requierePreparacion: false, estado: 'ACTIVO', ...auditSeed
+  },
+
+  /* ================ 🍻 BEBIDAS ALCOHOL / Bar (Orden 5) ================ */
+  {
+    id: 'PROD-CERVEZA-ARTESANAL', categoriaId: 'CAT-BEBIDAS-ALCOHOL', codigo: 'BAR601', nombre: 'Cerveza Artesanal',
+    descripcion: 'Cerveza artesanal local. S/ 15.00',
+    precioVentaBase: 15.00, costoAproximado: 6.00, moneda: 'PEN',
+    permiteModificadores: true, requierePreparacion: false, estado: 'ACTIVO', ...auditSeed
+  },
+  {
+    id: 'PROD-VINO-SANTIAGO-QUEIROLO', categoriaId: 'CAT-BEBIDAS-ALCOHOL', codigo: 'BAR602', nombre: 'Vino Santiago Queirolo',
+    descripcion: 'Botella 750ml. S/ 25.00 (Boca, Magdalena y borgoñita).',
+    precioVentaBase: 25.00, costoAproximado: 10.00, moneda: 'PEN',
+    permiteModificadores: false, requierePreparacion: false, estado: 'ACTIVO', ...auditSeed
+  },
+  {
+    id: 'PROD-CALIENTITO-TRADICIONAL', categoriaId: 'CAT-BEBIDAS-ALCOHOL', codigo: 'BAR603', nombre: 'Calientito Tradicional 1LT',
+    descripcion: 'Bebida tradicional de yerva luisa, flor de Jamaica, naranja, limón y piña. S/ 20.00.',
+    precioVentaBase: 20.00, costoAproximado: 7.50, moneda: 'PEN',
+    permiteModificadores: true, requierePreparacion: true, estado: 'ACTIVO', ...auditSeed
+  },
+
+  /* ================ 🥪 SANDWICH (Orden 6) ================ */
+  {
+    id: 'PROD-SANDWICH-QUESO', categoriaId: 'CAT-SANDWICH', codigo: 'SW701', nombre: 'Sándwich Queso',
+    descripcion: 'Pan + queso fresco / fundido. S/ 5.00.',
+    precioVentaBase: 5.00, costoAproximado: 1.80, moneda: 'PEN',
+    permiteModificadores: true, requierePreparacion: true, estado: 'ACTIVO', ...auditSeed
+  },
+  {
+    id: 'PROD-SANDWICH-HUEVO', categoriaId: 'CAT-SANDWICH', codigo: 'SW702', nombre: 'Sándwich Huevo',
+    descripcion: 'Huevo pasado por agua + pan. S/ 5.00.',
+    precioVentaBase: 5.00, costoAproximado: 1.80, moneda: 'PEN',
+    permiteModificadores: true, requierePreparacion: true, estado: 'ACTIVO', ...auditSeed
+  },
+  {
+    id: 'PROD-SANDWICH-ACEITUNA', categoriaId: 'CAT-SANDWICH', codigo: 'SW703', nombre: 'Sándwich Aceituna',
+    descripcion: 'Pan con aceitunas, opcional jamón. S/ 5.00.',
+    precioVentaBase: 5.00, costoAproximado: 1.80, moneda: 'PEN',
+    permiteModificadores: true, requierePreparacion: true, estado: 'ACTIVO', ...auditSeed
+  },
+  {
+    id: 'PROD-SANDWICH-POLLO-PLANCHA', categoriaId: 'CAT-SANDWICH', codigo: 'SW704', nombre: 'Sándwich Pollo a la Plancha',
+    descripcion: 'Pollo grill + salsas. S/ 12.00.',
+    precioVentaBase: 12.00, costoAproximado: 4.50, moneda: 'PEN',
+    permiteModificadores: true, requierePreparacion: true, estado: 'ACTIVO', ...auditSeed
+  },
+
+  /* ================ 🥗 ENTRADAS (Orden 7) ================ */
+  {
+    id: 'PROD-ENT-ENSALADA-FRESCA', categoriaId: 'CAT-ENTRADAS', codigo: 'ENT801', nombre: 'Ensalada Fresca',
+    descripcion: 'Pechuga, lechuga, palta y tomate. S/ 15.00',
+    precioVentaBase: 15.00, costoAproximado: 5.50, moneda: 'PEN',
+    permiteModificadores: true, requierePreparacion: true, estado: 'ACTIVO', ...auditSeed
+  },
+  {
+    id: 'PROD-ENT-ENSALADA-ATUN', categoriaId: 'CAT-ENTRADAS', codigo: 'ENT802', nombre: 'Ensalada de Atún',
+    descripcion: 'Filete de atún en aceitunas, lechuga, huevo duro, cebolla, canchita y vinagreta.',
+    precioVentaBase: 20.00, costoAproximado: 7.50, moneda: 'PEN',
+    permiteModificadores: true, requierePreparacion: true, estado: 'ACTIVO', ...auditSeed
+  },
+  {
+    id: 'PROD-ENT-PAPA-HUANCAINA', categoriaId: 'CAT-ENTRADAS', codigo: 'ENT803', nombre: 'Papa a la Huancaína',
+    descripcion: 'Papas sancochadas, crema a la huancaína, lechuga, huevo duro y aceitunas.',
+    precioVentaBase: 12.00, costoAproximado: 4.50, moneda: 'PEN',
+    permiteModificadores: true, requierePreparacion: true, estado: 'ACTIVO', ...auditSeed
+  },
+  {
+    id: 'PROD-ENT-TEQUENOS', categoriaId: 'CAT-ENTRADAS', codigo: 'ENT804', nombre: 'Tequeños',
+    descripcion: 'Anticucho con queso grifo jimenado acompañado de una crema de palta.',
+    precioVentaBase: 15.00, costoAproximado: 5.50, moneda: 'PEN',
+    permiteModificadores: true, requierePreparacion: true, estado: 'ACTIVO', ...auditSeed
+  },
+
+  /* ================ 🍲 SOPAS (Orden 8) ================ */
+  {
+    id: 'PROD-SOPA-CALDO-GALLINA', categoriaId: 'CAT-SOPAS', codigo: 'SOP901', nombre: 'Caldo de Gallina',
+    descripcion: 'Acompañado de Papa sancochada y Huevo. S/ 25.00',
+    precioVentaBase: 25.00, costoAproximado: 9.50, moneda: 'PEN',
+    permiteModificadores: true, requierePreparacion: true, estado: 'ACTIVO', ...auditSeed
+  },
+  {
+    id: 'PROD-SOPA-MINUTA', categoriaId: 'CAT-SOPAS', codigo: 'SOP902', nombre: 'Sopa a la Minuta',
+    descripcion: 'Acompañada de Pan tostado. S/ 20.00',
+    precioVentaBase: 20.00, costoAproximado: 7.50, moneda: 'PEN',
+    permiteModificadores: true, requierePreparacion: true, estado: 'ACTIVO', ...auditSeed
+  },
+  {
+    id: 'PROD-SOPA-PAPA-CASHQUI', categoriaId: 'CAT-SOPAS', codigo: 'SOP903', nombre: 'Sopa de Papa Cashqui',
+    descripcion: 'Repel: aceite, huacate, ajos y hierbas aromáticas. S/ 15.00',
+    precioVentaBase: 15.00, costoAproximado: 5.50, moneda: 'PEN',
+    permiteModificadores: true, requierePreparacion: true, estado: 'ACTIVO', ...auditSeed
+  },
+  {
+    id: 'PROD-SOPA-CREMA-ZAPALLO', categoriaId: 'CAT-SOPAS', codigo: 'SOP904', nombre: 'Crema de Zapallo',
+    descripcion: 'A base de zapallo y hierbas aromáticas. S/ 15.00',
+    precioVentaBase: 15.00, costoAproximado: 5.50, moneda: 'PEN',
+    permiteModificadores: true, requierePreparacion: true, estado: 'ACTIVO', ...auditSeed
+  },
+
+  /* ================ 🍽️ PLATOS PRINCIPALES (Orden 9) ================ */
+  {
+    id: 'PROD-PLATO-LOMO-SALTADO', categoriaId: 'CAT-PLATOS', codigo: 'PLA1001', nombre: 'Lomo Saltado',
+    descripcion: 'Lomo fino salteado, papas fritas y/o arroz blanco al wok. S/ 30.00',
+    precioVentaBase: 30.00, costoAproximado: 11.50, moneda: 'PEN',
+    permiteModificadores: true, requierePreparacion: true, estado: 'ACTIVO', ...auditSeed
+  },
+  {
+    id: 'PROD-PLATO-TALLARIN-SALTADO', categoriaId: 'CAT-PLATOS', codigo: 'PLA1002', nombre: 'Tallarín Saltado',
+    descripcion: 'Lomo fino salteado, queso mozzarella, pimiento y ajo. S/ 30.00',
+    precioVentaBase: 30.00, costoAproximado: 11.50, moneda: 'PEN',
+    permiteModificadores: true, requierePreparacion: true, estado: 'ACTIVO', ...auditSeed
+  },
+  {
+    id: 'PROD-PLATO-PICANTE-CUY', categoriaId: 'CAT-PLATOS', codigo: 'PLA1003', nombre: 'Picante de Cuy',
+    descripcion: '½ Cuy, pepian sancochado, aderezos a base de mani, arroz amarillo o rocoto andino.',
+    precioVentaBase: 35.00, costoAproximado: 13.50, moneda: 'PEN',
+    permiteModificadores: true, requierePreparacion: true, estado: 'ACTIVO', ...auditSeed
+  },
+  {
+    id: 'PROD-PLATO-TRUCHA-PLANCHA', categoriaId: 'CAT-PLATOS', codigo: 'PLA1004', nombre: 'Trucha a la Plancha',
+    descripcion: 'Papas fritas o doradas, ensalada fresca. S/ 30.00',
+    precioVentaBase: 30.00, costoAproximado: 11.50, moneda: 'PEN',
+    permiteModificadores: true, requierePreparacion: true, estado: 'ACTIVO', ...auditSeed
+  },
+  {
+    id: 'PROD-PLATO-TRUCHA-FRITA', categoriaId: 'CAT-PLATOS', codigo: 'PLA1005', nombre: 'Trucha Frita',
+    descripcion: 'Papas fritas o doradas, ensalada fresca. S/ 32.00',
     precioVentaBase: 32.00, costoAproximado: 12.00, moneda: 'PEN',
     permiteModificadores: true, requierePreparacion: true, estado: 'ACTIVO', ...auditSeed
   },
   {
-    id: 'PROD-ENT-CEVICHE', categoriaId: 'CAT-ENTRADAS', codigo: 'ENT202', nombre: 'Ceviche de Pescado',
-    descripcion: 'Filete de pescado blanco fresco, cebolla roja, aji limo, jugo de limón, cancha serrana, camote y choclo',
-    precioVentaBase: 48.00, costoAproximado: 19.00, moneda: 'PEN',
-    permiteModificadores: true, requierePreparacion: true, estado: 'ACTIVO', ...auditSeed
-  },
-  {
-    id: 'PROD-PLATO-LOMO', categoriaId: 'CAT-PLATOS', codigo: 'PLA301', nombre: 'Lomo Saltado Criollo',
-    descripcion: 'Lomo fino saltado con verduras orientales, papas fritas, arroz blanco al wok, ají amarillo',
-    precioVentaBase: 62.00, costoAproximado: 25.00, moneda: 'PEN',
-    permiteModificadores: true, requierePreparacion: true, estado: 'ACTIVO', ...auditSeed
-  },
-  {
-    id: 'PROD-PLATO-TACACHO', categoriaId: 'CAT-PLATOS', codigo: 'PLA302', nombre: 'Tacacho con Cecina y Chorizo',
-    descripcion: 'Platano verde machacado en mantequilla de cerdo, servido con cecina ahumada, chorizo criollo, ensalada y salsa criolla',
-    precioVentaBase: 58.00, costoAproximado: 23.00, moneda: 'PEN',
-    permiteModificadores: true, requierePreparacion: true, estado: 'ACTIVO', ...auditSeed
-  },
-  {
-    id: 'PROD-PLATO-JUANE', categoriaId: 'CAT-PLATOS', codigo: 'PLA303', nombre: 'Juane Gallina Criolla',
-    descripcion: 'Arroz perfumado con hierbas y especias amazónicas, envuelto en hoja de bijao, acompañado de gallina criolla, huevo duro y aceitunas',
-    precioVentaBase: 55.00, costoAproximado: 21.00, moneda: 'PEN',
-    permiteModificadores: true, requierePreparacion: true, estado: 'ACTIVO', ...auditSeed
-  },
-  {
-    id: 'PROD-PLATO-PESCADO', categoriaId: 'CAT-PLATOS', codigo: 'PLA304', nombre: 'Filete de Pescado a la Plancha',
-    descripcion: 'Pescado blanco fresco del día, salsa de maracuyá o 3 ajíes, puré de yuca, ensalada amazónica',
-    precioVentaBase: 68.00, costoAproximado: 27.00, moneda: 'PEN',
-    permiteModificadores: true, requierePreparacion: true, estado: 'ACTIVO', ...auditSeed
-  },
-  {
-    id: 'PROD-JUGO-NARANJA', categoriaId: 'CAT-BEBIDAS-FRIAS', codigo: 'BEB401', nombre: 'Jugo de Naranja Natural 500ml',
-    descripcion: 'Jugo recién exprimido de naranja dulce del valle, sin azúcar añadido',
-    precioVentaBase: 14.00, costoAproximado: 5.50, moneda: 'PEN',
-    permiteModificadores: false, requierePreparacion: false, estado: 'ACTIVO', ...auditSeed
-  },
-  {
-    id: 'PROD-AGUA-MINERAL', categoriaId: 'CAT-BEBIDAS-FRIAS', codigo: 'BEB402', nombre: 'Agua Mineral 750ml',
-    descripcion: 'Agua mineral sin gas, marca líder nacional',
-    precioVentaBase: 8.00, costoAproximado: 2.80, moneda: 'PEN',
-    permiteModificadores: false, requierePreparacion: false, estado: 'ACTIVO', ...auditSeed
-  },
-  {
-    id: 'PROD-GASEOSA', categoriaId: 'CAT-BEBIDAS-FRIAS', codigo: 'BEB403', nombre: 'Gaseosa 330ml',
-    descripcion: 'Inca Kola / Coca Cola / Sprite (especificar en observaciones)',
-    precioVentaBase: 9.00, costoAproximado: 3.20, moneda: 'PEN',
-    permiteModificadores: false, requierePreparacion: false, estado: 'ACTIVO', ...auditSeed
-  },
-  {
-    id: 'PROD-CAFE-AMERICANO', categoriaId: 'CAT-BEBIDAS-CALIENTES', codigo: 'BEB501', nombre: 'Café Americano Grande',
-    descripcion: 'Café 100% orgánico peruano, grano tostado, doble shot americano',
-    precioVentaBase: 12.00, costoAproximado: 4.20, moneda: 'PEN',
-    permiteModificadores: true, requierePreparacion: false, estado: 'ACTIVO', ...auditSeed
-  },
-  {
-    id: 'PROD-TE-VERDE', categoriaId: 'CAT-BEBIDAS-CALIENTES', codigo: 'BEB502', nombre: 'Té Verde Infusión',
-    descripcion: 'Té verde orgánico con hierbas aromáticas del jardín del lodge',
-    precioVentaBase: 10.00, costoAproximado: 3.50, moneda: 'PEN',
-    permiteModificadores: false, requierePreparacion: false, estado: 'ACTIVO', ...auditSeed
-  },
-  {
-    id: 'PROD-CUSQUENA', categoriaId: 'CAT-ALCOHOL', codigo: 'BAR601', nombre: 'Cerveza Cusqueña Trigo 620ml',
-    descripcion: 'Cerveza de trigo malta peruana, envase retornable de 620ml',
-    precioVentaBase: 15.00, costoAproximado: 6.20, moneda: 'PEN',
-    permiteModificadores: false, requierePreparacion: false, estado: 'ACTIVO', ...auditSeed
-  },
-  {
-    id: 'PROD-PISCO-SOUR', categoriaId: 'CAT-ALCOHOL', codigo: 'BAR602', nombre: 'Pisco Sour Clásico',
-    descripcion: 'Pisco puro 50ml, jugo de limón, jarabe de goma, clara de huevo, 3 gotas de amargo de angostura',
+    id: 'PROD-PLATO-POLLO-PLANCHA', categoriaId: 'CAT-PLATOS', codigo: 'PLA1006', nombre: 'Pollo a la Plancha',
+    descripcion: 'Con puré de doradas, ensalada fresca. S/ 28.00',
     precioVentaBase: 28.00, costoAproximado: 10.50, moneda: 'PEN',
     permiteModificadores: true, requierePreparacion: true, estado: 'ACTIVO', ...auditSeed
   },
   {
-    id: 'PROD-VINO-BOTELLA', categoriaId: 'CAT-ALCOHOL', codigo: 'BAR603', nombre: 'Vino Tinto Tinto Reserva - Botella 750ml',
-    descripcion: 'Vino tinto reserva de los valles de Ica, marida perfecto con carnes rojas y parrilla',
-    precioVentaBase: 120.00, costoAproximado: 48.00, moneda: 'PEN',
-    permiteModificadores: false, requierePreparacion: false, estado: 'ACTIVO', ...auditSeed
+    id: 'PROD-PLATO-CHULETA-PARRILLA', categoriaId: 'CAT-PLATOS', codigo: 'PLA1007', nombre: 'Chuleta a la Parrilla',
+    descripcion: 'Papas fritas o doradas, ensalada de estación. S/ 28.00',
+    precioVentaBase: 28.00, costoAproximado: 10.50, moneda: 'PEN',
+    permiteModificadores: true, requierePreparacion: true, estado: 'ACTIVO', ...auditSeed
   },
   {
-    id: 'PROD-POSTRE-TRES-LECHES', categoriaId: 'CAT-POSTRES', codigo: 'POST701', nombre: 'Torta de Tres Leches',
-    descripcion: 'Esponjosa torta bañada en leche evaporada, leche condensada y leche entera, decorada con merengue italiano',
-    precioVentaBase: 22.00, costoAproximado: 8.00, moneda: 'PEN',
-    permiteModificadores: false, requierePreparacion: true, estado: 'ACTIVO', ...auditSeed
+    id: 'PROD-PLATO-ESTOFADO-POLLO', categoriaId: 'CAT-PLATOS', codigo: 'PLA1008', nombre: 'Estofado de Pollo',
+    descripcion: 'Acompañado de papas sancochadas y arroz. S/ 25.00',
+    precioVentaBase: 25.00, costoAproximado: 9.50, moneda: 'PEN',
+    permiteModificadores: true, requierePreparacion: true, estado: 'ACTIVO', ...auditSeed
   },
   {
-    id: 'PROD-MAZAMORRA-MORADA', categoriaId: 'CAT-POSTRES', codigo: 'POST702', nombre: 'Mazamorra Morada con Arroz con Leche',
-    descripcion: 'Mazamorra morada de maíz morado peruano con frutas, acompañado de porción de arroz con leche cremoso y canela',
-    precioVentaBase: 20.00, costoAproximado: 7.20, moneda: 'PEN',
-    permiteModificadores: false, requierePreparacion: true, estado: 'ACTIVO', ...auditSeed
+    id: 'PROD-PLATO-GUISO-POLLO', categoriaId: 'CAT-PLATOS', codigo: 'PLA1009', nombre: 'Guiso de Pollo',
+    descripcion: 'Acompañado de Arroz. S/ 25.00',
+    precioVentaBase: 25.00, costoAproximado: 9.50, moneda: 'PEN',
+    permiteModificadores: true, requierePreparacion: true, estado: 'ACTIVO', ...auditSeed
+  },
+
+  /* ================ 🍕 PIZZAS (Orden 10) ================ */
+  {
+    id: 'PROD-PIZZA-AMERICANA', categoriaId: 'CAT-PIZZAS', codigo: 'PIZ1101', nombre: 'Pizza Americana (Personal)',
+    descripcion: 'Jamoncito y queso mozzarella, pimiento y orégano. S/ 29.00. Mediana = +S/ 12.',
+    precioVentaBase: 29.00, costoAproximado: 11.00, moneda: 'PEN',
+    permiteModificadores: true, requierePreparacion: true, estado: 'ACTIVO', ...auditSeed
   },
   {
-    id: 'PROD-MINI-SNACK', categoriaId: 'CAT-MINIBAR', codigo: 'MINI801', nombre: 'Paquete Snack Galletas Chocolate',
-    descripcion: 'Caja de galletas rellenas chocolate minibar habitación',
-    precioVentaBase: 16.00, costoAproximado: 6.00, moneda: 'PEN',
+    id: 'PROD-PIZZA-HAWAIANA', categoriaId: 'CAT-PIZZAS', codigo: 'PIZ1102', nombre: 'Pizza Hawaiana (Personal)',
+    descripcion: 'Jamoncito, queso mozzarella, piña. S/ 30.00. Mediana = +S/ 12.',
+    precioVentaBase: 30.00, costoAproximado: 11.50, moneda: 'PEN',
+    permiteModificadores: true, requierePreparacion: true, estado: 'ACTIVO', ...auditSeed
+  },
+  {
+    id: 'PROD-PIZZA-PEPPERONI', categoriaId: 'CAT-PIZZAS', codigo: 'PIZ1103', nombre: 'Pizza de Pepperoni (Personal)',
+    descripcion: 'Jamoncito, queso mozzarella y pepperoni. S/ 32.00. Mediana = +S/ 12.',
+    precioVentaBase: 32.00, costoAproximado: 12.00, moneda: 'PEN',
+    permiteModificadores: true, requierePreparacion: true, estado: 'ACTIVO', ...auditSeed
+  },
+
+  /* ================ 🍰 POSTRES + DERECHO CORCHO (Orden 11) ================ */
+  {
+    id: 'PROD-POSTRE-WAFFLES', categoriaId: 'CAT-POSTRES', codigo: 'POS1201', nombre: 'Waffles',
+    descripcion: 'Con frutas de bosque, miel y/o fudge de chocolate. S/ 15.00',
+    precioVentaBase: 15.00, costoAproximado: 5.50, moneda: 'PEN',
+    permiteModificadores: true, requierePreparacion: true, estado: 'ACTIVO', ...auditSeed
+  },
+  {
+    id: 'PROD-POSTRE-CREPE-HELADOS', categoriaId: 'CAT-POSTRES', codigo: 'POS1202', nombre: 'Crepe con Helados',
+    descripcion: 'Fudge de chocolate, galletas, helado de vainilla. S/ 15.00',
+    precioVentaBase: 15.00, costoAproximado: 5.50, moneda: 'PEN',
+    permiteModificadores: true, requierePreparacion: true, estado: 'ACTIVO', ...auditSeed
+  },
+  {
+    id: 'PROD-POSTRE-ENSALADA-FRUTAS', categoriaId: 'CAT-POSTRES', codigo: 'POS1203', nombre: 'Ensalada de Frutas',
+    descripcion: 'Frutas de estación, miel y/o yogurt. S/ 15.00',
+    precioVentaBase: 15.00, costoAproximado: 5.50, moneda: 'PEN',
+    permiteModificadores: true, requierePreparacion: true, estado: 'ACTIVO', ...auditSeed
+  },
+  {
+    id: 'PROD-POSTRE-HELADOS', categoriaId: 'CAT-POSTRES', codigo: 'POS1204', nombre: 'Helados',
+    descripcion: 'Porción de helado de sabores estacionales. S/ 7.00',
+    precioVentaBase: 7.00, costoAproximado: 2.60, moneda: 'PEN',
+    permiteModificadores: true, requierePreparacion: false, estado: 'ACTIVO', ...auditSeed
+  },
+  {
+    id: 'PROD-DERECHO-CORCHO', categoriaId: 'CAT-POSTRES', codigo: 'POS1205', nombre: 'Derecho de Corcho (Botella de vino)',
+    descripcion: 'Cargo por consumo de botella de vino fuera del menú. Atención: Previa reservación. S/ 10.00',
+    precioVentaBase: 10.00, costoAproximado: 0, moneda: 'PEN',
     permiteModificadores: false, requierePreparacion: false, estado: 'ACTIVO', ...auditSeed
   },
 ];
@@ -248,26 +464,40 @@ const modificadoresFBSeed: ModificadorProducto[] = [
 ];
 
 const productosFBSeed: ProductoFB[] = productosFBSeedBase.map((p) => {
-  const presenta = presentacionesBase(p.id, p.precioVentaBase, 'Porción');
+  const presenta = presentacionesBase(p.id, p.precioVentaBase, (
+    p.categoriaId === 'CAT-PIZZAS' ? 'Personal (Mediana = +S/ 12)' :
+    p.categoriaId === 'CAT-SANDWICH' ? 'Unidad' :
+    p.categoriaId === 'CAT-BEBIDAS-ALCOHOL' && p.id === 'PROD-VINO-SANTIAGO-QUEIROLO' ? 'Botella 750ml' :
+    p.categoriaId === 'CAT-BEBIDAS-FRIAS' ? (
+      p.id === 'PROD-GASEOSA' ? '500ml (1/2L)' :
+      p.id === 'PROD-AGUA-MINERAL' ? 'Unidad' :
+      p.id === 'PROD-GATORADE' ? '1L' :
+      p.id === 'PROD-CHICHA-MORADA-1L' || p.id === 'PROD-LIMONADA-1L' || p.id === 'PROD-MARACUYA-1L' ? '1L' : 'Unidad'
+    ) : 'Porción'
+  ));
   const modIds: string[] = [];
   if (p.permiteModificadores) {
-    if (p.categoriaId === 'CAT-BEBIDAS-FRIAS' || p.categoriaId === 'CAT-ALCOHOL') modIds.push('MOD-HIELO');
-    if (p.categoriaId === 'CAT-BEBIDAS-FRIAS' || p.categoriaId === 'CAT-BEBIDAS-CALIENTES') modIds.push('MOD-AZUCAR');
-    if (p.categoriaId === 'CAT-PLATOS' || p.categoriaId === 'CAT-ENTRADAS') modIds.push('MOD-SIN-CEBOLLA', 'MOD-QUESO-EXTRA');
-    if (p.id === 'PROD-PLATO-LOMO') modIds.push('MOD-BIEN-COCIDO');
+    if (['CAT-BEBIDAS-FRIAS','CAT-JUGOS','CAT-BEBIDAS-ALCOHOL'].includes(String(p.categoriaId))) modIds.push('MOD-HIELO');
+    if (['CAT-BEBIDAS-FRIAS','CAT-BEBIDAS-CALIENTES','CAT-JUGOS'].includes(String(p.categoriaId))) modIds.push('MOD-AZUCAR');
+    if (['CAT-PLATOS','CAT-ENTRADAS','CAT-SOPAS','CAT-SANDWICH','CAT-PIZZAS','CAT-DESAYUNOS'].includes(String(p.categoriaId))) {
+      modIds.push('MOD-SIN-CEBOLLA');
+      if (['CAT-PLATOS','CAT-PIZZAS','CAT-SANDWICH'].includes(String(p.categoriaId))) modIds.push('MOD-QUESO-EXTRA');
+    }
+    if (['PROD-PLATO-LOMO-SALTADO','PROD-PLATO-TRUCHA-PLANCHA','PROD-PLATO-TRUCHA-FRITA','PROD-PLATO-POLLO-PLANCHA','PROD-PLATO-CHULETA-PARRILLA'].includes(String(p.id))) modIds.push('MOD-BIEN-COCIDO');
   }
   const alergIds: string[] = [];
-  if (p.id === 'PROD-ENT-CEVICHE' || p.id === 'PROD-PLATO-PESCADO') alergIds.push('AL-PESCADO', 'AL-MARISCOS');
-  if (p.id === 'PROD-PISCO-SOUR') alergIds.push('AL-HUEVO');
-  if (p.id === 'PROD-POSTRE-TRES-LECHES' || p.id === 'PROD-MAZAMORRA-MORADA') alergIds.push('AL-LACTOSA', 'AL-GLUTEN', 'AL-HUEVO');
-  if (p.id === 'PROD-ENT-ENSALADA-QUINUA') alergIds.push('AL-SOYA');
+  if (p.categoriaId === 'CAT-POSTRES' || p.id === 'PROD-PLATO-TALLARIN-SALTADO' || p.id === 'PROD-POSTRE-HELADOS') alergIds.push('AL-LACTOSA', 'AL-GLUTEN', 'AL-HUEVO');
+  if (p.categoriaId === 'CAT-PLATOS' && (p.id.includes('TRUCHA') || p.id.includes('PESCADO') || p.id === 'PROD-ENT-ENSALADA-ATUN')) alergIds.push('AL-PESCADO', 'AL-MARISCOS');
+  if (p.categoriaId === 'CAT-ENTRADAS' && (p.id === 'PROD-ENT-ENSALADA-ATUN' || p.id === 'PROD-ENT-ENSALADA-FRESCA' || p.id === 'PROD-ENT-PAPA-HUANCAINA' || p.id === 'PROD-ENT-TEQUENOS')) alergIds.push('AL-LACTOSA');
+  if (p.categoriaId === 'CAT-PIZZAS') alergIds.push('AL-GLUTEN', 'AL-LACTOSA');
+  if (p.categoriaId === 'CAT-DESAYUNOS') alergIds.push('AL-GLUTEN', 'AL-HUEVO', 'AL-LACTOSA');
   const estac: EstacionCocinaFK[] = [];
-  if (p.categoriaId === 'CAT-DESAYUNOS' || p.categoriaId === 'CAT-PLATOS') estac.push('COCINA_CALIENTES');
-  if (p.id === 'PROD-ENT-ENSALADA-QUINUA') estac.push('COCINA_FRIOS');
-  if (p.id === 'PROD-ENT-CEVICHE') estac.push('COCINA_FRIOS');
-  if (p.id === 'PROD-PLATO-LOMO' || p.id === 'PROD-PLATO-PESCADO') estac.push('GRILL_PARRILLA');
-  if (p.categoriaId === 'CAT-ALCOHOL' || p.categoriaId === 'CAT-BEBIDAS-FRIAS' || p.categoriaId === 'CAT-BEBIDAS-CALIENTES') estac.push('BAR');
-  if (p.categoriaId === 'CAT-POSTRES') estac.push('PASTELERIA_POSTRES');
+  if (['CAT-DESAYUNOS','CAT-PLATOS','CAT-SANDWICH','CAT-PIZZAS','CAT-SOPAS'].includes(String(p.categoriaId))) estac.push('COCINA_CALIENTES');
+  if (p.categoriaId === 'CAT-ENTRADAS') estac.push(p.id === 'PROD-ENT-ENSALADA-FRESCA' || p.id === 'PROD-ENT-ENSALADA-ATUN' ? 'COCINA_FRIOS' : 'COCINA_CALIENTES');
+  if (['PROD-PLATO-LOMO-SALTADO','PROD-PLATO-TALLARIN-SALTADO','PROD-PLATO-TRUCHA-FRITA','PROD-PLATO-TRUCHA-PLANCHA','PROD-PLATO-POLLO-PLANCHA','PROD-PLATO-CHULETA-PARRILLA'].includes(String(p.id))) estac.push('GRILL_PARRILLA');
+  if (['CAT-BEBIDAS-ALCOHOL','CAT-BEBIDAS-FRIAS','CAT-BEBIDAS-CALIENTES','CAT-JUGOS'].includes(String(p.categoriaId))) estac.push('BAR');
+  if (['CAT-POSTRES','CAT-SOPAS'].includes(String(p.categoriaId)) && p.categoriaId === 'CAT-POSTRES') estac.push('PASTELERIA_POSTRES');
+  if (['CAT-SOPAS'].includes(String(p.categoriaId))) estac.push('COCINA_CALIENTES');
   return {
     ...p,
     presentacionesIds: presenta.map((pr) => pr.id),
