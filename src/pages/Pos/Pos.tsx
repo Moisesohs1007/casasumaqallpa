@@ -19,7 +19,7 @@ import {
   IonFab, IonFabButton, IonFabList, IonIcon,
 } from '@ionic/react';
 import type { Color } from '@ionic/core';
-import { checkmarkCircle, alert, timeOutline, Icon, add } from 'ionicons/icons';
+import { checkmarkCircle, alert, timeOutline, Icon, add, fastFood } from 'ionicons/icons';
 import TomarComanda from '../../components/modals/TomarComanda';
 import {
   PuntoVenta,
