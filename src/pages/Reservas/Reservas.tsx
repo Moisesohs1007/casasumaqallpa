@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { IonContent, IonHeader, IonPage, IonTitle, IonToolbar, IonList, IonItem, IonLabel, IonBadge, IonFab, IonFabButton, IonIcon, useIonRouter, useIonViewWillEnter } from '@ionic/react';
-import { addCircle } from 'ionicons/icons';
+import { IonContent, IonHeader, IonPage, IonTitle, IonToolbar, IonList, IonItem, IonLabel, IonBadge, IonFab, IonFabButton, IonIcon, useIonRouter, useIonViewWillEnter, IonButton, IonButtons } from '@ionic/react';
+import { addCircle, logIn, create } from 'ionicons/icons';
 import type { Color } from '@ionic/core';
 import {
   Reserva,
@@ -8,7 +8,10 @@ import {
   OrigenReserva,
 } from '../../types';
 import { ReservaService } from '../../services';
+import CheckinModal from '../../components/modals/CheckinModal';
 import './Reservas.css';
+
+const USUARIO_ACTUAL = { id: 'USR-MOISES-0001', nombres: 'Moisés', apellidos: 'Ochoa' };
 
 const estadoColor: Record<EstadoReserva, Color> = {
   PENDIENTE: 'warning',
@@ -39,6 +42,15 @@ const estadoLabel: Record<EstadoReserva, string> = {
 const ReservasPage: React.FC = () => {
   const router = useIonRouter();
   const [reservas, setReservas] = useState<Reserva[]>([]);
+  const [modalCheckinOpen, setModalCheckinOpen] = useState(false);
+  const [reservaIdParaCheckin, setReservaIdParaCheckin] = useState<string | null>(null);
+
+  const abrirCheckin = (e: React.MouseEvent, id: string) => {
+    e.stopPropagation();
+    e.preventDefault();
+    setReservaIdParaCheckin(id);
+    setModalCheckinOpen(true);
+  };
 
   useIonViewWillEnter(() => {
     try {
@@ -83,8 +95,17 @@ const ReservasPage: React.FC = () => {
             const origen = r.origen || '';
             const checkin = (r.fechaCheckin || r.fechaCheckIn || '').slice(0, 10);
             const checkout = (r.fechaCheckout || r.fechaCheckOut || '').slice(0, 10);
+            const puedeCheckearse = ['PENDIENTE', 'CONFIRMADA', 'MODIFICADA'].includes(estado);
             return (
-              <IonItem key={r.id || codigo} button detail>
+              <IonItem
+                key={r.id || codigo}
+                button
+                detail
+                onClick={(e) => {
+                  e.preventDefault();
+                  router.push(`/reservas/${r.id || codigo}`, 'forward');
+                }}
+              >
                 <IonLabel>
                   <h2>
                     #{codigo} — {titular}
@@ -96,9 +117,22 @@ const ReservasPage: React.FC = () => {
                     Check-in: {checkin} · Check-out: {checkout}
                   </p>
                 </IonLabel>
-                <IonBadge color={estadoColor[estado] || 'medium'} slot="end">
-                  {(estadoLabel[estado] || estado).toUpperCase()}
-                </IonBadge>
+                <IonButtons slot="end">
+                  {puedeCheckearse && (
+                    <IonButton
+                      color="success"
+                      size="small"
+                      fill="solid"
+                      onClick={(e) => abrirCheckin(e, r.id)}
+                    >
+                      <IonIcon icon={logIn} slot="start" />
+                      CHECK-IN
+                    </IonButton>
+                  )}
+                  <IonBadge color={estadoColor[estado] || 'medium'} slot="end">
+                    {(estadoLabel[estado] || estado).toUpperCase()}
+                  </IonBadge>
+                </IonButtons>
               </IonItem>
             );
           })}
@@ -116,6 +150,26 @@ const ReservasPage: React.FC = () => {
             <IonIcon icon={addCircle} />
           </IonFabButton>
         </IonFab>
+
+        <CheckinModal
+          isOpen={modalCheckinOpen}
+          onDidDismiss={() => {
+            setModalCheckinOpen(false);
+            setReservaIdParaCheckin(null);
+            // Refrescar listado después de check-in
+            try {
+              const todas = ReservaService.listarTodas ? ReservaService.listarTodas() : [];
+              const ordenadas = [...todas].sort((a: any, b: any) => {
+                const fa = new Date(a.fechaCreacion || a.createdAt || 0).getTime();
+                const fb = new Date(b.fechaCreacion || b.createdAt || 0).getTime();
+                return fb - fa;
+              });
+              setReservas(ordenadas as any);
+            } catch {}
+          }}
+          reservaId={reservaIdParaCheckin}
+          usuarioActual={USUARIO_ACTUAL}
+        />
       </IonContent>
     </IonPage>
   );
