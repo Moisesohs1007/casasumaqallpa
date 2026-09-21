@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   IonBadge, IonButton, IonCard, IonCardContent, IonCardHeader, IonCardSubtitle, IonCardTitle,
-  IonCol, IonIcon, IonInput, IonItem, IonLabel, IonModal, IonNote, IonRow, IonSearchbar,
+  IonCol, IonGrid, IonIcon, IonInput, IonItem, IonLabel, IonModal, IonNote, IonRow, IonSearchbar,
   IonSelect, IonSelectOption, IonText, IonTextarea, IonChip,
 } from '@ionic/react';
 import {
