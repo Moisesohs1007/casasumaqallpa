@@ -39,26 +39,67 @@ const CheckinModal: React.FC<CheckinModalProps> = ({ isOpen, onDidDismiss, reser
   const huesped: Huesped | undefined = reserva
     ? ((reserva as any).huespedTitular ?? (reserva as any).huesped ?? HuespedService.buscarPorId((reserva as any).huespedTitularId || (reserva as any).huespedId) as any)
     : undefined;
-  const habitacion: Habitacion | undefined = reserva && (reserva as any).habitaciones?.[0]
-    ? (HabitacionService.buscarPorId((reserva as any).habitaciones[0].habitacionId || (reserva as any).habitaciones[0].habitacion?.id) as any) ?? (reserva as any).habitaciones[0].habitacion
-    : undefined;
-  const noches = (reserva as any)?.noches ?? (reserva as any)?.totalNoches ?? ((reserva as any).habitaciones?.[0]?.noches) ?? 0;
-  const rawTotal = (reserva as any)?.totalReserva
-    ?? (reserva as any)?.total
-    ?? (reserva as any)?.montoTotal
-    ?? ((reserva as any).habitaciones?.[0]?.precioTotalReservaHabitacion || 0)
-    ?? ((reserva as any).subTotalAlojamiento || 0) + ((reserva as any).impuestos || 0) - ((reserva as any).descuentos || 0);
-  const total = Number(rawTotal) || 0;
-  const checkinDate = (reserva as any)?.fechaCheckin ?? (reserva as any)?.fechaCheckIn ?? '';
-  const checkoutDate = (reserva as any)?.fechaCheckout ?? (reserva as any)?.fechaCheckOut ?? '';
+  const habitacionesList: Habitacion[] = (reserva ? ((reserva as any).habitaciones || []).map((hr: any) => {
+    const hab = HabitacionService.buscarPorId(hr.habitacionId || hr?.habitacion?.id) as any;
+    return hab ?? hr?.habitacion;
+  }).filter(Boolean) : []) as Habitacion[];
+  const habitacionPrincipal: Habitacion | undefined = habitacionesList[0];
+  const habitacionesCount = habitacionesList.length;
 
-  // Precargar llaveCodigo con codigo de habitacion (ya existe un valor por defecto)
+  // Calcular noches segun los nombres reales del seed
+  const checkinDateInternal =
+    ((reserva as any)?.fechaCheckin ??
+      (reserva as any)?.fechaCheckIn ??
+      (reserva as any)?.habitaciones?.[0]?.fechaCheckin ??
+      (reserva as any)?.habitaciones?.[0]?.fechaCheckinPropuesto ||
+      '').toString().slice(0, 10);
+  const checkoutDateInternal =
+    ((reserva as any)?.fechaCheckout ??
+      (reserva as any)?.fechaCheckOut ??
+      (reserva as any)?.habitaciones?.[0]?.fechaCheckout ??
+      (reserva as any)?.habitaciones?.[0]?.fechaCheckoutPropuesto ||
+      '').toString().slice(0, 10);
+  const checkinDate = checkinDateInternal;
+  const checkoutDate = checkoutDateInternal;
+
+  const nochesInternal =
+    Number((reserva as any)?.noches ??
+      (reserva as any)?.totalNoches ??
+      (reserva as any)?.habitaciones?.reduce((acc: number, hr: any) => Math.max(acc, Number(hr.totalNoches || hr.noches || 0)), 0) ??
+      (checkinDate && checkoutDate
+        ? Math.max(1, Math.round(
+            (new Date(checkoutDate).getTime() - new Date(checkinDate).getTime()) / (1000 * 60 * 60 * 24)
+          ))
+        : 0));
+  const noches = nochesInternal;
+
+  // Calcular TOTAL sumando todas las habitaciones (porque R-1004 tiene 2)
+  const subtotalBase =
+    Number((reserva as any)?.subTotalAlojamiento) ||
+    Number((reserva as any)?.subTotal) ||
+    ((reserva as any).habitaciones?.reduce((acc: number, hr: any) => {
+      const precioNoche = Number(hr.precioBaseAcordadoPorNoche || hr.precioPorNoche || hr.precioAcordadoPorNoche || 0);
+      const n = Number(hr.totalNoches || hr.noches || noches || 0);
+      return acc + precioNoche * n;
+    }, 0) || 0);
+  const impuestosTotal = Number((reserva as any)?.impuestos) || Math.round(subtotalBase * 0.18 + subtotalBase * 0.05);
+  const descuentosTotal = Number((reserva as any)?.descuentos) || 0;
+  const rawTotal =
+    Number((reserva as any)?.totalReserva) ||
+    Number((reserva as any)?.total) ||
+    Number((reserva as any)?.montoTotal) ||
+    ((reserva as any).habitaciones?.reduce((acc: number, hr: any) => acc + Number(hr.precioTotalReservaHabitacion || hr.precioTotal || 0), 0)) ||
+    Math.max(0, subtotalBase + impuestosTotal - descuentosTotal) ||
+    0;
+  const total = Number(rawTotal) || 0;
+
+  // Precargar llaveCodigo con codigo de la habitacion principal
   React.useEffect(() => {
     if (isOpen && reserva && !llaveCodigo) {
-      const codHabitacion = habitacion ? (habitacion as any).codigo : ((reserva as any).habitaciones?.[0]?.habitacionId || (reserva as any).habitaciones?.[0]?.habitacion?.codigo);
+      const codHabitacion = habitacionPrincipal ? (habitacionPrincipal as any).codigo : ((reserva as any).habitaciones?.[0]?.habitacionId || (reserva as any).habitaciones?.[0]?.habitacion?.codigo);
       if (codHabitacion) setLlaveCodigo(codHabitacion);
     }
-  }, [isOpen, reserva, habitacion, llaveCodigo]);
+  }, [isOpen, reserva, habitacionPrincipal, llaveCodigo]);
 
   const handleConfirmarCheckIn = async () => {
     if (!reservaId || !reserva) {
@@ -135,15 +176,13 @@ const CheckinModal: React.FC<CheckinModalProps> = ({ isOpen, onDidDismiss, reser
       isOpen={isOpen}
       onDidDismiss={cerrar}
       onIonModalDidPresent={resetModal}
-      initialBreakpoint={1}
-      breakpoints={[0, 1]}
       style={{
-        '--width': '95%',
+        '--width': '92%',
         '--min-width': '320px',
-        '--max-width': '1200px',
-        '--height': '92%',
-        '--max-height': '92%',
-        '--border-radius': '14px',
+        '--max-width': '800px',
+        '--height': 'auto',
+        '--max-height': '72%',
+        '--border-radius': '16px',
       }}
     >
       <IonPage>
@@ -199,9 +238,13 @@ const CheckinModal: React.FC<CheckinModalProps> = ({ isOpen, onDidDismiss, reser
                       <IonItem lines="none" style={{ paddingLeft: 0 }}>
                         <IonIcon icon={bed} color="medium" slot="start" />
                         <IonLabel>
-                          <h3 style={{ margin: 0 }}>{habitacion ? `${(habitacion as any).codigo} · ${(habitacion as any).nombre || (habitacion as any).tipo?.nombre || ''}` : 'Habitación'}</h3>
+                          <h3 style={{ margin: 0 }}>
+                            {habitacionPrincipal
+                              ? `${(habitacionPrincipal as any).codigo}${habitacionesCount > 1 ? ` + ${habitacionesCount - 1} hab.` : ''} · ${(habitacionPrincipal as any).nombre || (habitacionPrincipal as any).tipo?.nombre || ''}`
+                              : 'Habitación'}
+                          </h3>
                           <IonNote>
-                            {(habitacion as any)?.tipo?.capacidadMaxima ? `Capacidad: ${(habitacion as any).tipo.capacidadMaxima} pax` : ''}
+                            {habitacionesList.map((h: any) => h.codigo || h.nombre).filter(Boolean).join(' + ') || ''}
                           </IonNote>
                         </IonLabel>
                         <IonBadge color="primary" slot="end">{noches} noche{noches === 1 ? '' : 's'}</IonBadge>
