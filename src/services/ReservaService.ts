@@ -267,13 +267,13 @@ export const ReservaService = {
     const anterior = this.buscarPorId(id);
     if (!anterior) return undefined;
     const estadosValidos: Record<EstadoReserva, EstadoReserva[]> = {
-      PENDIENTE: ['CONFIRMADA', 'CANCELADA'],
-      CONFIRMADA: ['CHECKED_IN', 'CANCELADA'],
-      CHECKED_IN: ['CHECKED_OUT'],
-      CHECKED_OUT: [],
-      CANCELADA: [],
-      NO_SHOW: [],
-      MODIFICADA: ['CONFIRMADA', 'CANCELADA', 'CHECKED_IN'],
+      PENDIENTE: ['CONFIRMADA', 'CANCELADA', 'CHECKED_IN', 'NO_SHOW', 'MODIFICADA'],
+      CONFIRMADA: ['CHECKED_IN', 'CANCELADA', 'PENDIENTE', 'NO_SHOW', 'MODIFICADA'],
+      MODIFICADA: ['CONFIRMADA', 'CANCELADA', 'CHECKED_IN', 'PENDIENTE', 'NO_SHOW'],
+      CHECKED_IN: ['CHECKED_OUT', 'MODIFICADA'],
+      CHECKED_OUT: ['MODIFICADA'],
+      CANCELADA: ['MODIFICADA'],
+      NO_SHOW: ['MODIFICADA', 'CANCELADA'],
     };
     const actuales = estadosValidos[anterior.estado];
     if (!actuales.includes(nuevoEstado) && nuevoEstado !== anterior.estado) {
