@@ -1,211 +1,59 @@
-import { IonContent, IonHeader, IonPage, IonTitle, IonToolbar, IonList, IonItem, IonLabel, IonBadge, IonFab, IonFabButton, IonIcon, useIonRouter } from '@ionic/react';
+import React, { useState } from 'react';
+import { IonContent, IonHeader, IonPage, IonTitle, IonToolbar, IonList, IonItem, IonLabel, IonBadge, IonFab, IonFabButton, IonIcon, useIonRouter, useIonViewWillEnter } from '@ionic/react';
 import { addCircle } from 'ionicons/icons';
 import type { Color } from '@ionic/core';
 import {
   Reserva,
   EstadoReserva,
   OrigenReserva,
-  Moneda,
-  Huesped,
-  HabitacionReserva,
-  PoliticaCancelacion,
-  ID,
-  DateTimeISO,
-  DateISO,
 } from '../../types';
+import { ReservaService } from '../../services';
 import './Reservas.css';
-
-const now = new Date();
-const isoNow: DateTimeISO = now.toISOString();
-
-function buildMockHuesped(id: string, nombres: string, apellidos: string, tel: string): Huesped {
-  return {
-    id,
-    uuid: `huesped-uuid-${id}`,
-    nombres,
-    apellidos,
-    tipoDocumento: 'DNI',
-    numeroDocumento: `${id}-${nombres.slice(0, 3)}`,
-    telefonoCelular: tel,
-    preferenciasAlimentarias: 'NINGUNA',
-    tags: [],
-    createdAt: isoNow,
-    updatedAt: isoNow,
-  };
-}
-
-function buildMockReserva(params: {
-  id: ID;
-  codigo: string;
-  huespedTitularId: ID;
-  huespedTitular?: Huesped;
-  habitacionNombre: string;
-  estado: EstadoReserva;
-  origen: OrigenReserva;
-  fechaCheckIn: DateISO;
-  fechaCheckOut: DateISO;
-  noches: number;
-  adultos: number;
-  ninos?: number;
-}): Reserva {
-  const habitacionReserva: HabitacionReserva = {
-    id: `hab-res-${params.id}`,
-    reservaId: params.id,
-    habitacionId: params.habitacionNombre,
-    tipoHabitacionId: 'tipo-x',
-    tarifaId: 'tarifa-x',
-    fechaCheckIn: params.fechaCheckIn,
-    fechaCheckOut: params.fechaCheckOut,
-    noches: params.noches,
-    adultos: params.adultos,
-    ninos: params.ninos ?? 0,
-    precioTotalReservaHabitacion: 100 * params.noches,
-    moneda: 'PEN',
-  };
-  const politica: PoliticaCancelacion = {
-    id: 'pc-default',
-    nombre: 'Flexible',
-    tipo: 'FLEXIBLE',
-    diasAntesParaCancelarGratis: 2,
-    estado: 'ACTIVO',
-    createdAt: isoNow,
-    updatedAt: isoNow,
-  };
-  const subtotal = habitacionReserva.precioTotalReservaHabitacion;
-  return {
-    id: params.id,
-    codigo: params.codigo,
-    huespedTitularId: params.huespedTitularId,
-    huespedTitular: params.huespedTitular,
-    habitaciones: [habitacionReserva],
-    origen: params.origen,
-    estado: params.estado,
-    fechaCreacion: isoNow,
-    fechaCheckIn: params.fechaCheckIn,
-    fechaCheckOut: params.fechaCheckOut,
-    noches: params.noches,
-    adultosTotal: params.adultos,
-    ninosTotal: params.ninos ?? 0,
-    moneda: 'PEN' as Moneda,
-    subTotalAlojamiento: subtotal,
-    impuestos: Math.round(subtotal * 0.18),
-    descuentos: 0,
-    totalReserva: subtotal + Math.round(subtotal * 0.18),
-    politicaCancelacionId: politica.id,
-    politicaCancelacion: politica,
-    historialCambios: [
-      {
-        id: `hc-${params.id}-1`,
-        fecha: isoNow,
-        usuarioId: 'usr-actual',
-        tipoCambio: 'CREADA',
-      },
-    ],
-    createdAt: isoNow,
-    updatedAt: isoNow,
-  };
-}
-
-const mockHuespedes: Huesped[] = [
-  buildMockHuesped('h-perez', 'Juan', 'Pérez', '+51987654321'),
-  buildMockHuesped('h-gomez', 'María', 'Gómez', '+51987654322'),
-  buildMockHuesped('h-quispe', 'Luis', 'Quispe', '+51987654323'),
-  buildMockHuesped('h-ramos', 'Ana', 'Ramos', '+51987654324'),
-  buildMockHuesped('h-huaman', 'Carlos', 'Huamán', '+51987654325'),
-];
-
-const mockReservas: Reserva[] = [
-  buildMockReserva({
-    id: 'res-1001',
-    codigo: 'R-1001',
-    huespedTitularId: mockHuespedes[0].id,
-    huespedTitular: mockHuespedes[0],
-    habitacionNombre: 'Cabaña 1',
-    estado: 'CHECKIN',
-    origen: 'DIRECTA',
-    fechaCheckIn: '2026-09-20',
-    fechaCheckOut: '2026-09-23',
-    noches: 3,
-    adultos: 2,
-  }),
-  buildMockReserva({
-    id: 'res-1002',
-    codigo: 'R-1002',
-    huespedTitularId: mockHuespedes[1].id,
-    huespedTitular: mockHuespedes[1],
-    habitacionNombre: 'Suite 2',
-    estado: 'CONFIRMADA',
-    origen: 'BOOKING',
-    fechaCheckIn: '2026-09-21',
-    fechaCheckOut: '2026-09-24',
-    noches: 3,
-    adultos: 2,
-    ninos: 1,
-  }),
-  buildMockReserva({
-    id: 'res-1003',
-    codigo: 'R-1003',
-    huespedTitularId: mockHuespedes[2].id,
-    huespedTitular: mockHuespedes[2],
-    habitacionNombre: 'Familiar 3',
-    estado: 'CHECKIN',
-    origen: 'WHATSAPP',
-    fechaCheckIn: '2026-09-20',
-    fechaCheckOut: '2026-09-22',
-    noches: 2,
-    adultos: 3,
-    ninos: 2,
-  }),
-  buildMockReserva({
-    id: 'res-1004',
-    codigo: 'R-1004',
-    huespedTitularId: mockHuespedes[3].id,
-    huespedTitular: mockHuespedes[3],
-    habitacionNombre: 'Cabaña 4',
-    estado: 'PENDIENTE',
-    origen: 'WEB_OFICIAL',
-    fechaCheckIn: '2026-09-25',
-    fechaCheckOut: '2026-09-28',
-    noches: 3,
-    adultos: 2,
-  }),
-  buildMockReserva({
-    id: 'res-1005',
-    codigo: 'R-1005',
-    huespedTitularId: mockHuespedes[4].id,
-    huespedTitular: mockHuespedes[4],
-    habitacionNombre: 'Doble 5',
-    estado: 'CHECKOUT',
-    origen: 'TELEFONO',
-    fechaCheckIn: '2026-09-19',
-    fechaCheckOut: '2026-09-20',
-    noches: 1,
-    adultos: 2,
-  }),
-];
 
 const estadoColor: Record<EstadoReserva, Color> = {
   PENDIENTE: 'warning',
   CONFIRMADA: 'tertiary',
   CHECKIN: 'success',
+  CHECKED_IN: 'success',
   CHECKOUT: 'medium',
+  CHECKED_OUT: 'medium',
   CANCELADA: 'danger',
   NO_SHOW: 'danger',
   MODIFICADA: 'primary',
+  EN_ESPERA: 'warning',
 };
 
 const estadoLabel: Record<EstadoReserva, string> = {
   PENDIENTE: 'Pendiente',
   CONFIRMADA: 'Confirmada',
   CHECKIN: 'Check-in',
+  CHECKED_IN: 'Check-in',
   CHECKOUT: 'Check-out',
+  CHECKED_OUT: 'Check-out',
   CANCELADA: 'Cancelada',
   NO_SHOW: 'No show',
   MODIFICADA: 'Modificada',
+  EN_ESPERA: 'En espera',
 };
 
 const ReservasPage: React.FC = () => {
   const router = useIonRouter();
+  const [reservas, setReservas] = useState<Reserva[]>([]);
+
+  useIonViewWillEnter(() => {
+    try {
+      const todas = ReservaService.listarTodas ? ReservaService.listarTodas() : [];
+      const ordenadas = [...todas].sort((a: any, b: any) => {
+        const fa = new Date(a.fechaCreacion || a.createdAt || 0).getTime();
+        const fb = new Date(b.fechaCreacion || b.createdAt || 0).getTime();
+        return fb - fa;
+      });
+      setReservas(ordenadas as any);
+    } catch {
+      setReservas([]);
+    }
+  });
+
   return (
     <IonPage>
       <IonHeader>
@@ -221,31 +69,46 @@ const ReservasPage: React.FC = () => {
         </IonHeader>
 
         <IonList inset>
-          {mockReservas.map((r) => {
-            const hab0 = r.habitaciones[0];
-            const nombreHab = hab0?.habitacionId ?? '—';
-            const titular = r.huespedTitular
-              ? `${r.huespedTitular.nombres} ${r.huespedTitular.apellidos}`
-              : `Titular #${r.huespedTitularId}`;
+          {reservas.map((r: any) => {
+            const hab0 = (r.habitaciones || [])[0];
+            const codHab = hab0?.habitacion?.codigo ?? hab0?.tipoHabitacionNombre ?? hab0?.habitacionId ?? '—';
+            const titular = r.huesped
+              ? `${r.huesped.nombres} ${r.huesped.apellidos}`
+              : r.huespedTitular
+                ? `${r.huespedTitular.nombres} ${r.huespedTitular.apellidos}`
+                : `Titular #${r.huespedId || r.huespedTitularId || ''}`;
+            const codigo = r.codigoReserva || r.codigo || 'R-???';
+            const estado = (r.estado || 'PENDIENTE') as EstadoReserva;
+            const noches = r.totalNoches || r.noches || 0;
+            const origen = r.origen || '';
+            const checkin = (r.fechaCheckin || r.fechaCheckIn || '').slice(0, 10);
+            const checkout = (r.fechaCheckout || r.fechaCheckOut || '').slice(0, 10);
             return (
-              <IonItem key={r.id} button detail>
+              <IonItem key={r.id || codigo} button detail>
                 <IonLabel>
                   <h2>
-                    #{r.codigo} — {titular}
+                    #{codigo} — {titular}
                   </h2>
                   <p>
-                    {nombreHab} · {r.noches} noche{r.noches === 1 ? '' : 's'} · {r.origen}
+                    {codHab} · {noches} noche{noches === 1 ? '' : 's'} · {origen}
                   </p>
                   <p className="ion-text-wrap">
-                    Check-in: {r.fechaCheckIn} · Check-out: {r.fechaCheckOut}
+                    Check-in: {checkin} · Check-out: {checkout}
                   </p>
                 </IonLabel>
-                <IonBadge color={estadoColor[r.estado]} slot="end">
-                  {estadoLabel[r.estado].toUpperCase()}
+                <IonBadge color={estadoColor[estado] || 'medium'} slot="end">
+                  {(estadoLabel[estado] || estado).toUpperCase()}
                 </IonBadge>
               </IonItem>
             );
           })}
+          {reservas.length === 0 && (
+            <IonItem lines="none">
+              <IonLabel style={{ textAlign: 'center', padding: '24px 0' }}>
+                No hay reservas todavía. Toca el botón [+] para crear la primera.
+              </IonLabel>
+            </IonItem>
+          )}
         </IonList>
 
         <IonFab slot="fixed" vertical="bottom" horizontal="end" style={{ marginBottom: 90, marginRight: 10 }}>
@@ -259,3 +122,4 @@ const ReservasPage: React.FC = () => {
 };
 
 export default ReservasPage;
+export { ReservasPage };
