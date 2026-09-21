@@ -42,10 +42,23 @@ const CheckinModal: React.FC<CheckinModalProps> = ({ isOpen, onDidDismiss, reser
   const habitacion: Habitacion | undefined = reserva && (reserva as any).habitaciones?.[0]
     ? (HabitacionService.buscarPorId((reserva as any).habitaciones[0].habitacionId || (reserva as any).habitaciones[0].habitacion?.id) as any) ?? (reserva as any).habitaciones[0].habitacion
     : undefined;
-  const noches = (reserva as any)?.noches ?? (reserva as any)?.totalNoches ?? 0;
-  const total = (reserva as any)?.totalReserva ?? (reserva as any)?.total ?? 0;
+  const noches = (reserva as any)?.noches ?? (reserva as any)?.totalNoches ?? ((reserva as any).habitaciones?.[0]?.noches) ?? 0;
+  const rawTotal = (reserva as any)?.totalReserva
+    ?? (reserva as any)?.total
+    ?? (reserva as any)?.montoTotal
+    ?? ((reserva as any).habitaciones?.[0]?.precioTotalReservaHabitacion || 0)
+    ?? ((reserva as any).subTotalAlojamiento || 0) + ((reserva as any).impuestos || 0) - ((reserva as any).descuentos || 0);
+  const total = Number(rawTotal) || 0;
   const checkinDate = (reserva as any)?.fechaCheckin ?? (reserva as any)?.fechaCheckIn ?? '';
   const checkoutDate = (reserva as any)?.fechaCheckout ?? (reserva as any)?.fechaCheckOut ?? '';
+
+  // Precargar llaveCodigo con codigo de habitacion (ya existe un valor por defecto)
+  React.useEffect(() => {
+    if (isOpen && reserva && !llaveCodigo) {
+      const codHabitacion = habitacion ? (habitacion as any).codigo : ((reserva as any).habitaciones?.[0]?.habitacionId || (reserva as any).habitaciones?.[0]?.habitacion?.codigo);
+      if (codHabitacion) setLlaveCodigo(codHabitacion);
+    }
+  }, [isOpen, reserva, habitacion, llaveCodigo]);
 
   const handleConfirmarCheckIn = async () => {
     if (!reservaId || !reserva) {
@@ -118,7 +131,21 @@ const CheckinModal: React.FC<CheckinModalProps> = ({ isOpen, onDidDismiss, reser
   };
 
   return (
-    <IonModal isOpen={isOpen} onDidDismiss={cerrar} onIonModalDidPresent={resetModal}>
+    <IonModal
+      isOpen={isOpen}
+      onDidDismiss={cerrar}
+      onIonModalDidPresent={resetModal}
+      initialBreakpoint={1}
+      breakpoints={[0, 1]}
+      style={{
+        '--width': '95%',
+        '--min-width': '320px',
+        '--max-width': '1200px',
+        '--height': '92%',
+        '--max-height': '92%',
+        '--border-radius': '14px',
+      }}
+    >
       <IonPage>
         <IonHeader>
           <IonToolbar color="success">
@@ -210,8 +237,20 @@ const CheckinModal: React.FC<CheckinModalProps> = ({ isOpen, onDidDismiss, reser
                     <IonCardContent>
                       <IonItem>
                         <IonLabel position="stacked">Código de llave entregada *</IonLabel>
-                        <IonInput value={llaveCodigo} onIonChange={e => setLlaveCodigo(e.detail.value as string)} placeholder="Ej: 101A, CAB-02, etc." />
+                        <IonInput
+                          value={llaveCodigo}
+                          onIonChange={e => setLlaveCodigo(e.detail.value as string)}
+                          placeholder="Ej: 101A, CAB-02, etc."
+                          color={llaveCodigo && llaveCodigo.trim() ? undefined : 'danger'}
+                        />
                       </IonItem>
+                      {(!llaveCodigo || !llaveCodigo.trim()) && (
+                        <IonItem lines="none" color="danger" className="ion-no-padding">
+                          <IonLabel style={{ paddingLeft: 16, paddingTop: 2, fontSize: 12 }}>
+                            ⚠️ Ingresa el código/número de llave entregada para habilitar el Check-in.
+                          </IonLabel>
+                        </IonItem>
+                      )}
                       <IonItem>
                         <IonLabel position="stacked">Cantidad de llaves</IonLabel>
                         <IonInput type="number" min={1} max={10} value={cantidadLlaves} onIonChange={e => setCantidadLlaves(Number(e.detail.value) || 1)} />
@@ -275,9 +314,14 @@ const CheckinModal: React.FC<CheckinModalProps> = ({ isOpen, onDidDismiss, reser
                   </IonButton>
                 </IonCol>
                 <IonCol size="12" sizeMd="6">
-                  <IonButton expand="block" color="success" onClick={handleConfirmarCheckIn} disabled={procesando || !llaveCodigo}>
+                  <IonButton
+                    expand="block"
+                    color="success"
+                    onClick={handleConfirmarCheckIn}
+                    disabled={procesando || !llaveCodigo || !llaveCodigo.trim()}
+                  >
                     <IonIcon icon={checkmarkCircle} slot="start" />
-                    {procesando ? 'Procesando...' : `CONFIRMAR CHECK-IN · ${(reserva as any).codigo || ''}`}
+                    {procesando ? 'Procesando...' : `CONFIRMAR CHECK-IN · ${(reserva as any).codigo || (reserva as any).codigoReserva || ''}`}
                   </IonButton>
                 </IonCol>
               </IonRow>
