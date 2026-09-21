@@ -55,8 +55,19 @@ const CheckoutModal: React.FC<Props> = ({ isOpen, onDismiss, reservaId }) => {
       const todos = (FolioService.listarTodos ? FolioService.listarTodos() : []) as Folio[];
       const f = todos.find((x: any) => x.reservaId === r.id || x.reserva?.id === r.id);
       setFolio(f);
-      const adelanto = Number((f as any)?.pagoAdelanto?.monto || 0) || 0;
-      const totalFolio = Number((f as any)?.totalCargos || (r as any)?.montoTotalReserva || 0) || 0;
+      const adelanto = Math.max(
+        0,
+        Number((f as any)?.pagoAdelanto?.monto ?? 0) ||
+        Number((f as any)?.montoPagoAdelanto ?? 0) ||
+        0
+      );
+      const totalReserva = Number((r as any)?.montoTotalReserva ?? 0) || 0;
+      const totalCargosFolio =
+        Number((f as any)?.totalCargos ?? 0) ||
+        Number((f as any)?.montoTotal ?? 0) ||
+        0;
+      // El total que se usa para cobrar es max(totalFolio, totalReserva)
+      const totalFolio = Math.max(totalReserva, totalCargosFolio);
       setMontoAdelanto(String(adelanto.toFixed(2)));
       const resta = Math.max(0, totalFolio - adelanto);
       setMontoPagoFinal(String(resta.toFixed(2)));
