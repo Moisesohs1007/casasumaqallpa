@@ -162,6 +162,17 @@ export interface Folio extends AuditFields {
   fechaAnulacion?: DateTimeISO;
 }
 
+export interface CargoFolioImpuestoDetalle {
+  impuestoId: string;
+  impuestoNombre?: string;
+  montoImpuesto: number;
+}
+export interface CargoFolioDescuentoDetalle {
+  descuentoId?: string;
+  descuentoNombre?: string;
+  montoDescuento: number;
+}
+
 export interface CargoFolio extends AuditFields {
   id: ID;
   folioId: ID;
@@ -173,9 +184,12 @@ export interface CargoFolio extends AuditFields {
   habitacionId?: ID;
   habitacion?: Habitacion;
   comandaId?: ID;
+  comandaDetalleId?: ID;
   tourId?: ID;
   trasladoId?: ID;
   referenciaExternaId?: ID;
+  referenciaId?: ID;
+  productoInventarioId?: ID;
   descripcion?: string;
   conceptoDetalle?: string[];
   cantidad: number;
@@ -187,6 +201,7 @@ export interface CargoFolio extends AuditFields {
   impuestoPorcentaje?: number;
   subtotal: number;
   total: number;
+  monto?: number;
   moneda: Moneda;
   tipoCambio?: number;
   cargoAuto: boolean;
@@ -202,6 +217,22 @@ export interface CargoFolio extends AuditFields {
   motivoAnulacion?: string;
   usuarioAnulacionId?: ID;
   comprobanteDetalleId?: ID;
+  huespedId?: ID;
+  reservaId?: ID;
+  usuarioId?: ID;
+  fechaAplicacion?: DateTimeISO;
+  fechaVencimiento?: DateTimeISO;
+  esAnulado?: boolean;
+  comprobanteAsociadoId?: ID;
+  comentarios?: string;
+  estado?: 'PENDIENTE_COBRO' | 'COBRADO' | 'ANULADO' | 'PENDIENTE';
+  impuestosIds?: ID[];
+  impuestosMontoDesglosado?: CargoFolioImpuestoDetalle[];
+  descuentosIds?: ID[];
+  descuentosMontoDesglosado?: CargoFolioDescuentoDetalle[];
+  propinaMonto?: number;
+  cajaSesionId?: ID;
+  aplicaIgv?: boolean;
 }
 
 export type OrigenCargoFolio =

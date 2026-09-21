@@ -179,8 +179,8 @@ export const FolioService = {
       0
     );
     const totalProp = cargos.reduce((s, c) => s + Number(c.propinaMonto || 0), 0);
-    const total = cargos.reduce((s, c) => s + Number(c.monto || 0), 0);
-    const pagado = (f.pagos || []).reduce((s, p) => s + Number(p.monto || 0), 0);
+    const total = cargos.reduce((s, c) => s + Number(c.total || c.monto || 0), 0);
+    const pagado = (f.pagos || []).reduce((s, p) => s + Number(p.monto || p.total || 0), 0);
     const saldo = Number((total - pagado).toFixed(2));
     return {
       ...f,
@@ -191,8 +191,8 @@ export const FolioService = {
       totalFolio: Number(total.toFixed(2)),
       totalPagado: Number(pagado.toFixed(2)),
       saldoPendiente: saldo,
-      creditoExcedido: f.limiteCreditoAutorizado > 0 && total > f.limiteCreditoAutorizado,
-    };
+      creditoExcedido: Number((f as any).limiteCreditoAutorizado || 0) > 0 && total > Number((f as any).limiteCreditoAutorizado || 0),
+    } as Folio & any;
   },
 
   recalcularTotales(folioId: string, updatedBy = 'system-recalc'): Folio | undefined {
