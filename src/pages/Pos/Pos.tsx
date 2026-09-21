@@ -19,7 +19,7 @@ import {
   IonFab, IonFabButton, IonFabList, IonIcon,
 } from '@ionic/react';
 import type { Color } from '@ionic/core';
-import { checkmarkCircle, alert, timeOutline, Icon, add, fastFood } from 'ionicons/icons';
+import { checkmarkCircle, alert, timeOutline, add, fastFood } from 'ionicons/icons';
 import TomarComanda from '../../components/modals/TomarComanda';
 import {
   PuntoVenta,
@@ -331,19 +331,14 @@ const PosPage: React.FC = () => {
           </IonRow>
         </IonGrid>
 
-        <IonFab slot="fixed" vertical="bottom" horizontal="end" style={{ margin: 16, zIndex: 10 }}>
-          <IonFabButton color="success" onClick={() => setTomarComandaOpen(true)}>
-            <IonIcon icon={add} />
+        <IonFab slot="fixed" vertical="bottom" horizontal="end" style={{ margin: 16, zIndex: 9999, position: 'fixed', right: 24, bottom: 24 }}>
+          <IonFabButton
+            color="success"
+            onClick={() => setTomarComandaOpen(true)}
+            title="🧾 Nueva comanda / Room Service"
+          >
+            <IonIcon icon={fastFood} />
           </IonFabButton>
-          <IonFabList side="top">
-            <IonFabButton
-              color="primary"
-              onClick={() => setTomarComandaOpen(true)}
-              title="Nueva comanda / Room Service"
-            >
-              <IonIcon icon={fastFood} />
-            </IonFabButton>
-          </IonFabList>
         </IonFab>
 
         <TomarComanda
