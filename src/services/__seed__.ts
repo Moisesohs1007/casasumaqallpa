@@ -1695,8 +1695,8 @@ const buildCargoAlojamiento = (folioId: string, rh: Reserva['habitaciones'][numb
     motivoAnulacion: '',
     comprobanteAsociadoId: undefined,
     comentarios: `Cargo automático check-in. Folio #${folioNum}. R: ${rh.reservaId}`,
-    createdAt: seedUtil.nowISO(),
-    updatedAt: seedUtil.nowISO(),
+    createdAt: hoy(),
+    updatedAt: hoy(),
     createdBy: 'USR-RECEP-0002',
     updatedBy: 'USR-RECEP-0002',
   };
@@ -1748,8 +1748,8 @@ const folioCheckIn = (r: Reserva, folioNum: string, num = 'F-2026-0920'): Folio 
     notasInternas: `Folio abierto en Check-in automático. Hab ${rh.habitacion.codigo}. Cualquier consumo POS se carga automáticamente.`,
     comprobantePrevioId: undefined,
     comprobanteFinalId: undefined,
-    createdAt: seedUtil.nowISO(),
-    updatedAt: seedUtil.nowISO(),
+    createdAt: hoy(),
+    updatedAt: hoy(),
     createdBy: 'USR-RECEP-0002',
     updatedBy: 'USR-RECEP-0002',
   };
