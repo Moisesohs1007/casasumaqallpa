@@ -318,7 +318,8 @@ export const ComandaService = {
       const precio = Number(prod.precioVentaBase) || 0;
       const nominal = Number((linea.cantidad * precio).toFixed(2));
       const impuestosOrig = Array.isArray(prod.impuestosIds) && prod.impuestosIds.length > 0 ? prod.impuestosIds.slice() : null;
-      const selvaActivo = impuestosOrig ? impuestosOrig.includes('IMP-SELVA-5') : true;
+      // Usuario confirmó: SOLO IGV 18%. NO hay IGV Zona Selva 5% por defecto.
+      const selvaActivo = impuestosOrig ? impuestosOrig.includes('IMP-SELVA-5') : false;
       const igvActivo = impuestosOrig ? impuestosOrig.includes('IMP-IGV-18') : true;
       const impuestosIdsFinal: string[] = [];
       if (igvActivo) impuestosIdsFinal.push('IMP-IGV-18');

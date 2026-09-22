@@ -414,11 +414,6 @@ const impuestoIGV: ImpuestoTarifa = {
   valor: 18.00, descripcion: 'Impuesto General a las Ventas - Perú', afectaBaseImponible: true, ...auditSeed
 };
 
-const impuestoSelva: ImpuestoTarifa = {
-  id: 'IMP-SELVA-5', nombre: 'IGV Selva 5% Adicional', codigo: 'IGV_SELVA', tipo: 'PORCENTAJE',
-  valor: 5.00, descripcion: 'Impuesto adicional a la venta en zona de selva baja', afectaBaseImponible: true, ...auditSeed
-};
-
 const propinasSugeridas = [5, 7, 10];
 
 const modificadoresFBSeed: ModificadorProducto[] = [
@@ -579,7 +574,7 @@ const tarifasSeed: Tarifa[] = [
     politicaCancelacionId: 'POL-CANCEL-48H',
     fechaInicioVigencia: addDaysISO(hoy(), -365),
     fechaFinVigencia: addDaysISO(hoy(), 730),
-    impuestosIds: ['IMP-IGV-18', 'IMP-SELVA-5'],
+    impuestosIds: ['IMP-IGV-18'],
     estado: 'ACTIVO', ...auditSeed
   },
   {
@@ -591,7 +586,7 @@ const tarifasSeed: Tarifa[] = [
     politicaCancelacionId: 'POL-CANCEL-72H',
     fechaInicioVigencia: addDaysISO(hoy(), -365),
     fechaFinVigencia: addDaysISO(hoy(), 730),
-    impuestosIds: ['IMP-IGV-18', 'IMP-SELVA-5'],
+    impuestosIds: ['IMP-IGV-18'],
     estado: 'ACTIVO', ...auditSeed
   },
   {
@@ -603,7 +598,7 @@ const tarifasSeed: Tarifa[] = [
     politicaCancelacionId: 'POL-CANCEL-7D',
     fechaInicioVigencia: addDaysISO(hoy(), -365),
     fechaFinVigencia: addDaysISO(hoy(), 730),
-    impuestosIds: ['IMP-IGV-18', 'IMP-SELVA-5'],
+    impuestosIds: ['IMP-IGV-18'],
     estado: 'ACTIVO', ...auditSeed
   },
   {
@@ -1075,7 +1070,7 @@ const puntoVentaPrincipal: PuntoVenta = {
   ubicacion: 'Planta baja, frente a piscina y jardín principal',
   numeroSerieEquipo: null,
   impuestoPredeterminadoId: 'IMP-IGV-18',
-  impuestosAdicionalesIds: ['IMP-SELVA-5'],
+  impuestosAdicionalesIds: [],
   monedaPredeterminada: 'PEN',
   propinaSugeridaPorcentaje: 10.0,
   permitePropinaVoluntaria: true,
@@ -1659,11 +1654,11 @@ const buildCargoAlojamiento = (folioId: string, rh: Reserva['habitaciones'][numb
   const noches = rh.totalNoches;
   const pu = Number(rh.precioBaseAcordadoPorNoche.toFixed(2));
   const total = Number((noches * pu).toFixed(2));
-  // SUNAT Perú: el precio por noche de tarifa ya INCLUYE impuestos (IGV18 + IGV Selva 5% = 23% total).
-  // Regla: NO calcular impuesto sobre nominal (evita "doble IGV"). Se desagrupa primero baseImponible.
-  // Lodge de Selva: por defecto TODAS las habitaciones cobran IGV Selva 5%.
-  const impIdsTarifa = (rh as any).impuestosIds || (rh as any).tarifa?.impuestosIds || ['IMP-IGV-18', 'IMP-SELVA-5'];
-  const tieneSelva = Array.isArray(impIdsTarifa) ? impIdsTarifa.includes('IMP-SELVA-5') : true;
+  // SUNAT Perú: el precio por noche de tarifa ya INCLUYE IGV 18%.
+  // Regla: NO calcular impuesto sobre nominal. Se desagrupa primero la base imponible.
+  // IMPORTANTE: Usuario confirmó 18% solo (NO hay IGV Zona Selva 5% adicional).
+  const impIdsTarifa = (rh as any).impuestosIds || (rh as any).tarifa?.impuestosIds || ['IMP-IGV-18'];
+  const tieneSelva = Array.isArray(impIdsTarifa) ? impIdsTarifa.includes('IMP-SELVA-5') : false;
   const divisor = tieneSelva ? 1.23 : 1.18;
   const subtotal = Number((total / divisor).toFixed(2));
   const imp18 = Number((subtotal * 0.18).toFixed(2));
@@ -1826,7 +1821,7 @@ const pagoFolioCerrado: PagoFolio = {
 const buildComandaDetalle = (comandaId: string, prod: ProductoFB, cant: number, observaciones = ''): ComandaDetalle => {
   const precio = Number(prod.precioVentaBase) || 0;
   const nominal = Number((precio * cant).toFixed(2));
-  const impuestosActivos = (Array.isArray(prod.impuestosIds) && prod.impuestosIds.length > 0) ? prod.impuestosIds : ['IMP-IGV-18', 'IMP-SELVA-5'];
+  const impuestosActivos = (Array.isArray(prod.impuestosIds) && prod.impuestosIds.length > 0) ? prod.impuestosIds : ['IMP-IGV-18'];
   const tieneSelva = impuestosActivos.includes('IMP-SELVA-5');
   const divisorDesagrupacion = tieneSelva ? 1.23 : 1.18;
   const baseImponible = Number((nominal / divisorDesagrupacion).toFixed(2));
@@ -2065,7 +2060,7 @@ export const seed = {
   audit: auditSeed,
   alergenos: alergenosSeed,
   estacionesCocina: estacionesCocinaSeed,
-  impuestos: [impuestoIGV, impuestoSelva],
+  impuestos: [impuestoIGV],
   categoriasFB: categoriasFBSeed,
   productosFB: productosFBSeed,
   modificadoresFB: modificadoresFBSeed,
