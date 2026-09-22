@@ -115,16 +115,22 @@ const ReservaDetalle: React.FC = () => {
 
   useIonViewWillEnter(() => {
     if (!id) return;
-    const idStr = String(id);
-    const esReservaValida = /^(RES-|R-)?\d+$/i.test(idStr) || /^\d+$/.test(idStr);
-    if (!esReservaValida || idStr.toLowerCase() === 'nueva' || idStr.toLowerCase() === 'nuevo') {
+    const idStr = String(id).trim();
+    const esNuevaLiteral = idStr.toLowerCase() === 'nueva' || idStr.toLowerCase() === 'nuevo' || idStr.toLowerCase().includes('/reservasnueva') || idStr.toLowerCase().includes('reservasnuevo');
+    if (esNuevaLiteral) {
       setNoEncontrada(false);
       setErrorMsg(null);
       setSuccessMsg(null);
       router.push('/nueva-reserva', 'root', 'replace');
       return;
     }
-    cargar(id);
+    const idUpper = idStr.toUpperCase().replace(/[^A-Z0-9]/g, '');
+    const esIdLiteralRerserva = /^(RES)?R?\d+$/.test(idUpper) || /^\d+$/.test(idUpper) || idUpper.startsWith('RES') || idUpper.includes('R100') || idUpper.match(/R\d{3,}$/);
+    if (!esIdLiteralRerserva) {
+      cargar(id);
+    } else {
+      cargar(id);
+    }
     setErrorMsg(null);
     setSuccessMsg(null);
     setMotivoCancelacion('');
