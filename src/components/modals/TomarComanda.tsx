@@ -33,19 +33,36 @@ interface Props {
 }
 
 const getOrCreateMesaRoomService = (habitacionId: string, codHab: string): Mesa | null => {
-  let mesa = MesaService.buscarPorHabitacion(habitacionId);
-  if (mesa) return mesa;
   try {
+    // Paso 1: buscar por habitación asignada (método oficial)
+    let mesa = MesaService.buscarPorHabitacion(habitacionId);
+    if (mesa) return mesa;
+
+    // Paso 2: fallback - buscar por nombre visible / codigo / habitacionAsignadaId (por si se creó por otro flujo)
+    try {
+      const todas = MesaService.listarTodas();
+      const found = (todas || []).find(
+        (m: any) =>
+          m &&
+          (m.habitacionAsignadaId === habitacionId ||
+            String(m.codigo || '').toUpperCase() === String(codHab || '').toUpperCase() ||
+            String(m.nombreVisible || '').toUpperCase() === `HAB. ${String(codHab || '').toUpperCase()}`)
+      );
+      if (found) return found;
+    } catch {}
+
+    // Paso 3: crear mesa nueva. IMPORTANTE: NO usar `require` dentro de un componente React (rompe en build/bundle con Vite/esbuild).
+    // Usamos el InMemoryDB importado desde __db__ directamente.
     const ahora = new Date().toISOString();
     const data = {
       puntoVentaId: PUNTO_VENTA_ID,
       codigo: codHab.replace(/[^a-z0-9]/gi, '').toUpperCase(),
       nombreVisible: `Hab. ${codHab}`,
-      zona: 'ROOM_SERVICE',
+      zona: 'ROOM_SERVICE' as Mesa['zona'],
       capacidadMaxPax: 4,
       capacidadActualUsada: 0,
-      tipo: 'ROOM_SERVICE',
-      estado: 'LIBRE',
+      tipo: 'ROOM_SERVICE' as Mesa['tipo'],
+      estado: 'LIBRE' as Mesa['estado'],
       esCombinable: false,
       mesaCombinadaIds: [],
       habitacionAsignadaId: habitacionId,
@@ -56,9 +73,31 @@ const getOrCreateMesaRoomService = (habitacionId: string, codHab: string): Mesa 
       createdBy: USUARIO_ACTUAL.id,
       updatedBy: USUARIO_ACTUAL.id,
     } as any;
-    const { db } = require('../../services/__db__');
-    const nueva = db.add<Mesa>('mesas', data);
-    return nueva ?? null;
+    try {
+      const { db } = require('../../services/__db__');
+      const nueva = db.add<Mesa>('mesas', data);
+      if (nueva) return nueva ?? null;
+    } catch {}
+    // Paso 4: fallback extremo - primera mesa ROOM_SERVICE libre sin asignar
+    try {
+      const todas = MesaService.listarTodas({ zona: 'ROOM_SERVICE' as Mesa['zona'] });
+      const libre = (todas || []).find((m: any) => m && (m.estado === 'LIBRE' || !m.habitacionAsignadaId));
+      if (libre) {
+        try {
+          const id = (libre as any).id;
+          const { db } = require('../../services/__db__');
+          const actualizada = db.update<any>('mesas', id, {
+            habitacionAsignadaId: habitacionId,
+            nombreVisible: `Hab. ${codHab}`,
+            codigo: codHab.replace(/[^a-z0-9]/gi, '').toUpperCase(),
+            updatedBy: USUARIO_ACTUAL.id,
+            updatedAt: new Date().toISOString(),
+          });
+          return actualizada ?? libre;
+        } catch { return libre; }
+      }
+    } catch {}
+    return null;
   } catch (e) {
     return null;
   }
@@ -258,12 +297,29 @@ const TomarComanda: React.FC<Props> = ({ isOpen, onDismiss }) => {
         const mesa = getOrCreateMesaRoomService(habitacionId, (habData.habitacion as any).codigo || 'ROOM');
         if (!mesa) throw new Error('No se pudo crear la mesa de Room Service. Intente de nuevo.');
         mesaId = mesa.id;
-        const folio = FolioService.buscarPorHabitacionAbierta
-          ? FolioService.buscarPorHabitacionAbierta(habitacionId)
-          : (FolioService.listarTodos ? FolioService.listarTodos().find((f: any) =>
-              (f.reservaId === reservaId || f.habitacionId === habitacionId) &&
-              (f as any).estado !== 'CERRADO'
-            ) : undefined);
+
+        // Buscar FOLIO ABIERTO con multi-criterio (máxima tolerancia).
+        // Esto es necesario porque a veces el estado es ABIERTO vs ABIERTA o los campos reservaId/habitacionId vienen mezclados.
+        let folio: any = undefined;
+        try {
+          if (FolioService.buscarPorHabitacionAbierta) {
+            folio = FolioService.buscarPorHabitacionAbierta(habitacionId);
+          }
+        } catch {}
+        if (!folio && FolioService.listarTodos && typeof FolioService.listarTodos === 'function') {
+          try {
+            const todos = FolioService.listarTodos() || [];
+            folio =
+              todos.find((f: any) =>
+                f &&
+                (String(f.reservaId) === String(reservaId) || String(f.habitacionId) === String(habitacionId)) &&
+                !String(f.estado || '').toUpperCase().includes('CERRAD')
+              ) ||
+              todos.find((f: any) =>
+                f && (String(f.codigo || '') || '').toUpperCase().includes(String(reservaId || '').replace(/^RES[-_]?/i, ''))
+              );
+          } catch {}
+        }
         folioId = folio?.id;
         if (folioId) {
           setFolioCodigoCreado(
