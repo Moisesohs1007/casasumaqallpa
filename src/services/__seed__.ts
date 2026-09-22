@@ -1640,43 +1640,65 @@ const reservasSeed: Reserva[] = [reserva1, reserva2, reserva3, reserva4, reserva
 // ===== FOLIOS =====
 const buildCargoAlojamiento = (folioId: string, rh: Reserva['habitaciones'][number], folioNum: string): CargoFolio => {
   const noches = rh.totalNoches;
-  const monto = Number((noches * rh.precioBaseAcordadoPorNoche).toFixed(2));
+  const pu = Number(rh.precioBaseAcordadoPorNoche.toFixed(2));
+  const total = Number((noches * pu).toFixed(2));
+  const subtotal = Number((total / 1.23).toFixed(2));
+  const imp18 = Number((subtotal * 0.18).toFixed(2));
+  const imp5 = Number((subtotal * 0.05).toFixed(2));
   return {
     id: generateUUID(),
     folioId,
-    tipo: 'ALOJAMIENTO',
-    concepto: `Alojamiento ${noches} noche${noches > 1 ? 's' : ''} - Hab ${rh.habitacion.codigo}`,
-    descripcion: `${noches} noches de alojamiento en habitación. Tarifa base S/ ${rh.precioBaseAcordadoPorNoche.toFixed(2)}`,
-    origen: 'ALOJAMIENTO_RESERVA',
-    referenciaId: rh.id,
-    reservaId: rh.reservaId || '',
+    numeroLinea: 1,
+    tipoConcepto: 'ALOJAMIENTO',
+    concepto: `Alojamiento ${noches} noche${noches > 1 ? 's' : ''} · Hab ${rh.habitacion.codigo}`,
+    descripcion: `${noches} noches de alojamiento en habitación. Tarifa base S/ ${pu.toFixed(2)} / noche. Folio #${folioNum}`,
+    categoria: 'Alojamiento',
     habitacionId: rh.habitacionId,
+    reservaId: rh.reservaId || '',
+    referenciaId: rh.id,
+    referenciaExternaId: rh.id,
+    comandaId: undefined,
+    comandaDetalleId: undefined,
+    productoInventarioId: undefined,
+    cajaSesionId: undefined,
     huespedId: '',
-    productoInventarioId: null,
-    comandaId: null,
-    comandaDetalleId: null,
-    cajaSesionId: null,
-    usuarioId: 'USR-RECEP-0002',
-    monto,
+    cantidad: noches,
+    unidadMedida: 'NOCHE',
+    precioUnitario: pu,
+    descuentoMonto: 0,
+    descuentoPorcentaje: 0,
+    montoImpuesto: Number((imp18 + imp5).toFixed(2)),
+    impuestoPorcentaje: 23,
+    subtotal,
+    total,
+    monto: total,
     moneda: 'PEN',
     impuestosIds: ['IMP-IGV-18', 'IMP-SELVA-5'],
     impuestosMontoDesglosado: [
-      { impuestoId: 'IMP-IGV-18', impuestoNombre: 'IGV 18%', montoImpuesto: Number((monto * 0.18).toFixed(2)) },
-      { impuestoId: 'IMP-SELVA-5', impuestoNombre: 'IGV Selva 5%', montoImpuesto: Number((monto * 0.05).toFixed(2)) },
+      { impuestoId: 'IMP-IGV-18', impuestoNombre: 'IGV 18%', montoImpuesto: imp18 },
+      { impuestoId: 'IMP-SELVA-5', impuestoNombre: 'IGV Selva 5%', montoImpuesto: imp5 },
     ],
-    subtotal: Number((monto / 1.23).toFixed(2)),
     descuentosIds: [],
     descuentosMontoDesglosado: [],
     propinaMonto: 0,
+    cargoAuto: true,
+    origenCargo: 'AUTO_NOCHE_ALOJAMIENTO',
+    usuarioId: 'USR-RECEP-0002',
+    usuarioRegistroId: 'USR-RECEP-0002',
+    nombreUsuarioAplicaCargo: 'Recepción',
     estado: 'PENDIENTE_COBRO',
     fechaCargo: hoy(),
     fechaAplicacion: hoy(),
     fechaVencimiento: addDaysISO(hoy(), rh.totalNoches),
     esAnulado: false,
+    anulado: false,
     motivoAnulacion: '',
-    comprobanteAsociadoId: null,
-    comentarios: `Cargo automático check-in. Folio #${folioNum}`,
-    ...auditSeed
+    comprobanteAsociadoId: undefined,
+    comentarios: `Cargo automático check-in. Folio #${folioNum}. R: ${rh.reservaId}`,
+    createdAt: seedUtil.nowISO(),
+    updatedAt: seedUtil.nowISO(),
+    createdBy: 'USR-RECEP-0002',
+    updatedBy: 'USR-RECEP-0002',
   };
 };
 
@@ -1684,50 +1706,66 @@ const folioCheckIn = (r: Reserva, folioNum: string, num = 'F-2026-0920'): Folio 
   const rh = r.habitaciones[0];
   const huespedId = r.huespedId;
   const habitacionId = rh.habitacionId;
-  const cargoAloj = buildCargoAlojamiento('', rh, folioNum);
-  const cargos: CargoFolio[] = [{ ...cargoAloj, folioId: '' }];
+  const folioId = `FOL-${r.id}`;
+  const cargoAloj = buildCargoAlojamiento(folioId, rh, folioNum);
+  const cargos: CargoFolio[] = [cargoAloj];
+  const subTot = cargos.reduce((sum, c) => sum + Number(c.subtotal || 0), 0);
+  const totImp = cargos.reduce((sum, c) => sum + (c.impuestosMontoDesglosado?.reduce((s, i) => s + Number(i.montoImpuesto || 0), 0) || 0), 0);
+  const tot = cargos.reduce((sum, c) => sum + Number(c.total || c.monto || 0), 0);
   return {
-    id: `FOL-${r.id}`,
+    id: folioId,
+    codigo: folioNum,
     numeroFolio: num,
     reservaId: r.id,
     reserva: r,
-    checkInId: r.checkInInfo ? `CHECKIN-${r.id}` : null,
+    checkInId: r.checkInInfo ? `CHECKIN-${r.id}` : undefined,
     huespedId,
     huesped: r.huesped,
     habitacionId,
     habitacion: rh.habitacion,
     fechaApertura: r.fechaCheckinReal || r.fechaCheckin,
-    fechaCierre: null,
+    fechaCierre: undefined,
     fechaCheckout: r.fechaCheckout,
-    fechaCheckoutReal: null,
-    estado: 'ABIERTO',
+    fechaCheckoutReal: undefined,
+    estado: r.checkInInfo ? 'ABIERTO' as any : 'PENDIENTE_COBRO' as any,
     esCuentaCompartida: false,
     foliosCompartidosIds: [],
     usuarioIdApertura: r.checkInInfo?.recepcionistaId || 'USR-RECEP-0002',
-    usuarioIdCierre: null,
+    usuarioIdCierre: undefined,
     moneda: 'PEN',
     cargos,
     pagos: [],
-    subTotalSinImpuestos: cargos.reduce((sum, c) => sum + c.subtotal, 0),
-    totalImpuestos: cargos.reduce((sum, c) => sum + (c.impuestosMontoDesglosado?.reduce((s, i) => s + i.montoImpuesto, 0) || 0), 0),
+    subTotalSinImpuestos: Number(subTot.toFixed(2)),
+    totalImpuestos: Number(totImp.toFixed(2)),
     totalPropinas: 0,
     totalDescuentos: 0,
     totalBonificacionesCortesia: 0,
-    totalFolio: cargos.reduce((sum, c) => sum + c.monto, 0),
+    totalFolio: Number(tot.toFixed(2)),
     totalPagado: 0,
-    saldoPendiente: cargos.reduce((sum, c) => sum + c.monto, 0),
+    saldoPendiente: Number(tot.toFixed(2)),
     limiteCreditoAutorizado: 3000,
     creditoExcedido: false,
     notasInternas: `Folio abierto en Check-in automático. Hab ${rh.habitacion.codigo}. Cualquier consumo POS se carga automáticamente.`,
-    comprobantePrevioId: null,
-    comprobanteFinalId: null,
-    ...auditSeed
+    comprobantePrevioId: undefined,
+    comprobanteFinalId: undefined,
+    createdAt: seedUtil.nowISO(),
+    updatedAt: seedUtil.nowISO(),
+    createdBy: 'USR-RECEP-0002',
+    updatedBy: 'USR-RECEP-0002',
   };
 };
 
 const foliosSeed: Folio[] = [
   folioCheckIn(reserva1, 'F-2026-0920-001', 'F-2026-0920-001'),
   folioCheckIn(reserva3, 'F-2026-0920-002', 'F-2026-0920-002'),
+  (() => {
+    // R-1004 CAB-04 check-in (user captura A3 folio F-2E88)
+    try {
+      return folioCheckIn(reserva4, 'F-2E88', 'F-2E88');
+    } catch {
+      return folioCheckIn(reserva3, 'F-2E88', 'F-2E88');
+    }
+  })(),
 ];
 
 // Pagos del folio cerrado de la reserva 5
