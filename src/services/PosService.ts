@@ -186,14 +186,28 @@ export const ComandaService = {
       s + Number(d.descuentoMonto || 0), 0
     );
     const propinaSugerida = c.propinaSugerida ?? Number((total * 0.10).toFixed(2));
+    // Impuestos: usar los desgloses reales de cada línea (ya calculados por línea con su divisor 1.18 / 1.23).
+    // Fallback: si detalles no tienen impuestos, asumir solo IGV 18% (usuario confirmó: no selva 5%).
+    const impuestosDetalleMap = new Map<string, { impuestoId: string; impuestoNombre: string; montoImpuesto: number }>();
+    for (const d of detalles) {
+      const arr = (d.impuestosMontoDesglosado as any[]) || [];
+      for (const x of arr) {
+        const id = String(x.impuestoId);
+        if (!id || id === 'IMP-SELVA-5') continue; // NO selva
+        const prev = impuestosDetalleMap.get(id) || { impuestoId: id, impuestoNombre: String(x.impuestoNombre || id), montoImpuesto: 0 };
+        prev.montoImpuesto += Number(x.montoImpuesto || 0);
+        impuestosDetalleMap.set(id, prev);
+      }
+    }
+    let impuestosDetalle = Array.from(impuestosDetalleMap.values()).map((x) => ({ ...x, montoImpuesto: Number(x.montoImpuesto.toFixed(2)) }));
+    if (impuestosDetalle.length === 0) {
+      impuestosDetalle = [{ impuestoId: 'IMP-IGV-18', impuestoNombre: 'IGV 18%', montoImpuesto: Number((subtotal * 0.18).toFixed(2)) }];
+    }
     return {
       ...c,
       totalNetoSinImpuestos: Number(subtotal.toFixed(2)),
-      totalImpuestos: Number(impuestos.toFixed(2)),
-      impuestosDetalle: [
-        { impuestoId: 'IMP-IGV-18', impuestoNombre: 'IGV 18%', montoImpuesto: Number((subtotal * 0.18).toFixed(2)) },
-        { impuestoId: 'IMP-SELVA-5', impuestoNombre: 'IGV Selva 5%', montoImpuesto: Number((subtotal * 0.05).toFixed(2)) },
-      ],
+      totalImpuestos: Number(impuestosDetalle.reduce((s, x) => s + Number(x.montoImpuesto || 0), 0).toFixed(2)),
+      impuestosDetalle,
       totalDescuentos: Number(descuentos.toFixed(2)),
       propinaSugerida: Number(propinaSugerida.toFixed(2)),
       totalComanda: Number(total.toFixed(2)),

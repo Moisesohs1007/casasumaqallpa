@@ -313,8 +313,10 @@ export const FolioService = {
 
       // Cargo AUTOMÁTICO de alojamiento por habitación (días de la reserva)
       const montoCargoAlojamiento = Number((rh.totalNoches * rh.precioBaseAcordadoPorNoche).toFixed(2));
-      const subtotal = Number((montoCargoAlojamiento / 1.23).toFixed(2));
-      const impuestosIds = ['IMP-IGV-18', 'IMP-SELVA-5'];
+      // Usuario confirmó: SOLO IGV 18%. NO hay IMP-SELVA-5.
+      const divisor = 1.18;
+      const subtotal = Number((montoCargoAlojamiento / divisor).toFixed(2));
+      const impuestosIds = ['IMP-IGV-18'];
       const cargo: CargoFolio = {
         id: seedUtil.generateUUID(),
         folioId: folioSeed.id,
@@ -334,10 +336,11 @@ export const FolioService = {
         monto: montoCargoAlojamiento,
         moneda: reservaActualizada.moneda,
         impuestosIds,
-        impuestosMontoDesglosado: impuestosIds.map((impId) => {
-          const imp = ImpuestoService.buscarPorId(impId)!;
-          const montoImp = imp.tipo === 'PORCENTAJE' ? Number(((subtotal * imp.valor) / 100).toFixed(2)) : 0;
-          return { impuestoId: impId, impuestoNombre: imp.nombre, montoImpuesto: montoImp };
+        impuestosMontoDesglosado: impuestosIds.flatMap((impId) => {
+          const imp = ImpuestoService.buscarPorId(impId);
+          if (!imp) return []; // IMPORTANTE null-safety: si impuesto id no existe en maestro → SKIP no crash
+          const montoImp = imp.tipo === 'PORCENTAJE' ? Number(((subtotal * (Number(imp.valor) || 0)) / 100).toFixed(2)) : Number(imp.valor) || 0;
+          return [{ impuestoId: impId, impuestoNombre: imp.nombre || impId, montoImpuesto: montoImp }];
         }),
         subtotal,
         descuentosIds: [],
