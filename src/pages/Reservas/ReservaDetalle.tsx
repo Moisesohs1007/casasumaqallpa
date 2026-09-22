@@ -13,6 +13,7 @@ import {
 import type { Color } from '@ionic/core';
 import type { EstadoReserva, Reserva, Huesped, Habitacion, Folio } from '../../types';
 import { ReservaService, HuespedService, HabitacionService, FolioService } from '../../services';
+import { CargoFolioService, PagoFolioService } from '../../services/FolioService';
 import CheckinModal from '../../components/modals/CheckinModal';
 import CheckoutModal from '../../components/modals/CheckoutModal';
 import './Reservas.css';
@@ -82,10 +83,30 @@ const ReservaDetalle: React.FC = () => {
   const resolverVinculados = (r: any) => {
     try {
       const todosFolios = (FolioService.listarTodos ? FolioService.listarTodos() : []) as any[];
-      const folio = todosFolios.find(f =>
-        f.reservaId === r.id || f.reserva?.id === r.id ||
-        (r.codigo && (f.reservaCodigo === r.codigo || f.codigoReserva === r.codigo))
-      );
+      const habIds: string[] = [];
+      try {
+        for (const h of (r.habitaciones || []) as any[]) {
+          if (h?.habitacionId) habIds.push(String(h.habitacionId));
+          if (h?.habitacion?.id) habIds.push(String(h.habitacion.id));
+        }
+      } catch {}
+      const folio = todosFolios.find((f) => {
+        const fAny = f as any;
+        const frId = String(fAny.reservaId ?? fAny.reserva?.id ?? '');
+        const fc = String(fAny.codigo ?? fAny.codigoFolio ?? fAny.numeroFolio ?? fAny.id ?? '').toUpperCase();
+        const fhId = String(fAny.habitacionId ?? fAny.habitacion?.id ?? '');
+        const rc = String(r.codigoReserva ?? r.codigo ?? r.id ?? '').toUpperCase();
+        const rId = String(r.id ?? '');
+        if (frId && (frId === rId || frId.toUpperCase().includes(rc.replace(/[^A-Z0-9]/g, '')))) return true;
+        if (fAny.reservaCodigo && String(fAny.reservaCodigo).toUpperCase() === rc) return true;
+        if (fAny.reserva?.codigoReserva && String(fAny.reserva.codigoReserva).toUpperCase() === rc) return true;
+        if (rc && fc.includes(rc.replace(/[^A-Z0-9]/g, ''))) return true;
+        if (fhId && habIds.includes(fhId)) return true;
+        for (const hab of habIds) {
+          if (fc.includes(hab.replace(/[^A-Z0-9]/g, ''))) return true;
+        }
+        return false;
+      });
       setFolioVinculado(folio ?? null);
     } catch {
       setFolioVinculado(null);
@@ -299,23 +320,64 @@ const ReservaDetalle: React.FC = () => {
                             </IonItem>
                             <div style={{ marginTop: 12 }}>
                               {folioVinculado ? (
-                                <IonChip
-                                  color="warning"
-                                  outline
-                                  onClick={() => router.push(`/folio/${folioVinculado.id}`)}
-                                  style={{
-                                    cursor: 'pointer',
-                                    padding: '10px 14px',
-                                    border: '1px solid #d97706',
-                                    fontWeight: 700,
-                                    fontSize: 14,
-                                    background: '#fffbeb',
-                                    height: 'auto',
-                                  }}
-                                >
-                                  <IonIcon icon={documentText} />
-                                  👉 Folio F-{String((folioVinculado as any).codigo || (folioVinculado as any).numeroFolio || folioVinculado.id).slice(-4).toUpperCase()} · Clic aquí VER CUENTA GENERAL · Saldo pendiente S/ {(Number((folioVinculado as any).saldoPendiente ?? (folioVinculado as any).totalFolio ?? total) || 0).toFixed(2)}
-                                </IonChip>
+                                (() => {
+                                  const fAny = folioVinculado as any;
+                                  let totalCargosFolio = 0;
+                                  let totalPagosFolio = 0;
+                                  let cargosPosCount = 0;
+                                  let cargosPosMonto = 0;
+                                  try {
+                                    const cargos = Array.isArray(fAny.cargos) ? fAny.cargos : (CargoFolioService && typeof CargoFolioService.listarPorFolio === 'function' ? CargoFolioService.listarPorFolio(fAny.id) : []);
+                                    for (const c of (cargos || []) as any[]) {
+                                      const m = Number(c.total ?? c.monto ?? c.montoTotal ?? c.totalLinea ?? c.importeTotal ?? 0) || 0;
+                                      totalCargosFolio += m;
+                                      if (String(c.origenCargo || c.origen || c.tipoConcepto || '').toUpperCase().includes('ROOM') || String(c.tipoConcepto || c.origen || '').toUpperCase().includes('SERVICE') || String(c.categoriaConcepto || '').toUpperCase().includes('COCINA') || String(c.categoriaConcepto || '').toUpperCase().includes('BAR') || String(c.usuarioRegistroId || '').startsWith('USR-MOISES')) {
+                                        cargosPosCount += 1;
+                                        cargosPosMonto += m;
+                                      }
+                                    }
+                                  } catch {}
+                                  try {
+                                    const pagos = Array.isArray(fAny.pagos) ? fAny.pagos : (PagoFolioService && typeof PagoFolioService.listarPorFolio === 'function' ? PagoFolioService.listarPorFolio(fAny.id) : []);
+                                    for (const p of (pagos || []) as any[]) {
+                                      totalPagosFolio += Number(p.monto ?? p.montoPagado ?? p.importePago ?? 0) || 0;
+                                    }
+                                  } catch {}
+                                  totalCargosFolio = Math.max(totalCargosFolio, Number(fAny.totalCargos ?? fAny.totalFolio ?? total ?? 0) || 0);
+                                  totalPagosFolio = Math.max(totalPagosFolio, Number(fAny.totalPagos ?? fAny.totalPagado ?? Number(r.montoPagadoAnticipado ?? r.pagoAdelanto ?? 0) || 0) || 0);
+                                  const saldoFinal = Number(Math.max(0, totalCargosFolio - totalPagosFolio)) || 0;
+                                  const codCorto = String(fAny.codigo || fAny.numeroFolio || fAny.id).replace(/^FOL[-_]?/i, 'F-').replace(/^RES[-_]?/i, 'R-').slice(-8);
+                                  return (
+                                    <div>
+                                      <IonChip
+                                        color="warning"
+                                        outline
+                                        onClick={() => router.push(`/folio/${fAny.id}`)}
+                                        style={{
+                                          cursor: 'pointer',
+                                          padding: '10px 14px',
+                                          border: '1px solid #d97706',
+                                          fontWeight: 700,
+                                          fontSize: 14,
+                                          background: '#fffbeb',
+                                          height: 'auto',
+                                          minHeight: '48px',
+                                        }}
+                                      >
+                                        <IonIcon icon={documentText} />
+                                        👉 Folio {codCorto} · Clic aquí VER CUENTA GENERAL · Saldo pendiente S/ {saldoFinal.toFixed(2)}
+                                      </IonChip>
+                                      {cargosPosCount > 0 && (
+                                        <div style={{ marginTop: 8, padding: '8px 12px', background: '#ecfdf5', border: '1px solid #10b981', borderRadius: 8, fontSize: 13, fontWeight: 600, color: '#065f46' }}>
+                                          🚀 Cargos POS agregados recientemente: <strong>{cargosPosCount}</strong> item(s) = <strong>S/ {Number(cargosPosMonto).toFixed(2)}</strong> (Room Service / Bebidas / Cocina).
+                                        </div>
+                                      )}
+                                      <div style={{ marginTop: 6, fontSize: 12, color: '#4b5563' }}>
+                                        Total cargos (alojamiento + extras): S/ {totalCargosFolio.toFixed(2)} · Pagos/Adelantos: S/ {totalPagosFolio.toFixed(2)}
+                                      </div>
+                                    </div>
+                                  );
+                                })()
                               ) : (
                                 <IonNote>Sin folio abierto (se creará automáticamente al hacer Check-in).</IonNote>
                               )}
