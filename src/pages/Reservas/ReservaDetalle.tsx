@@ -100,7 +100,7 @@ const ReservaDetalle: React.FC = () => {
       setNoEncontrada(false);
       setErrorMsg(null);
       setSuccessMsg(null);
-      router.push('/reservas/nueva', 'root', 'replace');
+      router.push('/nueva-reserva', 'root', 'replace');
       return;
     }
     cargar(id);

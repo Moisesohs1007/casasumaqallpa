@@ -146,10 +146,7 @@ const ReservasPage: React.FC = () => {
         </IonList>
 
         <IonFab slot="fixed" vertical="bottom" horizontal="end" style={{ marginBottom: 90, marginRight: 10 }}>
-          <IonFabButton color="primary" onClick={() => {
-            router.goBack();
-            setTimeout(() => router.push('/reservas/nueva', 'root', 'replace'), 10);
-          }}>
+          <IonFabButton color="primary" onClick={() => router.push('/nueva-reserva', 'root', 'replace')}>
             <IonIcon icon={addCircle} />
           </IonFabButton>
         </IonFab>

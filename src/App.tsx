@@ -38,7 +38,7 @@ const App: React.FC = () => {
             <Route exact path="/reservas">
               <ReservasPage />
             </Route>
-            <Route exact path="/reservas/nueva">
+            <Route exact path="/nueva-reserva">
               <NuevaReservaPage />
             </Route>
             <Route exact path="/reservas/:id">
