@@ -93,7 +93,17 @@ const ReservaDetalle: React.FC = () => {
   };
 
   useIonViewWillEnter(() => {
-    if (id) cargar(id);
+    if (!id) return;
+    const idStr = String(id);
+    const esReservaValida = /^(RES-|R-)?\d+$/i.test(idStr) || /^\d+$/.test(idStr);
+    if (!esReservaValida || idStr.toLowerCase() === 'nueva' || idStr.toLowerCase() === 'nuevo') {
+      setNoEncontrada(false);
+      setErrorMsg(null);
+      setSuccessMsg(null);
+      router.push('/reservas/nueva', 'root', 'replace');
+      return;
+    }
+    cargar(id);
     setErrorMsg(null);
     setSuccessMsg(null);
     setMotivoCancelacion('');
