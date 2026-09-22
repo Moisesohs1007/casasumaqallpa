@@ -315,20 +315,32 @@ export const ComandaService = {
       const prod = CatalogoFBService.buscarProductoPorId(linea.productoId);
       if (!prod) continue;
       const presentacionId = linea.presentacionId || prod.presentacionesActivasIds[0] || '';
-      const precio = prod.precioVentaBase;
-      const imps = (prod.impuestosIds && prod.impuestosIds.length ? prod.impuestosIds : ['IMP-IGV-18', 'IMP-SELVA-5']).map((impId) => {
+      const precio = Number(prod.precioVentaBase) || 0;
+      const nominal = Number((linea.cantidad * precio).toFixed(2));
+      const impuestosOrig = Array.isArray(prod.impuestosIds) && prod.impuestosIds.length > 0 ? prod.impuestosIds.slice() : null;
+      const selvaActivo = impuestosOrig ? impuestosOrig.includes('IMP-SELVA-5') : true;
+      const igvActivo = impuestosOrig ? impuestosOrig.includes('IMP-IGV-18') : true;
+      const impuestosIdsFinal: string[] = [];
+      if (igvActivo) impuestosIdsFinal.push('IMP-IGV-18');
+      if (selvaActivo) impuestosIdsFinal.push('IMP-SELVA-5');
+      if (impuestosIdsFinal.length === 0) impuestosIdsFinal.push('IMP-IGV-18');
+      const tieneSelva = impuestosIdsFinal.includes('IMP-SELVA-5');
+      const divisor = tieneSelva ? 1.23 : 1.18;
+      const baseImponible = Number((nominal / divisor).toFixed(2));
+      const imps = impuestosIdsFinal.map((impId) => {
         const imp = ImpuestoService.buscarPorId(impId);
-        if (!imp) return { impuestoId: impId, impuestoNombre: impId || 'IMPUESTO', montoImpuesto: 0 };
-        const base = (linea.cantidad * precio) / 1.23;
+        const porc = impId === 'IMP-IGV-18' ? 18 : 5;
+        if (!imp) return { impuestoId: impId, impuestoNombre: impId === 'IMP-IGV-18' ? 'IGV 18%' : 'IGV Selva 5%', montoImpuesto: 0 };
+        const monto = imp.tipo === 'PORCENTAJE' ? baseImponible * (porc / 100) : Number(imp.valor) || 0;
         return {
           impuestoId: impId,
-          impuestoNombre: imp.nombre || impId,
-          montoImpuesto: Number((imp.tipo === 'PORCENTAJE' ? ((base * imp.valor) / 100).toFixed(2) : '0') as unknown as number),
+          impuestoNombre: imp.nombre || (impId === 'IMP-IGV-18' ? 'IGV 18%' : 'IGV Selva 5%'),
+          montoImpuesto: Number(monto.toFixed(2)),
         };
       });
       const totalImpuestos = Number(imps.reduce((s, x) => s + Number(x.montoImpuesto || 0), 0).toFixed(2));
-      const montoLinea = Number((linea.cantidad * precio).toFixed(2));
-      const subtotal = Number(Math.max(0, montoLinea - totalImpuestos).toFixed(2));
+      const montoLinea = nominal;
+      const subtotal = baseImponible;
       const montoImpuesto = totalImpuestos;
       const detalle = db.add<ComandaDetalle>(KEY_COMDET, {
         comandaId,
