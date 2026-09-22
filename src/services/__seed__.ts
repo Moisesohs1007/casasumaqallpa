@@ -1659,9 +1659,19 @@ const buildCargoAlojamiento = (folioId: string, rh: Reserva['habitaciones'][numb
   const noches = rh.totalNoches;
   const pu = Number(rh.precioBaseAcordadoPorNoche.toFixed(2));
   const total = Number((noches * pu).toFixed(2));
-  const subtotal = Number((total / 1.23).toFixed(2));
+  // SUNAT Perú: el precio por noche de tarifa ya INCLUYE impuestos (IGV18 + IGV Selva 5% = 23% total).
+  // Regla: NO calcular impuesto sobre nominal (evita "doble IGV"). Se desagrupa primero baseImponible.
+  // Lodge de Selva: por defecto TODAS las habitaciones cobran IGV Selva 5%.
+  const impIdsTarifa = (rh as any).impuestosIds || (rh as any).tarifa?.impuestosIds || ['IMP-IGV-18', 'IMP-SELVA-5'];
+  const tieneSelva = Array.isArray(impIdsTarifa) ? impIdsTarifa.includes('IMP-SELVA-5') : true;
+  const divisor = tieneSelva ? 1.23 : 1.18;
+  const subtotal = Number((total / divisor).toFixed(2));
   const imp18 = Number((subtotal * 0.18).toFixed(2));
-  const imp5 = Number((subtotal * 0.05).toFixed(2));
+  const imp5 = tieneSelva ? Number((subtotal * 0.05).toFixed(2)) : 0;
+  const impuestosIdsFinal: string[] = ['IMP-IGV-18'];
+  if (tieneSelva) impuestosIdsFinal.push('IMP-SELVA-5');
+  const impuestosMontoDesglosadoFinal: any[] = [{ impuestoId: 'IMP-IGV-18', impuestoNombre: 'IGV 18%', montoImpuesto: imp18 }];
+  if (tieneSelva) impuestosMontoDesglosadoFinal.push({ impuestoId: 'IMP-SELVA-5', impuestoNombre: 'IGV Selva 5%', montoImpuesto: imp5 });
   return {
     id: generateUUID(),
     folioId,
@@ -1685,16 +1695,13 @@ const buildCargoAlojamiento = (folioId: string, rh: Reserva['habitaciones'][numb
     descuentoMonto: 0,
     descuentoPorcentaje: 0,
     montoImpuesto: Number((imp18 + imp5).toFixed(2)),
-    impuestoPorcentaje: 23,
+    impuestoPorcentaje: tieneSelva ? 23 : 18,
     subtotal,
     total,
     monto: total,
     moneda: 'PEN',
-    impuestosIds: ['IMP-IGV-18', 'IMP-SELVA-5'],
-    impuestosMontoDesglosado: [
-      { impuestoId: 'IMP-IGV-18', impuestoNombre: 'IGV 18%', montoImpuesto: imp18 },
-      { impuestoId: 'IMP-SELVA-5', impuestoNombre: 'IGV Selva 5%', montoImpuesto: imp5 },
-    ],
+    impuestosIds: impuestosIdsFinal,
+    impuestosMontoDesglosado: impuestosMontoDesglosadoFinal,
     descuentosIds: [],
     descuentosMontoDesglosado: [],
     propinaMonto: 0,
@@ -1817,7 +1824,16 @@ const pagoFolioCerrado: PagoFolio = {
 
 // ===== COMANDAS MOCK =====
 const buildComandaDetalle = (comandaId: string, prod: ProductoFB, cant: number, observaciones = ''): ComandaDetalle => {
-  const precio = prod.precioVentaBase;
+  const precio = Number(prod.precioVentaBase) || 0;
+  const nominal = Number((precio * cant).toFixed(2));
+  const impuestosActivos = (Array.isArray(prod.impuestosIds) && prod.impuestosIds.length > 0) ? prod.impuestosIds : ['IMP-IGV-18', 'IMP-SELVA-5'];
+  const tieneSelva = impuestosActivos.includes('IMP-SELVA-5');
+  const divisorDesagrupacion = tieneSelva ? 1.23 : 1.18;
+  const baseImponible = Number((nominal / divisorDesagrupacion).toFixed(2));
+  const impuestosMontoDesglosado = impuestosActivos.map((id) => {
+    const monto = id === 'IMP-IGV-18' ? baseImponible * 0.18 : baseImponible * 0.05;
+    return { impuestoId: id, impuestoNombre: id === 'IMP-IGV-18' ? 'IGV 18%' : 'IGV Selva 5%', montoImpuesto: Number(monto.toFixed(2)) };
+  });
   const linea: LineaComanda = {
     id: generateUUID(),
     numeroLinea: 1,
@@ -1831,13 +1847,10 @@ const buildComandaDetalle = (comandaId: string, prod: ProductoFB, cant: number, 
     observaciones,
     seleccionModificadores: [],
     alergenosOmitidosIds: [],
-    impuestosIds: prod.impuestosIds,
-    impuestosMontoDesglosado: prod.impuestosIds.map((id) => {
-      const monto = (precio * cant) * (id === 'IMP-IGV-18' ? 0.18 : 0.05);
-      return { impuestoId: id, impuestoNombre: id === 'IMP-IGV-18' ? 'IGV 18%' : 'IGV Selva 5%', montoImpuesto: Number(monto.toFixed(2)) };
-    }),
-    subtotal: Number((precio * cant / 1.23).toFixed(2)),
-    montoLinea: Number((precio * cant).toFixed(2)),
+    impuestosIds: impuestosActivos,
+    impuestosMontoDesglosado,
+    subtotal: baseImponible,
+    montoLinea: nominal,
     estadoPreparacion: 'PENDIENTE',
     estacionCocinaId: prod.estacionesCocinaIds[0] || null,
     usuarioIdAsignadoEstacion: null,
@@ -1865,6 +1878,21 @@ const buildComanda = (
   opts: Partial<Comanda> = {}
 ): Comanda => {
   const total = detalles.reduce((sum, d) => sum + d.montoLinea, 0);
+  // IMP: cabecera calculada desde los items (no /1.23 siempre) porque no todos productos tienen SELVA5
+  const totalSubtotal = detalles.reduce((s, d) => s + Number(d.subtotal || 0), 0);
+  const totalIGV18 = detalles.reduce((s, d) => {
+    const arr = d.impuestosMontoDesglosado || [];
+    const i = arr.find(x => String(x.impuestoId || '').includes('IGV') && !String(x.impuestoId || '').includes('Selva'));
+    return s + Number(i?.montoImpuesto || 0);
+  }, 0);
+  const totalSelva5 = detalles.reduce((s, d) => {
+    const arr = d.impuestosMontoDesglosado || [];
+    const i = arr.find(x => String(x.impuestoId || '').includes('Selva') || String(x.impuestoId || '').includes('SELVA'));
+    return s + Number(i?.montoImpuesto || 0);
+  }, 0);
+  const impuestosDetalle: any[] = [];
+  if (totalIGV18 > 0) impuestosDetalle.push({ impuestoId: 'IMP-IGV-18', impuestoNombre: 'IGV 18%', montoImpuesto: Number(totalIGV18.toFixed(2)) });
+  if (totalSelva5 > 0) impuestosDetalle.push({ impuestoId: 'IMP-SELVA-5', impuestoNombre: 'IGV Selva 5%', montoImpuesto: Number(totalSelva5.toFixed(2)) });
   return {
     id: generateUUID(),
     puntoVentaId: c.puntoVentaId,
@@ -1897,12 +1925,9 @@ const buildComanda = (
     paxNinos: 0,
     moneda: 'PEN',
     detalles,
-    totalNetoSinImpuestos: Number((total / 1.23).toFixed(2)),
-    totalImpuestos: Number((total - (total / 1.23)).toFixed(2)),
-    impuestosDetalle: [
-      { impuestoId: 'IMP-IGV-18', impuestoNombre: 'IGV 18%', montoImpuesto: Number((total * 0.18 / 1.23).toFixed(2)) },
-      { impuestoId: 'IMP-SELVA-5', impuestoNombre: 'IGV Selva 5%', montoImpuesto: Number((total * 0.05 / 1.23).toFixed(2)) },
-    ],
+    totalNetoSinImpuestos: Number(totalSubtotal.toFixed(2)),
+    totalImpuestos: Number((totalIGV18 + totalSelva5).toFixed(2)),
+    impuestosDetalle,
     totalDescuentos: 0,
     descuentosAplicadosIds: [],
     propinaSugerida: Number((total * 0.10).toFixed(2)),

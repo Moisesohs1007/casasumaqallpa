@@ -183,8 +183,10 @@ const Folio: React.FC = () => {
     adelantoAloj = Number((f as any)?.pagosAplicados || (f as any)?.pagoAdelanto || (f as any)?.pagoAnticipadoMonto || 0);
   } catch {}
   const pagosTot = Math.max(totalPagos, adelantoAloj);
-  const totalFolio = Number((f as any)?.totalFolio || (f as any)?.totalPeriodo || totalCargos || 0);
-  const saldo = Number((Math.max(totalFolio, totalCargos) - pagosTot).toFixed(2));
+  const totalFolioCalc = Number((subTotalCargos + igv18 + igv5 - descuentosTot).toFixed(2));
+  const totalFolioSeed = Number((f as any)?.totalFolio || (f as any)?.totalPeriodo || 0);
+  const totalFolio = Number(Math.max(totalFolioCalc, totalFolioSeed, totalCargos).toFixed(2));
+  const saldo = Number((totalFolio - pagosTot).toFixed(2));
 
   const codHab = (f as any)?.habitacion?.codigo || (f as any)?.habitacionCodigo || (f as any)?.habitacionId || '—';
   const habNombre = (f as any)?.habitacion?.tipoNombre || (f as any)?.habitacion?.nombre || '';
@@ -328,12 +330,16 @@ const Folio: React.FC = () => {
                                         </div>
                                       )}
                                       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 4 }}>
-                                        <IonChip color="warning" outline style={{ fontSize: 11, padding: 0, '--padding-start': 10, '--padding-end': 10, height: 24 }}>
-                                          IGV18 {fmt(Number(imp18))}
-                                        </IonChip>
-                                        <IonChip color="tertiary" outline style={{ fontSize: 11, padding: 0, '--padding-start': 10, '--padding-end': 10, height: 24 }}>
-                                          SELVA5 {fmt(Number(imp5))}
-                                        </IonChip>
+                                        {Number(imp18) > 0 && (
+                                          <IonChip color="warning" outline style={{ fontSize: 11, padding: 0, '--padding-start': 10, '--padding-end': 10, height: 24 }}>
+                                            IGV18 {fmt(Number(imp18))}
+                                          </IonChip>
+                                        )}
+                                        {Number(imp5) > 0 && (
+                                          <IonChip color="tertiary" outline style={{ fontSize: 11, padding: 0, '--padding-start': 10, '--padding-end': 10, height: 24 }}>
+                                            SELVA5 {fmt(Number(imp5))}
+                                          </IonChip>
+                                        )}
                                       </div>
                                       {c.descripcion && (
                                         <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 4, fontStyle: 'italic' }}>
@@ -459,13 +465,15 @@ const Folio: React.FC = () => {
                       </IonLabel>
                       <div slot="end" style={{ fontWeight: 600 }}>{fmt(igv18)}</div>
                     </IonItem>
-                    <IonItem lines="none" class="ion-no-padding">
-                      <IonLabel>
-                        <IonBadge color="tertiary" style={{ fontSize: 10, marginRight: 6 }}>SELVA 5%</IonBadge>
-                        IGV Zona Selva
-                      </IonLabel>
-                      <div slot="end" style={{ fontWeight: 600 }}>{fmt(igv5)}</div>
-                    </IonItem>
+                    {igv5 > 0 && (
+                      <IonItem lines="none" class="ion-no-padding">
+                        <IonLabel>
+                          <IonBadge color="tertiary" style={{ fontSize: 10, marginRight: 6 }}>SELVA 5%</IonBadge>
+                          IGV Zona Selva
+                        </IonLabel>
+                        <div slot="end" style={{ fontWeight: 600 }}>{fmt(igv5)}</div>
+                      </IonItem>
+                    )}
                     {descuentosTot > 0 && (
                       <IonItem lines="none" class="ion-no-padding">
                         <IonLabel>🎟️ Descuentos Aplicados</IonLabel>
