@@ -335,9 +335,9 @@ const ReservaDetalle: React.FC = () => {
                                   try {
                                     const cargos = Array.isArray(fAny.cargos) ? fAny.cargos : (CargoFolioService && typeof CargoFolioService.listarPorFolio === 'function' ? CargoFolioService.listarPorFolio(fAny.id) : []);
                                     for (const c of (cargos || []) as any[]) {
-                                      const m = Number(c.total ?? c.monto ?? c.montoTotal ?? c.totalLinea ?? c.importeTotal ?? 0) || 0;
+                                      const m = Number(((((c.total ?? c.monto) ?? c.montoTotal) ?? c.totalLinea) ?? c.importeTotal) ?? 0) ?? 0;
                                       totalCargosFolio += m;
-                                      if (String(c.origenCargo || c.origen || c.tipoConcepto || '').toUpperCase().includes('ROOM') || String(c.tipoConcepto || c.origen || '').toUpperCase().includes('SERVICE') || String(c.categoriaConcepto || '').toUpperCase().includes('COCINA') || String(c.categoriaConcepto || '').toUpperCase().includes('BAR') || String(c.usuarioRegistroId || '').startsWith('USR-MOISES')) {
+                                      if (String(c.origenCargo ?? c.origen ?? c.tipoConcepto ?? '').toUpperCase().includes('ROOM') || String(c.tipoConcepto ?? c.origen ?? '').toUpperCase().includes('SERVICE') || String(c.categoriaConcepto ?? '').toUpperCase().includes('COCINA') || String(c.categoriaConcepto ?? '').toUpperCase().includes('BAR') || String(c.usuarioRegistroId ?? '').startsWith('USR-MOISES')) {
                                         cargosPosCount += 1;
                                         cargosPosMonto += m;
                                       }
@@ -346,13 +346,13 @@ const ReservaDetalle: React.FC = () => {
                                   try {
                                     const pagos = Array.isArray(fAny.pagos) ? fAny.pagos : (PagoFolioService && typeof PagoFolioService.listarPorFolio === 'function' ? PagoFolioService.listarPorFolio(fAny.id) : []);
                                     for (const p of (pagos || []) as any[]) {
-                                      totalPagosFolio += Number(p.monto ?? p.montoPagado ?? p.importePago ?? 0) || 0;
+                                      totalPagosFolio += Number((p.monto ?? p.montoPagado ?? p.importePago) ?? 0) ?? 0;
                                     }
                                   } catch {}
-                                  totalCargosFolio = Math.max(totalCargosFolio, Number(fAny.totalCargos ?? fAny.totalFolio ?? total ?? 0) || 0);
-                                  totalPagosFolio = Math.max(totalPagosFolio, Number(fAny.totalPagos ?? fAny.totalPagado ?? Number(r.montoPagadoAnticipado ?? r.pagoAdelanto ?? 0) || 0) || 0);
-                                  const saldoFinal = Number(Math.max(0, totalCargosFolio - totalPagosFolio)) || 0;
-                                  const codCorto = String(fAny.codigo || fAny.numeroFolio || fAny.id).replace(/^FOL[-_]?/i, 'F-').replace(/^RES[-_]?/i, 'R-').slice(-8);
+                                  totalCargosFolio = Math.max(totalCargosFolio, ((Number((fAny as any).totalCargos) ?? Number((fAny as any).totalFolio)) ?? Number(total)) ?? 0);
+                                  totalPagosFolio = Math.max(totalPagosFolio, ((Number((fAny as any).totalPagos) ?? Number((fAny as any).totalPagado)) ?? Number((r as any).montoPagadoAnticipado ?? (r as any).pagoAdelanto)) ?? 0);
+                                  const saldoFinal = Number(Math.max(0, ((totalCargosFolio ?? 0) - (totalPagosFolio ?? 0))) ?? 0);
+                                  const codCorto = String(((fAny as any).codigo ?? (fAny as any).numeroFolio) ?? fAny.id).replace(/^FOL[-_]?/i, 'F-').replace(/^RES[-_]?/i, 'R-').slice(-8);
                                   return (
                                     <div>
                                       <IonChip
