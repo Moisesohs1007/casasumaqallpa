@@ -177,6 +177,13 @@ const Folio: React.FC = () => {
       s + (((c as any).descuentosMontoDesglosado || []).reduce((s2: number, x: any) => s2 + Number(x?.montoDescuento || 0), 0)), 0);
     totalCargos = cargos.reduce((s, c) => s + Number((c as any).total || (c as any).monto || 0), 0);
   } catch {}
+  // Anti redondeo SUNAT (evita 840.00 vs 840.01): La suma subtotal+igv18+igv5-descuentos DEBE coincidir con el total nominal real.
+  // Si hay desfase de centavos (0.01) por toFixed(2) separados, se absorbe en el subtotal para cuadre.
+  const subCuadre = Number((subTotalCargos + igv18 + igv5 - descuentosTot).toFixed(2));
+  const desfase = Number((totalCargos - subCuadre).toFixed(2));
+  if (Math.abs(desfase) > 0 && Math.abs(desfase) <= 0.03) {
+    subTotalCargos = Number((subTotalCargos + desfase).toFixed(2));
+  }
   let totalPagos = 0, adelantoAloj = 0;
   try {
     totalPagos = pagos.reduce((s, p) => s + Number((p as any).monto || (p as any).total || (p as any).montoAplicado || 0), 0);
@@ -185,7 +192,8 @@ const Folio: React.FC = () => {
   const pagosTot = Math.max(totalPagos, adelantoAloj);
   const totalFolioCalc = Number((subTotalCargos + igv18 + igv5 - descuentosTot).toFixed(2));
   const totalFolioSeed = Number((f as any)?.totalFolio || (f as any)?.totalPeriodo || 0);
-  const totalFolio = Number(Math.max(totalFolioCalc, totalFolioSeed, totalCargos).toFixed(2));
+  // Preferir siempre el total real de ítems (totalCargos) para evitar cualquier desfase residual
+  const totalFolio = Number((totalCargos > 0 ? Math.max(totalCargos, totalFolioSeed) : Math.max(totalFolioCalc, totalFolioSeed)).toFixed(2));
   const saldo = Number((totalFolio - pagosTot).toFixed(2));
 
   const codHab = (f as any)?.habitacion?.codigo || (f as any)?.habitacionCodigo || (f as any)?.habitacionId || '—';
@@ -326,21 +334,9 @@ const Folio: React.FC = () => {
                                       </div>
                                       {c.cantidad > 0 && (
                                         <div style={{ fontSize: 12, color: '#4b5563', marginBottom: 3 }}>
-                                          🧮 {cant} × {fmt(pu)} = {fmt(subt)}
+                                          🧮 {cant} × {fmt(pu)} = {fmt(tot)}
                                         </div>
                                       )}
-                                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 4 }}>
-                                        {Number(imp18) > 0 && (
-                                          <IonChip color="warning" outline style={{ fontSize: 11, padding: 0, '--padding-start': 10, '--padding-end': 10, height: 24 }}>
-                                            IGV18 {fmt(Number(imp18))}
-                                          </IonChip>
-                                        )}
-                                        {Number(imp5) > 0 && (
-                                          <IonChip color="tertiary" outline style={{ fontSize: 11, padding: 0, '--padding-start': 10, '--padding-end': 10, height: 24 }}>
-                                            SELVA5 {fmt(Number(imp5))}
-                                          </IonChip>
-                                        )}
-                                      </div>
                                       {c.descripcion && (
                                         <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 4, fontStyle: 'italic' }}>
                                           📝 {String(c.descripcion).substring(0, 90)}
