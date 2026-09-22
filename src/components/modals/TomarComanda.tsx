@@ -93,6 +93,7 @@ const TomarComanda: React.FC<Props> = ({ isOpen, onDismiss }) => {
   const [habitacionSeleccionadaId, setHabitacionSeleccionadaId] = useState<string>('');
   const [mesaSeleccionadaId, setMesaSeleccionadaId] = useState<string>('');
   const [carrito, setCarrito] = useState<LineaCarrito[]>([]);
+  const [refreshTick, setRefreshTick] = useState<number>(0);
 
   const reset = () => {
     setPaso('orden');
@@ -106,18 +107,22 @@ const TomarComanda: React.FC<Props> = ({ isOpen, onDismiss }) => {
     setHabitacionSeleccionadaId('');
     setMesaSeleccionadaId('');
     setCarrito([]);
+    setRefreshTick((t) => t + 1);
   };
 
   useEffect(() => {
     if (!isOpen) return;
-    reset();
+    setTimeout(() => {
+      reset();
+      setRefreshTick((t) => t + 2);
+    }, 50);
   }, [isOpen]);
 
   const categorias = useMemo(() => {
     return [{ id: 'TODOS', nombre: '🧺 Todos los productos', orden: 0 } as any].concat(
       CatalogoFBService.listarCategorias().filter((c: any) => c.estado === 'ACTIVO')
     );
-  }, [isOpen]);
+  }, [isOpen, refreshTick]);
 
   const productos = useMemo(() => {
     return CatalogoFBService.listarProductos({
@@ -126,7 +131,7 @@ const TomarComanda: React.FC<Props> = ({ isOpen, onDismiss }) => {
       categoriaId: categoriaFiltroId === 'TODOS' ? undefined : categoriaFiltroId,
       puntoVentaId: PUNTO_VENTA_ID,
     });
-  }, [categoriaFiltroId, busqueda, isOpen]);
+  }, [categoriaFiltroId, busqueda, isOpen, refreshTick]);
 
   const habitacionesCheckedIn = useMemo(() => {
     const reservas = (ReservaService.listarTodas() as Reserva[]).filter((r) => {
@@ -148,11 +153,11 @@ const TomarComanda: React.FC<Props> = ({ isOpen, onDismiss }) => {
       lista.push({ reserva: r, habitacion: hab ?? hab0.habitacion ?? { ...hab0, id: habId, codigo: codHab }, huespedNombre });
     }
     return lista;
-  }, [isOpen]);
+  }, [isOpen, refreshTick]);
 
   const mesasLibres = useMemo(() => {
     return MesaService.listarTodas({ puntoVentaId: PUNTO_VENTA_ID }).filter((m) => m.zona !== 'ROOM_SERVICE');
-  }, [isOpen]);
+  }, [isOpen, refreshTick]);
 
   const totalCarrito = carrito.reduce((s, l) => s + l.cantidad * l.precioUnitario, 0);
   const nroItems = carrito.reduce((s, l) => s + l.cantidad, 0);
