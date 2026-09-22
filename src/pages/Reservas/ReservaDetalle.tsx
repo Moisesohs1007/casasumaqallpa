@@ -152,10 +152,19 @@ const ReservaDetalle: React.FC = () => {
   const adultos = r?.adultosTotal ?? r?.totalAdultos ?? hab0?.adultos ?? 0;
   const ninos = r?.ninosTotal ?? r?.totalNinos ?? hab0?.ninos ?? 0;
   const pax = adultos + ninos;
-  const subTotal = r?.subTotalAlojamiento ?? r?.subTotalSinImpuestos ?? hab0?.precioTotalReservaHabitacion ?? 0;
-  const impuestos = r?.impuestos ?? r?.totalImpuestos ?? 0;
-  const descuentos = r?.descuentos ?? r?.descuentosTotal ?? 0;
-  const total = r?.totalReserva ?? r?.montoTotalReserva ?? (subTotal + (impuestos || 0) - (descuentos || 0));
+
+  // Usuario confirmó: SOLO IGV 18%. NO IGV Zona Selva.
+  // IMPORTANTE: Los campos subTotalAlojamiento / totalReserva muchas veces son el TOTAL NOMINAL (incluye impuestos).
+  // Regla SUNAT: precio cartel / tarifa = CON impuestos incluidos. Se desagrupa con /1.18.
+  const totalNominal = Number(r?.montoTotalReserva ?? r?.totalReserva ?? hab0?.precioTotalReservaHabitacion ?? 0) || 0;
+  const subtotalSinImp = Number((totalNominal / 1.18).toFixed(2));
+  const igv18Solo = Number((totalNominal - subtotalSinImp).toFixed(2));
+  const descuentos = Number(r?.descuentos ?? r?.descuentosTotal ?? 0) || 0;
+
+  // Fallbacks si vienen campos individuales
+  const subTotal = Number(r?.subTotalSinImpuestos ?? 0) > 0 ? Number(r.subTotalSinImpuestos) : subtotalSinImp;
+  const impuestos = Number(r?.totalImpuestos ?? r?.impuestos ?? 0) > 0 ? Number(r.totalImpuestos ?? r.impuestos) : igv18Solo;
+  const total = totalNominal > 0 ? totalNominal : Number((subTotal + impuestos - descuentos).toFixed(2));
   const promo = r?.codigoPromocionalAplicado ?? r?.promocionAplicada?.codigo ?? null;
   const checkin = (r?.fechaCheckin || r?.fechaCheckIn || '').slice(0, 10);
   const checkout = (r?.fechaCheckout || r?.fechaCheckOut || '').slice(0, 10);
@@ -309,7 +318,7 @@ const ReservaDetalle: React.FC = () => {
                               <h4 slot="end" style={{ margin: 0 }}>S/ {(Number(subTotal) || 0).toFixed(2)}</h4>
                             </IonItem>
                             <IonItem lines="none">
-                              <IonLabel>Impuestos (IGV 18% + Selva 5%)</IonLabel>
+                              <IonLabel>Impuestos (IGV 18%)</IonLabel>
                               <h4 slot="end" style={{ margin: 0 }}>S/ {(Number(impuestos) || 0).toFixed(2)}</h4>
                             </IonItem>
                             {promo && (
@@ -333,25 +342,43 @@ const ReservaDetalle: React.FC = () => {
                                   let cargosPosCount = 0;
                                   let cargosPosMonto = 0;
                                   try {
-                                    const cargos = Array.isArray(fAny.cargos) ? fAny.cargos : (CargoFolioService && typeof CargoFolioService.listarPorFolio === 'function' ? CargoFolioService.listarPorFolio(fAny.id) : []);
-                                    for (const c of (cargos || []) as any[]) {
-                                      const m = Number(((((c.total ?? c.monto) ?? c.montoTotal) ?? c.totalLinea) ?? c.importeTotal) ?? 0) ?? 0;
+                                    const cargosRaw = (Array.isArray(fAny.cargos) ? fAny.cargos : null) ||
+                                      ((CargoFolioService && typeof (CargoFolioService as any).listarPorFolio === 'function') ? ((CargoFolioService as any).listarPorFolio(fAny.id) || []) : []) || [];
+                                    const cargos = (Array.isArray(cargosRaw) ? cargosRaw : []).filter(Boolean) as any[];
+                                    for (const c of cargos) {
+                                      const m = Number(
+                                        ((c.total ?? c.monto) ?? c.montoTotal) ?? c.totalLinea ?? c.importeTotal ?? 0
+                                      ) || 0;
                                       totalCargosFolio += m;
-                                      if (String(c.origenCargo ?? c.origen ?? c.tipoConcepto ?? '').toUpperCase().includes('ROOM') || String(c.tipoConcepto ?? c.origen ?? '').toUpperCase().includes('SERVICE') || String(c.categoriaConcepto ?? '').toUpperCase().includes('COCINA') || String(c.categoriaConcepto ?? '').toUpperCase().includes('BAR') || String(c.usuarioRegistroId ?? '').startsWith('USR-MOISES')) {
+                                      const origen = String((c.origenCargo ?? c.origen ?? c.tipoConcepto ?? c.categoriaConcepto ?? '')).toUpperCase();
+                                      if (
+                                        origen.includes('ROOM') || origen.includes('SERVICE') ||
+                                        origen.includes('COCINA') || origen.includes('BAR') ||
+                                        origen.includes('POS') || origen.includes('COMIDA') ||
+                                        origen.includes('BEBIDA') ||
+                                        String(c.usuarioRegistroId ?? c.createdBy ?? '').startsWith('USR-MOISES')
+                                      ) {
                                         cargosPosCount += 1;
                                         cargosPosMonto += m;
                                       }
                                     }
                                   } catch {}
                                   try {
-                                    const pagos = Array.isArray(fAny.pagos) ? fAny.pagos : (PagoFolioService && typeof PagoFolioService.listarPorFolio === 'function' ? PagoFolioService.listarPorFolio(fAny.id) : []);
-                                    for (const p of (pagos || []) as any[]) {
-                                      totalPagosFolio += Number((p.monto ?? p.montoPagado ?? p.importePago) ?? 0) ?? 0;
+                                    const pagosRaw = (Array.isArray(fAny.pagos) ? fAny.pagos : null) ||
+                                      ((PagoFolioService && typeof (PagoFolioService as any).listarPorFolio === 'function') ? ((PagoFolioService as any).listarPorFolio(fAny.id) || []) : []) || [];
+                                    const pagos = (Array.isArray(pagosRaw) ? pagosRaw : []).filter(Boolean) as any[];
+                                    for (const p of pagos) {
+                                      totalPagosFolio += Number(
+                                        (p.monto ?? p.montoPagado ?? p.importePago) ?? 0
+                                      ) || 0;
                                     }
                                   } catch {}
-                                  totalCargosFolio = Math.max(totalCargosFolio, ((Number((fAny as any).totalCargos) ?? Number((fAny as any).totalFolio)) ?? Number(total)) ?? 0);
-                                  totalPagosFolio = Math.max(totalPagosFolio, ((Number((fAny as any).totalPagos) ?? Number((fAny as any).totalPagado)) ?? Number((r as any).montoPagadoAnticipado ?? (r as any).pagoAdelanto)) ?? 0);
-                                  const saldoFinal = Number(Math.max(0, ((totalCargosFolio ?? 0) - (totalPagosFolio ?? 0))) ?? 0);
+                                  const totalCargosSeed = Number((fAny as any).totalCargos) || Number((fAny as any).totalFolio) || 0;
+                                  totalCargosFolio = Math.max(totalCargosFolio || 0, totalCargosSeed || 0, Number(total) || 0) || 0;
+                                  const totalPagosSeed = Number((fAny as any).totalPagos) || Number((fAny as any).totalPagado) || 0;
+                                  const totalAdelanto = Number((r as any).montoPagadoAnticipado) || Number((r as any).pagoAdelanto) || 0;
+                                  totalPagosFolio = Math.max(totalPagosFolio || 0, totalPagosSeed || 0, totalAdelanto || 0) || 0;
+                                  const saldoFinal = Math.max(0, (totalCargosFolio || 0) - (totalPagosFolio || 0)) || 0;
                                   const codCorto = String(((fAny as any).codigo ?? (fAny as any).numeroFolio) ?? fAny.id).replace(/^FOL[-_]?/i, 'F-').replace(/^RES[-_]?/i, 'R-').slice(-8);
                                   return (
                                     <div>
@@ -371,15 +398,15 @@ const ReservaDetalle: React.FC = () => {
                                         }}
                                       >
                                         <IonIcon icon={documentText} />
-                                        👉 Folio {codCorto} · Clic aquí VER CUENTA GENERAL · Saldo pendiente S/ {saldoFinal.toFixed(2)}
+                                        👉 Folio {codCorto} · Clic aquí VER CUENTA GENERAL · Saldo pendiente S/ {Number(saldoFinal || 0).toFixed(2)}
                                       </IonChip>
                                       {cargosPosCount > 0 && (
                                         <div style={{ marginTop: 8, padding: '8px 12px', background: '#ecfdf5', border: '1px solid #10b981', borderRadius: 8, fontSize: 13, fontWeight: 600, color: '#065f46' }}>
-                                          🚀 Cargos POS agregados recientemente: <strong>{cargosPosCount}</strong> item(s) = <strong>S/ {Number(cargosPosMonto).toFixed(2)}</strong> (Room Service / Bebidas / Cocina).
+                                          🚀 Cargos POS agregados recientemente: <strong>{cargosPosCount}</strong> item(s) = <strong>S/ {Number(cargosPosMonto || 0).toFixed(2)}</strong> (Room Service / Bebidas / Cocina).
                                         </div>
                                       )}
                                       <div style={{ marginTop: 6, fontSize: 12, color: '#4b5563' }}>
-                                        Total cargos (alojamiento + extras): S/ {totalCargosFolio.toFixed(2)} · Pagos/Adelantos: S/ {totalPagosFolio.toFixed(2)}
+                                        Total cargos (alojamiento + extras): S/ {Number(totalCargosFolio || 0).toFixed(2)} · Pagos/Adelantos: S/ {Number(totalPagosFolio || 0).toFixed(2)}
                                       </div>
                                     </div>
                                   );
