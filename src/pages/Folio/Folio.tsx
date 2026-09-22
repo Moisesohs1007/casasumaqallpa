@@ -107,22 +107,44 @@ const Folio: React.FC = () => {
 
   const cargar = (folioId: string) => {
     try {
-      const listado = (FolioService as any).listarTodos ? (FolioService as any).listarTodos() : [];
-      let f: Folio | any = (FolioService as any).buscarPorId?.(folioId) || null;
-      if (!f) {
-        f = listado.find((x: any) =>
-          x.id === folioId ||
-          x.codigo === folioId ||
-          (x as any).numeroFolio === folioId ||
-          (x as any).codigoFolio === folioId
-        ) || null;
-      }
-      if (!f) {
+      let f: any = null;
+      try {
+        const servicio = FolioService as any;
+        const todos: any[] = (servicio.listarTodos?.() || []).filter(Boolean);
+        const encontrado = (id: string) => {
+          if (!id) return undefined;
+          try { const b = servicio.buscarPorId?.(id); return (b === null || b === undefined) ? undefined : b; } catch { return undefined; }
+        };
+        f = encontrado(folioId);
+        if (!f) {
+          f = todos.find((x) =>
+            x && (
+              x.id === folioId ||
+              x.codigo === folioId ||
+              x.numeroFolio === folioId ||
+              x.codigoFolio === folioId ||
+              x.reservaId === folioId ||
+              String(x.reserva?.id || '') === folioId ||
+              String(x.habitacionId || '') === folioId ||
+              String(x.habitacion?.id || '') === folioId
+            )
+          ) || undefined;
+        }
+        if (f && f.id) try { servicio.recalcularTotales?.(f.id); } catch {}
+        if (f && f.id) {
+          const f3 = encontrado(f.id);
+          if (f3) f = f3;
+        }
+      } catch (e) { f = null; }
+      if (!f || typeof f !== 'object' || !f.id) {
         setFolio(null); setNoEncontrado(true); return;
       }
-      try { FolioService.recalcularTotales?.(f.id); } catch {}
-      const f2: any = (FolioService as any).buscarPorId?.(f.id) || f;
-      setFolio({ ...f2, cargos: f2.cargos || [], pagos: f2.pagos || [] } as Folio);
+      const folioFinal: any = {
+        ...f,
+        cargos: Array.isArray(f.cargos) ? f.cargos.filter(Boolean) : [],
+        pagos: Array.isArray(f.pagos) ? f.pagos.filter(Boolean) : [],
+      };
+      setFolio(folioFinal as Folio);
       setNoEncontrado(false);
     } catch (e) {
       setFolio(null); setNoEncontrado(true);
@@ -133,38 +155,44 @@ const Folio: React.FC = () => {
     if (id) cargar(id);
   });
 
-  const f: any = folio;
-  const cargos: CargoFolio[] = (f?.cargos || []) as any[];
-  const pagos: PagoFolio[] = (f?.pagos || []) as any[];
-  const estado: EstadoFolio = (f?.estado || 'ABIERTO') as EstadoFolio;
+  const f: any = (folio && typeof folio === 'object') ? folio : null;
+  const cargos: CargoFolio[] = Array.isArray(f?.cargos) ? (f.cargos as any[]).filter(Boolean) : [];
+  const pagos: PagoFolio[] = Array.isArray(f?.pagos) ? (f.pagos as any[]).filter(Boolean) : [];
+  const estado: EstadoFolio = ((f as any)?.estado || 'ABIERTO') as EstadoFolio;
 
-  const subTotalCargos = cargos.reduce((s, c) => s + Number((c as any).subtotal || 0), 0);
-  const igv18 = cargos.reduce((s, c) => {
-    const arr = (c as any).impuestosMontoDesglosado || [];
-    const i = arr.find((x: any) => String(x.impuestoId || x.impuestoNombre || '').includes('IGV') && !String(x.impuestoId || x.impuestoNombre || '').includes('Selva'));
-    return s + Number(i?.montoImpuesto || 0);
-  }, 0);
-  const igv5 = cargos.reduce((s, c) => {
-    const arr = (c as any).impuestosMontoDesglosado || [];
-    const i = arr.find((x: any) => String(x.impuestoId || x.impuestoNombre || '').includes('Selva') || String(x.impuestoId || x.impuestoNombre || '').includes('SELVA'));
-    return s + Number(i?.montoImpuesto || 0);
-  }, 0);
-  const descuentosTot = cargos.reduce((s, c) =>
-    s + ((c as any).descuentosMontoDesglosado || []).reduce((s2: number, x: any) => s2 + Number(x.montoDescuento || 0), 0), 0);
-  const totalCargos = cargos.reduce((s, c) => s + Number((c as any).total || (c as any).monto || 0), 0);
-  const totalPagos = pagos.reduce((s, p) => s + Number((p as any).monto || (p as any).total || (p as any).montoAplicado || 0), 0);
-  const adelantoAloj = Number((f as any).pagosAplicados || (f as any).pagoAdelanto || (f as any).pagoAnticipadoMonto || 0);
+  let subTotalCargos = 0, igv18 = 0, igv5 = 0, descuentosTot = 0, totalCargos = 0;
+  try {
+    subTotalCargos = cargos.reduce((s, c) => s + Number((c as any).subtotal || 0), 0);
+    igv18 = cargos.reduce((s, c) => {
+      const arr = (c as any).impuestosMontoDesglosado || [];
+      const i = arr.find((x: any) => x && String(x.impuestoId || x.impuestoNombre || '').includes('IGV') && !String(x.impuestoId || x.impuestoNombre || '').includes('Selva'));
+      return s + Number(i?.montoImpuesto || 0);
+    }, 0);
+    igv5 = cargos.reduce((s, c) => {
+      const arr = (c as any).impuestosMontoDesglosado || [];
+      const i = arr.find((x: any) => x && (String(x.impuestoId || x.impuestoNombre || '').includes('Selva') || String(x.impuestoId || x.impuestoNombre || '').includes('SELVA')));
+      return s + Number(i?.montoImpuesto || 0);
+    }, 0);
+    descuentosTot = cargos.reduce((s, c) =>
+      s + (((c as any).descuentosMontoDesglosado || []).reduce((s2: number, x: any) => s2 + Number(x?.montoDescuento || 0), 0)), 0);
+    totalCargos = cargos.reduce((s, c) => s + Number((c as any).total || (c as any).monto || 0), 0);
+  } catch {}
+  let totalPagos = 0, adelantoAloj = 0;
+  try {
+    totalPagos = pagos.reduce((s, p) => s + Number((p as any).monto || (p as any).total || (p as any).montoAplicado || 0), 0);
+    adelantoAloj = Number((f as any)?.pagosAplicados || (f as any)?.pagoAdelanto || (f as any)?.pagoAnticipadoMonto || 0);
+  } catch {}
   const pagosTot = Math.max(totalPagos, adelantoAloj);
-  const totalFolio = Number((f as any).totalFolio || f?.totalPeriodo || totalCargos || 0);
-  const saldo = Number((totalFolio - pagosTot).toFixed(2));
+  const totalFolio = Number((f as any)?.totalFolio || (f as any)?.totalPeriodo || totalCargos || 0);
+  const saldo = Number((Math.max(totalFolio, totalCargos) - pagosTot).toFixed(2));
 
-  const codHab = (f as any).habitacion?.codigo || (f as any).habitacionCodigo || (f as any).habitacionId || '—';
-  const habNombre = (f as any).habitacion?.tipoNombre || (f as any).habitacion?.nombre || '';
-  const huespedNombres = (f as any).huesped?.nombres || (f as any).huesped?.nombreCompleto || (f as any).huespedTitular?.nombres || '';
-  const huespedDni = (f as any).huesped?.numeroDocumento || (f as any).huesped?.dni || (f as any).huespedTitular?.numeroDocumento || '';
-  const folioCodigo = f?.codigo || (f as any).numeroFolio || (f as any).codigoFolio || id || '';
-  const fechaApertura = f?.fechaApertura || (f as any).fechaInicio || '';
-  const reservaCodigo = f?.reservaId ? `#${String(f.reservaId).replace(/^RES-/, '')}` : (f as any).reserva?.codigo ? `#${String((f as any).reserva.codigo)}` : '';
+  const codHab = (f as any)?.habitacion?.codigo || (f as any)?.habitacionCodigo || (f as any)?.habitacionId || '—';
+  const habNombre = (f as any)?.habitacion?.tipoNombre || (f as any)?.habitacion?.nombre || '';
+  const huespedNombres = (f as any)?.huesped?.nombres || (f as any)?.huesped?.nombreCompleto || (f as any)?.huespedTitular?.nombres || '';
+  const huespedDni = (f as any)?.huesped?.numeroDocumento || (f as any)?.huesped?.dni || (f as any)?.huespedTitular?.numeroDocumento || '';
+  const folioCodigo = (f as any)?.codigo || (f as any)?.numeroFolio || (f as any)?.codigoFolio || id || '';
+  const fechaApertura = (f as any)?.fechaApertura || (f as any)?.fechaInicio || '';
+  const reservaCodigo = (f as any)?.reservaId ? `#${String((f as any).reservaId).replace(/^RES-/, '')}` : (f as any)?.reserva?.codigo ? `#${String((f as any).reserva.codigo)}` : '';
 
   const fmt = (n: number) => `S/ ${Number(n || 0).toFixed(2)}`;
 
