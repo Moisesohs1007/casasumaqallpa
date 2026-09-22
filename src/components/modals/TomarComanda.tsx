@@ -32,77 +32,6 @@ interface Props {
   onDismiss: () => void;
 }
 
-const getOrCreateMesaRoomService = (habitacionId: string, codHab: string): Mesa | null => {
-  try {
-    // Paso 1: buscar por habitación asignada (método oficial)
-    let mesa = MesaService.buscarPorHabitacion(habitacionId);
-    if (mesa) return mesa;
-
-    // Paso 2: fallback - buscar por nombre visible / codigo / habitacionAsignadaId (por si se creó por otro flujo)
-    try {
-      const todas = MesaService.listarTodas();
-      const found = (todas || []).find(
-        (m: any) =>
-          m &&
-          (m.habitacionAsignadaId === habitacionId ||
-            String(m.codigo || '').toUpperCase() === String(codHab || '').toUpperCase() ||
-            String(m.nombreVisible || '').toUpperCase() === `HAB. ${String(codHab || '').toUpperCase()}`)
-      );
-      if (found) return found;
-    } catch {}
-
-    // Paso 3: crear mesa nueva. IMPORTANTE: NO usar `require` dentro de un componente React (rompe en build/bundle con Vite/esbuild).
-    // Usamos el InMemoryDB importado desde __db__ directamente.
-    const ahora = new Date().toISOString();
-    const data = {
-      puntoVentaId: PUNTO_VENTA_ID,
-      codigo: codHab.replace(/[^a-z0-9]/gi, '').toUpperCase(),
-      nombreVisible: `Hab. ${codHab}`,
-      zona: 'ROOM_SERVICE' as Mesa['zona'],
-      capacidadMaxPax: 4,
-      capacidadActualUsada: 0,
-      tipo: 'ROOM_SERVICE' as Mesa['tipo'],
-      estado: 'LIBRE' as Mesa['estado'],
-      esCombinable: false,
-      mesaCombinadaIds: [],
-      habitacionAsignadaId: habitacionId,
-      proximaLimpiezaAt: null,
-      observaciones: 'Mesa creada en vivo para Room Service',
-      createdAt: ahora,
-      updatedAt: ahora,
-      createdBy: USUARIO_ACTUAL.id,
-      updatedBy: USUARIO_ACTUAL.id,
-    } as any;
-    try {
-      const { db } = require('../../services/__db__');
-      const nueva = db.add<Mesa>('mesas', data);
-      if (nueva) return nueva ?? null;
-    } catch {}
-    // Paso 4: fallback extremo - primera mesa ROOM_SERVICE libre sin asignar
-    try {
-      const todas = MesaService.listarTodas({ zona: 'ROOM_SERVICE' as Mesa['zona'] });
-      const libre = (todas || []).find((m: any) => m && (m.estado === 'LIBRE' || !m.habitacionAsignadaId));
-      if (libre) {
-        try {
-          const id = (libre as any).id;
-          const { db } = require('../../services/__db__');
-          const actualizada = db.update<any>('mesas', id, {
-            habitacionAsignadaId: habitacionId,
-            nombreVisible: `Hab. ${codHab}`,
-            codigo: codHab.replace(/[^a-z0-9]/gi, '').toUpperCase(),
-            updatedBy: USUARIO_ACTUAL.id,
-            updatedAt: new Date().toISOString(),
-          });
-          return actualizada ?? libre;
-        } catch { return libre; }
-      }
-    } catch {}
-    return null;
-  } catch (e) {
-    return null;
-  }
-};
-
 const emojiCategoria = (catId: string) => {
   if (catId.includes('DESAYUNO')) return '🥣';
   if (catId.includes('JUGO')) return '🥤';
@@ -294,8 +223,14 @@ const TomarComanda: React.FC<Props> = ({ isOpen, onDismiss }) => {
           (habData.reserva as any).huespedTitularId ||
           (habData.reserva.huesped as any)?.id ||
           undefined;
-        const mesa = getOrCreateMesaRoomService(habitacionId, (habData.habitacion as any).codigo || 'ROOM');
-        if (!mesa) throw new Error('No se pudo crear la mesa de Room Service. Intente de nuevo.');
+        // ✅ Método OFICIAL del servicio (NO hay requires dentro de React, no hay CommonJS, ESM puro Vite OK)
+        const mesa = MesaService.crearRoomServiceSiNoExiste({
+          habitacionId,
+          codHab: (habData.habitacion as any).codigo || 'ROOM',
+          puntoVentaId: PUNTO_VENTA_ID,
+          usuarioId: USUARIO_ACTUAL.id,
+        });
+        if (!mesa) throw new Error('Habitación sin mesa Room Service asignada. Intente nuevamente.');
         mesaId = mesa.id;
 
         // Buscar FOLIO ABIERTO con multi-criterio (máxima tolerancia).

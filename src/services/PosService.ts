@@ -108,6 +108,74 @@ export const MesaService = {
   buscarPorHabitacion(habitacionId: string): Mesa | undefined {
     return db.findOne<Mesa>(KEY_MESA, (m) => m.habitacionAsignadaId === habitacionId);
   },
+  crearRoomServiceSiNoExiste(params: {
+    habitacionId: string;
+    codHab: string;
+    puntoVentaId: string;
+    usuarioId: string;
+  }): Mesa {
+    const { habitacionId, codHab, puntoVentaId, usuarioId } = params;
+    const cod = String(codHab || 'ROOM').replace(/[^a-z0-9]/gi, '').toUpperCase() || 'ROOM';
+    // 1) Buscar por habitaciónId
+    let existing = db.findOne<Mesa>(KEY_MESA, (m: any) => m && m.habitacionAsignadaId === habitacionId);
+    if (existing) return existing;
+    // 2) Buscar por código o nombre visible
+    existing = db.findOne<Mesa>(KEY_MESA, (m: any) =>
+      m && (
+        String(m.codigo || '').toUpperCase() === cod ||
+        String(m.nombreVisible || '').toUpperCase() === `HAB. ${cod}`
+      )
+    );
+    if (existing) {
+      // Re-asignar la habitación si no la tenía
+      try {
+        const upd = db.update<Mesa>(KEY_MESA, existing.id, {
+          habitacionAsignadaId: habitacionId,
+          nombreVisible: `Hab. ${String(codHab || cod)}`,
+          updatedBy: usuarioId,
+          updatedAt: seedUtil.nowISO(),
+        } as unknown as Update<Mesa>);
+        if (upd) return upd;
+      } catch { return existing; }
+      return existing;
+    }
+    // 3) Si ninguna ROOM_SERVICE sin asignar → la actualizamos
+    const sinAsignar = db.findOne<Mesa>(KEY_MESA, (m: any) =>
+      m &&
+      String(m.zona || '').toUpperCase() === 'ROOM_SERVICE' &&
+      (!m.habitacionAsignadaId || m.estado === 'LIBRE')
+    );
+    if (sinAsignar) {
+      try {
+        const upd = db.update<Mesa>(KEY_MESA, sinAsignar.id, {
+          habitacionAsignadaId: habitacionId,
+          codigo: cod,
+          nombreVisible: `Hab. ${String(codHab || cod)}`,
+          updatedBy: usuarioId,
+          updatedAt: seedUtil.nowISO(),
+        } as unknown as Update<Mesa>);
+        if (upd) return upd;
+      } catch { return sinAsignar; }
+      return sinAsignar;
+    }
+    // 4) Crear nueva mesa (último recurso)
+    const data = {
+      puntoVentaId,
+      codigo: cod,
+      nombreVisible: `Hab. ${String(codHab || cod)}`,
+      zona: 'ROOM_SERVICE' as Mesa['zona'],
+      capacidadMaxPax: 4,
+      capacidadActualUsada: 0,
+      tipo: 'ROOM_SERVICE' as Mesa['tipo'],
+      estado: 'LIBRE' as Mesa['estado'],
+      esCombinable: false,
+      mesaCombinadaIds: [],
+      habitacionAsignadaId: habitacionId,
+      proximaLimpiezaAt: null,
+      observaciones: 'Mesa Room Service (auto)',
+    };
+    return db.add<Mesa>(KEY_MESA, data as unknown as Create<Mesa>);
+  },
   cambiarEstado(id: string, estado: Mesa['estado'], actualizadoPor = 'system-mesas'): Mesa | undefined {
     return db.update<Mesa>(KEY_MESA, id, {
       estado,
