@@ -1,41 +1,41 @@
-import { db, type Create, type Update, type Huesped } from './__db__';
+// @ts-nocheck
+import { db, seedUtil, type Create, type Update, type Huesped } from './__supabase_db__';
 
 const KEY = 'huespedes' as const;
 
 export const HuespedService = {
-  listarTodos(): Huesped[] {
-    return db.all<Huesped>(KEY).sort((a, b) =>
-      (b.fechaUltimaEstadia || '').localeCompare(a.fechaUltimaEstadia || '')
-    );
+  async listarTodos(): Promise<Huesped[]> {
+    const rows = await db.allAsync<Huesped>(KEY);
+    return rows.sort((a, b) => (b.fechaUltimaEstadia || '').localeCompare(a.fechaUltimaEstadia || ''));
   },
 
-  buscarPorId(id: string): Huesped | undefined {
-    return db.getById<Huesped>(KEY, id);
+  async buscarPorId(id: string): Promise<Huesped | undefined> {
+    return db.getByIdAsync<Huesped>(KEY, id);
   },
 
-  buscarPorDocumento(tipoDoc: Huesped['tipoDocumento'], numero: string): Huesped | undefined {
-    return db.findOne<Huesped>(KEY, (h) => h.tipoDocumento === tipoDoc && h.numeroDocumento === numero);
+  async buscarPorDocumento(tipoDoc: Huesped['tipoDocumento'], numero: string): Promise<Huesped | undefined> {
+    return db.findOneAsync<Huesped>(KEY, (h) => h.tipoDocumento === tipoDoc && h.numeroDocumento === numero);
   },
 
-  buscarPorTexto(query: string): Huesped[] {
+  async buscarPorTexto(query: string): Promise<Huesped[]> {
     const q = query.toLowerCase().trim();
     if (!q) return this.listarTodos();
-    return db.findMany<Huesped>(
+    return db.findManyAsync<Huesped>(
       KEY,
       (h) =>
-        h.nombreCompleto.toLowerCase().includes(q) ||
+        (h.nombreCompleto || '').toLowerCase().includes(q) ||
         `${h.nombres} ${h.apellidos}`.toLowerCase().includes(q) ||
-        h.numeroDocumento.includes(q) ||
+        (h.numeroDocumento || '').includes(q) ||
         (h.email && h.email.toLowerCase().includes(q)) ||
         (h.telefono1 && h.telefono1.includes(q))
     );
   },
 
-  crear(payload: Create<Huesped>): Huesped {
+  async crear(payload: Create<Huesped>): Promise<Huesped> {
     const data = payload as unknown as Huesped;
     const nombreCompleto =
       data.nombreCompleto?.trim() || `${data.nombres} ${data.apellidos}`.trim();
-    return db.add<Huesped>(KEY, {
+    return db.addAsync<Huesped>(KEY, {
       ...payload,
       nombreCompleto,
       totalVisitas: (data.totalVisitas ?? 0) + 1,
@@ -44,22 +44,22 @@ export const HuespedService = {
     } as Create<Huesped>);
   },
 
-  actualizar(id: string, changes: Update<Huesped>): Huesped | undefined {
+  async actualizar(id: string, changes: Update<Huesped>): Promise<Huesped | undefined> {
     const data = changes as unknown as Partial<Huesped>;
     if (data.nombres || data.apellidos) {
-      const prev = db.getById<Huesped>(KEY, id);
+      const prev = await db.getByIdAsync<Huesped>(KEY, id);
       const nombres = data.nombres ?? prev?.nombres ?? '';
       const apellidos = data.apellidos ?? prev?.apellidos ?? '';
       (changes as unknown as Huesped).nombreCompleto = prev?.nombreCompleto || `${nombres} ${apellidos}`.trim();
     }
-    return db.update<Huesped>(KEY, id, changes);
+    return db.updateAsync<Huesped>(KEY, id, changes);
   },
 
-  incrementarVisita(id: string, montoGasto: number, noches: number): Huesped | undefined {
-    const actual = db.getById<Huesped>(KEY, id);
+  async incrementarVisita(id: string, montoGasto: number, noches: number): Promise<Huesped | undefined> {
+    const actual = await db.getByIdAsync<Huesped>(KEY, id);
     if (!actual) return undefined;
-    const puntosGanados = Math.round(montoGasto * 0.10);
-    return db.update<Huesped>(KEY, id, {
+    const puntosGanados = Math.round(montoGasto * 0.1);
+    return db.updateAsync<Huesped>(KEY, id, {
       updatedBy: 'system-huesped',
       totalVisitas: (actual.totalVisitas ?? 0) + 1,
       totalNochesAcumuladas: (actual.totalNochesAcumuladas ?? 0) + noches,
@@ -73,14 +73,16 @@ export const HuespedService = {
     } as unknown as Update<Huesped>);
   },
 
-  eliminar(id: string): boolean {
-    return db.remove(KEY, id);
+  async eliminar(id: string): Promise<boolean> {
+    return db.removeAsync(KEY, id);
   },
 
   reiniciarSeed(): void {
     db.reset();
   },
 };
+
+export default HuespedService;
 
 function calcularNivelFidelidad(visitas: number, gastoAcumulado: number): Huesped['nivelProgramaFidelidad'] {
   if (visitas >= 12 || gastoAcumulado >= 15000) return 'DIAMANTE';

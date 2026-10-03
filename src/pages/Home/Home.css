@@ -1,36 +1,169 @@
+.dashboard-grid {
+  display: block;
+}
+
 .dashboard-card {
-  min-height: 160px;
-  border-radius: 12px;
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.08);
+  min-height: 108px;
+  border-radius: 10px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
+  padding: 0;
+  margin: 4px !important;
+  transition: transform 0.12s ease;
+}
+
+.dashboard-card:active {
+  transform: scale(0.98);
+}
+
+.dashboard-card ion-card-header {
+  padding: 8px 10px 2px 10px !important;
+}
+
+.dashboard-card ion-card-content {
+  padding: 2px 10px 10px 10px !important;
+  font-size: 0.75rem;
+  opacity: 0.95;
 }
 
 .card-header-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 6px;
+}
+
+.card-header-row ion-icon {
+  font-size: 1.8rem !important;
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  min-width: 36px;
 }
 
 .badge-value {
-  font-size: 1.4rem;
-  padding: 8px 14px;
+  font-size: 1.05rem;
+  font-weight: 800;
+  padding: 5px 10px;
   border-radius: 999px;
+  white-space: nowrap;
+  min-width: 64px;
+  text-align: center;
+  line-height: 1.2;
 }
 
 .badge-sub {
-  margin-left: 4px;
+  margin-left: 3px;
   opacity: 0.8;
-  font-size: 0.85rem;
-}
-
-.card-title {
-  font-size: 1rem;
+  font-size: 0.75rem;
   font-weight: 500;
 }
 
-.home-ul {
-  padding-left: 1.25rem;
+.card-title {
+  font-size: 0.88rem;
+  font-weight: 600;
+  margin: 4px 0 0 0 !important;
+  line-height: 1.15;
 }
 
-.home-ul li {
-  margin-bottom: 6px;
+/* Pantallas MUY pequeñas (<360px): 1 KPI x fila, grande */
+@media (max-width: 359.98px) {
+  .dashboard-card {
+    min-height: 120px;
+  }
+  .badge-value {
+    font-size: 1.25rem;
+    padding: 6px 12px;
+  }
+  .card-title {
+    font-size: 1rem;
+  }
+  .card-header-row ion-icon {
+    font-size: 2.2rem !important;
+    width: 42px;
+    height: 42px;
+  }
+}
+
+/* Mobile standard 360-575px: 2 cols compactas (1 fila = 2 KPIs) */
+@media (min-width: 360px) and (max-width: 575.98px) {
+  .dashboard-card {
+    min-height: 112px;
+  }
+  .badge-value {
+    font-size: 1.1rem;
+  }
+  .card-title {
+    font-size: 0.9rem;
+  }
+}
+
+/* Tablet MD+: 2 cols grandes */
+@media (min-width: 768px) {
+  .dashboard-card {
+    min-height: 140px;
+    border-radius: 12px;
+    margin: 8px !important;
+  }
+  .dashboard-card ion-card-header {
+    padding: 14px 16px 6px 16px !important;
+  }
+  .dashboard-card ion-card-content {
+    padding: 4px 16px 16px 16px !important;
+    font-size: 0.85rem;
+  }
+  .card-header-row ion-icon {
+    font-size: 2.4rem !important;
+    width: 48px;
+    height: 48px;
+    min-width: 48px;
+  }
+  .badge-value {
+    font-size: 1.5rem;
+    padding: 8px 16px;
+  }
+  .badge-sub {
+    font-size: 0.95rem;
+    margin-left: 6px;
+  }
+  .card-title {
+    font-size: 1.1rem;
+    margin: 8px 0 0 0 !important;
+  }
+}
+
+/* Desktop XL+: 4 cols perfectas */
+@media (min-width: 1200px) {
+  .dashboard-card {
+    min-height: 156px;
+  }
+  .badge-value {
+    font-size: 1.6rem;
+  }
+  .card-title {
+    font-size: 1.15rem;
+  }
+}
+
+.today-card {
+  margin: 4px 6px 6px 6px !important;
+  border-radius: 10px;
+}
+.today-card h2 {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 700;
+  line-height: 1.2;
+}
+.today-card p {
+  margin: 2px 0 0 0;
+  font-size: 0.85rem;
+  opacity: 0.8;
+}
+
+@media (min-width: 768px) {
+  .today-card {
+    margin: 8px 10px 10px 10px !important;
+  }
+  .today-card h2 { font-size: 1.25rem; }
+  .today-card p { font-size: 0.95rem; }
 }

@@ -196,6 +196,7 @@ export interface BloqueoManual extends AuditFields {
 
 export type OrigenReserva =
   | 'DIRECTA'
+  | 'WALK_IN'
   | 'WHATSAPP'
   | 'TELEFONO'
   | 'CORREO'

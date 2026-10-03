@@ -5,12 +5,12 @@ import {
   IonCardSubtitle, IonCardTitle, IonCol, IonContent, IonGrid, IonHeader, IonIcon,
   IonItem, IonItemDivider, IonLabel, IonList, IonNote, IonPage, IonRow, IonTitle,
   IonToolbar, IonBadge, IonChip, IonSegment, IonSegmentButton, useIonViewWillEnter,
-  useIonRouter, useIonToast, IonFooter,
+  useIonRouter, useIonToast, IonFooter, IonSkeletonText,
 } from '@ionic/react';
 import {
   arrowBack, documentText, bed, person, calendar, pricetags, alertCircle, logIn,
   checkmarkCircle, cash, closeOutline, restaurant, bedOutline, car, build,
-  sparkle, card, wallet,
+  sparkles, card, wallet,
 } from 'ionicons/icons';
 import type { Color } from '@ionic/core';
 import type {
@@ -97,25 +97,31 @@ const fmtFecha = (iso: string | undefined | null) => {
   }
 };
 
-const Folio: React.FC = () => {
+const FolioPage: React.FC = () => {
   const router = useIonRouter();
   const { id } = useParams<{ id: string }>();
   const [folio, setFolio] = useState<Folio | null>(null);
   const [noEncontrado, setNoEncontrado] = useState(false);
+  const [loading, setLoading] = useState(false);
   const [tab, setTab] = useState<'cargos' | 'pagos'>('cargos');
   const [presentToast] = useIonToast();
 
-  const cargar = (folioId: string) => {
+  const cargar = async (folioId: string) => {
+    setLoading(true);
+    setNoEncontrado(false);
     try {
       let f: any = null;
       try {
         const servicio = FolioService as any;
-        const todos: any[] = (servicio.listarTodos?.() || []).filter(Boolean);
-        const encontrado = (id: string) => {
-          if (!id) return undefined;
-          try { const b = servicio.buscarPorId?.(id); return (b === null || b === undefined) ? undefined : b; } catch { return undefined; }
+        const todos: any[] = (await servicio.listarTodos?.() || []).filter(Boolean);
+        const encontrar = async (idB: string) => {
+          if (!idB) return undefined;
+          try {
+            const b = await servicio.buscarPorId?.(idB);
+            return (b === null || b === undefined) ? undefined : b;
+          } catch { return undefined; }
         };
-        f = encontrado(folioId);
+        f = await encontrar(folioId);
         if (!f) {
           f = todos.find((x) =>
             x && (
@@ -130,9 +136,9 @@ const Folio: React.FC = () => {
             )
           ) || undefined;
         }
-        if (f && f.id) try { servicio.recalcularTotales?.(f.id); } catch {}
+        if (f && f.id) try { await servicio.recalcularTotales?.(f.id); } catch {}
         if (f && f.id) {
-          const f3 = encontrado(f.id);
+          const f3 = await encontrar(f.id);
           if (f3) f = f3;
         }
       } catch (e) { f = null; }
@@ -145,9 +151,10 @@ const Folio: React.FC = () => {
         pagos: Array.isArray(f.pagos) ? f.pagos.filter(Boolean) : [],
       };
       setFolio(folioFinal as Folio);
-      setNoEncontrado(false);
     } catch (e) {
       setFolio(null); setNoEncontrado(true);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -177,8 +184,6 @@ const Folio: React.FC = () => {
       s + (((c as any).descuentosMontoDesglosado || []).reduce((s2: number, x: any) => s2 + Number(x?.montoDescuento || 0), 0)), 0);
     totalCargos = cargos.reduce((s, c) => s + Number((c as any).total || (c as any).monto || 0), 0);
   } catch {}
-  // Anti redondeo SUNAT (evita 840.00 vs 840.01): La suma subtotal+igv18+igv5-descuentos DEBE coincidir con el total nominal real.
-  // Si hay desfase de centavos (0.01) por toFixed(2) separados, se absorbe en el subtotal para cuadre.
   const subCuadre = Number((subTotalCargos + igv18 + igv5 - descuentosTot).toFixed(2));
   const desfase = Number((totalCargos - subCuadre).toFixed(2));
   if (Math.abs(desfase) > 0 && Math.abs(desfase) <= 0.03) {
@@ -192,7 +197,6 @@ const Folio: React.FC = () => {
   const pagosTot = Math.max(totalPagos, adelantoAloj);
   const totalFolioCalc = Number((subTotalCargos + igv18 + igv5 - descuentosTot).toFixed(2));
   const totalFolioSeed = Number((f as any)?.totalFolio || (f as any)?.totalPeriodo || 0);
-  // Preferir siempre el total real de ítems (totalCargos) para evitar cualquier desfase residual
   const totalFolio = Number((totalCargos > 0 ? Math.max(totalCargos, totalFolioSeed) : Math.max(totalFolioCalc, totalFolioSeed)).toFixed(2));
   const saldo = Number((totalFolio - pagosTot).toFixed(2));
 
@@ -228,9 +232,25 @@ const Folio: React.FC = () => {
 
       <IonContent fullscreen className="ion-padding-vertical" style={{ background: '#f1f5f2' }}>
         <IonGrid>
-          <IonRow class="ion-justify-content-center ion-padding-start ion-padding-end ion-padding-bottom">
+          <IonRow className="ion-justify-content-center ion-padding-start ion-padding-end ion-padding-bottom">
             <IonCol size="12" size-lg="10" size-xl="8">
-              {/* INFO CARD */}
+              {loading && (
+                <IonCard style={{ borderRadius: 20 }}>
+                  <IonCardHeader>
+                    <IonSkeletonText animated style={{ width: '50%' }} />
+                    <IonCardSubtitle><IonSkeletonText animated style={{ width: '70%' }} /></IonCardSubtitle>
+                  </IonCardHeader>
+                  <IonCardContent>
+                    {[0,1,2,3].map(i => (
+                      <IonItem key={i} lines="none" className="ion-no-padding">
+                        <IonLabel><IonSkeletonText animated style={{ width: '40%' }} /><p><IonSkeletonText animated style={{ width: '60%' }} /></p></IonLabel>
+                      </IonItem>
+                    ))}
+                  </IonCardContent>
+                </IonCard>
+              )}
+              {!loading && (
+              <>
               <IonCard style={{ borderRadius: 20, border: '1px solid #e4efea' }}>
                 <IonCardHeader style={{ paddingBottom: 8 }}>
                   <IonCardTitle style={{ fontSize: 19, fontWeight: 800, color: '#1b5e20' }}>
@@ -242,8 +262,8 @@ const Folio: React.FC = () => {
                   </IonCardSubtitle>
                 </IonCardHeader>
                 <IonCardContent style={{ paddingTop: 0 }}>
-                  <IonList lines="none" class="ion-no-padding">
-                    <IonItem class="ion-no-padding" lines="none">
+                  <IonList lines="none" className="ion-no-padding">
+                    <IonItem className="ion-no-padding" lines="none">
                       <IonIcon icon={documentText} slot="start" color="success" style={{ fontSize: 22 }} />
                       <IonLabel style={{ marginLeft: -6 }}>
                         <div style={{ fontSize: 12, color: '#6b7280' }}>Folio</div>
@@ -253,7 +273,7 @@ const Folio: React.FC = () => {
                         {estadoFolioLabel[estado]}
                       </IonBadge>
                     </IonItem>
-                    <IonItem class="ion-no-padding" lines="none">
+                    <IonItem className="ion-no-padding" lines="none">
                       <IonIcon icon={bed} slot="start" color="tertiary" style={{ fontSize: 20 }} />
                       <IonLabel style={{ marginLeft: -6 }}>
                         <div style={{ fontSize: 12, color: '#6b7280' }}>Habitación</div>
@@ -262,7 +282,7 @@ const Folio: React.FC = () => {
                         </div>
                       </IonLabel>
                     </IonItem>
-                    <IonItem class="ion-no-padding" lines="none">
+                    <IonItem className="ion-no-padding" lines="none">
                       <IonIcon icon={person} slot="start" color="primary" style={{ fontSize: 20 }} />
                       <IonLabel style={{ marginLeft: -6 }}>
                         <div style={{ fontSize: 12, color: '#6b7280' }}>Huésped titular</div>
@@ -276,7 +296,6 @@ const Folio: React.FC = () => {
                 </IonCardContent>
               </IonCard>
 
-              {/* TABS */}
               <IonSegment value={tab} onIonChange={(e) => setTab(e.detail.value as any)} style={{ margin: '0 4px 14px 4px' }}>
                 <IonSegmentButton value="cargos">
                   <IonLabel style={{ fontWeight: 700 }}>🧾 Cargos ({cargos.length})</IonLabel>
@@ -286,10 +305,9 @@ const Folio: React.FC = () => {
                 </IonSegmentButton>
               </IonSegment>
 
-              {/* TAB CARGOS */}
               {tab === 'cargos' && (
                 <IonCard style={{ borderRadius: 20, border: '1px solid #e4efea' }}>
-                  <IonCardContent class="ion-no-padding">
+                  <IonCardContent className="ion-no-padding">
                     {cargos.length === 0 ? (
                       <IonItemDivider color="light" style={{ padding: '22px 16px', borderRadius: 18 }}>
                         <IonLabel className="ion-text-center" style={{ fontSize: 13, color: '#6b7280' }}>
@@ -366,10 +384,9 @@ const Folio: React.FC = () => {
                 </IonCard>
               )}
 
-              {/* TAB PAGOS */}
               {tab === 'pagos' && (
                 <IonCard style={{ borderRadius: 20, border: '1px solid #e4efea' }}>
-                  <IonCardContent class="ion-no-padding">
+                  <IonCardContent className="ion-no-padding">
                     {pagos.length === 0 && pagosTot === 0 ? (
                       <IonItemDivider color="light" style={{ padding: '22px 16px', borderRadius: 18 }}>
                         <IonLabel className="ion-text-center" style={{ fontSize: 13, color: '#6b7280' }}>
@@ -441,7 +458,6 @@ const Folio: React.FC = () => {
                 </IonCard>
               )}
 
-              {/* RESUMEN TOTALES */}
               <IonCard style={{ borderRadius: 20, border: '2px solid #1b5e20', marginBottom: 120 }}>
                 <IonCardHeader style={{ paddingBottom: 6 }}>
                   <IonCardTitle style={{ fontSize: 16, fontWeight: 800, color: '#1b5e20' }}>
@@ -449,12 +465,12 @@ const Folio: React.FC = () => {
                   </IonCardTitle>
                 </IonCardHeader>
                 <IonCardContent style={{ paddingTop: 2 }}>
-                  <IonList lines="none" class="ion-no-padding">
-                    <IonItem lines="none" class="ion-no-padding">
+                  <IonList lines="none" className="ion-no-padding">
+                    <IonItem lines="none" className="ion-no-padding">
                       <IonLabel>Subtotal sin impuestos</IonLabel>
                       <div slot="end" style={{ fontWeight: 600 }}>{fmt(subTotalCargos)}</div>
                     </IonItem>
-                    <IonItem lines="none" class="ion-no-padding">
+                    <IonItem lines="none" className="ion-no-padding">
                       <IonLabel>
                         <IonBadge color="warning" style={{ fontSize: 10, marginRight: 6 }}>IGV 18%</IonBadge>
                         Impuesto General Ventas
@@ -462,7 +478,7 @@ const Folio: React.FC = () => {
                       <div slot="end" style={{ fontWeight: 600 }}>{fmt(igv18)}</div>
                     </IonItem>
                     {igv5 > 0 && (
-                      <IonItem lines="none" class="ion-no-padding">
+                      <IonItem lines="none" className="ion-no-padding">
                         <IonLabel>
                           <IonBadge color="tertiary" style={{ fontSize: 10, marginRight: 6 }}>SELVA 5%</IonBadge>
                           IGV Zona Selva
@@ -471,24 +487,24 @@ const Folio: React.FC = () => {
                       </IonItem>
                     )}
                     {descuentosTot > 0 && (
-                      <IonItem lines="none" class="ion-no-padding">
+                      <IonItem lines="none" className="ion-no-padding">
                         <IonLabel>🎟️ Descuentos Aplicados</IonLabel>
                         <div slot="end" style={{ fontWeight: 700, color: '#059669' }}>- {fmt(descuentosTot)}</div>
                       </IonItem>
                     )}
                     <IonItemDivider color="light" style={{ marginTop: 4, marginBottom: 4, minHeight: 2 }} />
-                    <IonItem lines="none" class="ion-no-padding">
+                    <IonItem lines="none" className="ion-no-padding">
                       <IonLabel style={{ fontWeight: 700, fontSize: 14 }}>💲 TOTAL FOLIO</IonLabel>
                       <div slot="end" style={{ fontWeight: 900, fontSize: 18, color: '#1b5e20' }}>{fmt(totalFolio)}</div>
                     </IonItem>
                     {pagosTot > 0 && (
-                      <IonItem lines="none" class="ion-no-padding">
+                      <IonItem lines="none" className="ion-no-padding">
                         <IonLabel style={{ fontWeight: 700 }}>💰 Pagos / Adelantos</IonLabel>
                         <div slot="end" style={{ fontWeight: 800, color: '#059669' }}>- {fmt(pagosTot)}</div>
                       </IonItem>
                     )}
                     <IonItemDivider color="dark" style={{ minHeight: 2 }} />
-                    <IonItem lines="none" class="ion-no-padding" style={{ paddingTop: 8 }}>
+                    <IonItem lines="none" className="ion-no-padding" style={{ paddingTop: 8 }}>
                       <IonLabel style={{ fontWeight: 900, fontSize: 17 }}>
                         🧾 Saldo Pendiente
                       </IonLabel>
@@ -521,6 +537,8 @@ const Folio: React.FC = () => {
                     </div>
                   </IonCardContent>
                 </IonCard>
+              )}
+              </>
               )}
             </IonCol>
           </IonRow>
@@ -561,4 +579,4 @@ const cargoAutoColor = (c: any, _idx: number) => {
   return <IonBadge color="medium" style={{ marginTop: 4, fontSize: 10 }}>✍️ MANUAL</IonBadge>;
 };
 
-export default Folio;
+export default FolioPage;

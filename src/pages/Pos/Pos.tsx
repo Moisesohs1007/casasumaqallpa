@@ -17,233 +17,37 @@ import {
   IonLabel,
   IonChip,
   IonFab, IonFabButton, IonFabList, IonIcon,
+  IonSkeletonText,
+  useIonViewWillEnter,
 } from '@ionic/react';
 import type { Color } from '@ionic/core';
 import { checkmarkCircle, alert, timeOutline, add, fastFood } from 'ionicons/icons';
 import TomarComanda from '../../components/modals/TomarComanda';
 import {
-  PuntoVenta,
-  TipoPuntoVenta,
   Mesa,
-  EstadoMesa as EstadoMesaReal,
   Comanda,
-  EstadoComanda as EstadoComandaReal,
-  TipoConsumoComanda,
-  PrioridadComanda,
-  Moneda,
-  Usuario,
-  Huesped,
-  ID,
-  DateTimeISO,
 } from '../../types';
+import { MesaService, ComandaService } from '../../services';
 import './Pos.css';
-
-const now = new Date();
-const isoNow: DateTimeISO = now.toISOString();
-
-const auditBase = { createdAt: isoNow, updatedAt: isoNow };
-
-const pvRestaurante: PuntoVenta = {
-  id: 'pv-restaurante-1',
-  nombre: 'Restaurante Principal',
-  tipo: 'RESTAURANTE_CON_MESAS' as TipoPuntoVenta,
-  prefijoComanda: 'C-RST',
-  proximoNumeroComanda: 1001,
-  moneda: 'PEN' as Moneda,
-  horarioAtencion: [{ diaSemana: 'TODOS', operacion24h: true }],
-  tiposComandasPermitidos: ['MESA_RESTAURANTE', 'ROOM_SERVICE', 'PARA_LLEVAR'],
-  propinaOpcional: true,
-  propinaPorcentajeSugerido: 10,
-  impuestoPorDefecto: 'IGV',
-  permiteDescuentos: true,
-  maximoDescuentoPorcentaje: 20,
-  permiteCortesias: true,
-  estado: 'ACTIVO',
-  ...auditBase,
-};
-
-const estadoMesaMap: Record<'libre' | 'ocupada' | 'sucia', EstadoMesaReal> = {
-  libre: 'LIBRE',
-  ocupada: 'OCUPADA',
-  sucia: 'EN_LIMPIEZA',
-};
-
-function buildMockUsuario(id: ID, iniciales: string, nombre: string, apellido: string, rolNombre: string): Usuario {
-  return {
-    id,
-    uuid: `usr-uuid-${id}`,
-    iniciales,
-    nombres: nombre,
-    apellidos: apellido,
-    correoElectronico: `${nombre.toLowerCase()}.${apellido.toLowerCase()}@casasumaqallpa.com`,
-    rolId: `rol-${rolNombre.toLowerCase()}`,
-    estado: 'ACTIVO',
-    passwordHash: '__hidden__',
-    ...auditBase,
-  };
-}
-
-const mockUsuariosMozos: Usuario[] = [
-  buildMockUsuario('usr-luis', 'LM', 'Luis', 'Mendoza', 'MOZO'),
-  buildMockUsuario('usr-ana', 'AR', 'Ana', 'Ramos', 'MOZO'),
-  buildMockUsuario('usr-rs', 'RS', 'Room', 'Service', 'MOZO'),
-];
-
-function buildMockMesa(id: ID, nombre: string, capacidad: number, estadoLabel: 'libre' | 'ocupada' | 'sucia', habitacionVinculada?: string): Mesa {
-  return {
-    id,
-    nombre,
-    puntoVentaId: pvRestaurante.id,
-    puntoVenta: pvRestaurante,
-    capacidadPersonas: capacidad,
-    esCombinable: false,
-    esTransferible: true,
-    estado: estadoMesaMap[estadoLabel],
-    ...auditBase,
-  };
-}
-
-function buildMockComanda(params: {
-  id: ID;
-  numero: number;
-  mesaId: ID;
-  habitacionCodigo?: string;
-  mozo: Usuario;
-  estado: EstadoComandaReal;
-  itemsCantidad: number;
-  total: number;
-}): Comanda {
-  const tipoConsumo: TipoConsumoComanda = params.habitacionCodigo ? 'ROOM_SERVICE' : 'MESA_RESTAURANTE';
-  return {
-    id: params.id,
-    numeroCorrelativo: params.numero,
-    prefijoCorrelativo: pvRestaurante.prefijoComanda,
-    puntoVentaId: pvRestaurante.id,
-    puntoVenta: pvRestaurante,
-    tipoConsumo,
-    habitacionNombreString: params.habitacionCodigo,
-    mesaId: params.mesaId,
-    cantidadPersonas: 2,
-    mozoAsignadoId: params.mozo.id,
-    mozoAsignadoNombre: `${params.mozo.nombres} ${params.mozo.apellidos}`,
-    fechaApertura: isoNow,
-    estado: params.estado,
-    prioridad: tipoConsumo === 'ROOM_SERVICE' ? 'ROOM_SERVICE_RAPIDO' : 'NORMAL',
-    moneda: 'PEN' as Moneda,
-    subtotalProductos: Math.round(params.total / 1.18),
-    impuestos: params.total - Math.round(params.total / 1.18),
-    descuentosTotal: 0,
-    totalComanda: params.total,
-    saldoPendientePago: params.estado === 'CERRADA_COBRADA' || params.estado === 'CARGADA_A_FOLIO' ? 0 : params.total,
-    cargadaTotalmenteAFolio: params.estado === 'CARGADA_A_FOLIO',
-    items: [],
-    historialEstados: [
-      {
-        id: `he-${params.id}-1`,
-        fecha: isoNow,
-        estadoNuevo: params.estado,
-      },
-    ],
-    pagos: [],
-    usuarioAperturaId: params.mozo.id,
-    anulada: false,
-    ...auditBase,
-  };
-}
 
 type EstadoMesaLabel = 'libre' | 'ocupada' | 'sucia';
 type EstadoComandaLabel = 'abierta' | 'cocina' | 'lista' | 'cerrada';
 
 interface PosVistaMesaRow {
-  id: ID;
+  id: string;
   nombre: string;
   capacidad: number;
   estado: EstadoMesaLabel;
   habitacionVinculada?: string;
   comanda?: {
-    id: ID;
+    id: string;
     numero: number;
     estado: EstadoComandaLabel;
     itemsCantidad: number;
-    mozo: Usuario;
+    mozoNombre: string;
     total: number;
   };
 }
-
-const rawMesas: PosVistaMesaRow[] = [
-  {
-    id: 'm1',
-    nombre: 'Mesa 1',
-    capacidad: 4,
-    estado: 'ocupada',
-    comanda: { id: 'com-901', numero: 901, estado: 'cocina', itemsCantidad: 6, mozo: mockUsuariosMozos[0], total: 125.5 },
-  },
-  {
-    id: 'm2',
-    nombre: 'Mesa 2',
-    capacidad: 2,
-    estado: 'ocupada',
-    comanda: { id: 'com-902', numero: 902, estado: 'lista', itemsCantidad: 3, mozo: mockUsuariosMozos[1], total: 62 },
-  },
-  { id: 'm3', nombre: 'Mesa 3', capacidad: 6, estado: 'libre' },
-  { id: 'm4', nombre: 'Mesa 4', capacidad: 4, estado: 'sucia' },
-  {
-    id: 'm5',
-    nombre: 'Mesa 5',
-    capacidad: 2,
-    estado: 'ocupada',
-    comanda: { id: 'com-903', numero: 903, estado: 'abierta', itemsCantidad: 2, mozo: mockUsuariosMozos[0], total: 48 },
-  },
-  {
-    id: 'm6',
-    nombre: 'Terraza 1',
-    capacidad: 4,
-    estado: 'ocupada',
-    comanda: { id: 'com-904', numero: 904, estado: 'cerrada', itemsCantidad: 4, mozo: mockUsuariosMozos[1], total: 98 },
-  },
-  {
-    id: 'h101',
-    nombre: 'Hab. 101',
-    capacidad: 2,
-    estado: 'ocupada',
-    habitacionVinculada: 'CAB-01',
-    comanda: { id: 'com-910', numero: 910, estado: 'cocina', itemsCantidad: 5, mozo: mockUsuariosMozos[2], total: 110 },
-  },
-  {
-    id: 'h103',
-    nombre: 'Hab. 103',
-    capacidad: 4,
-    estado: 'ocupada',
-    habitacionVinculada: 'FAM-03',
-    comanda: { id: 'com-915', numero: 915, estado: 'abierta', itemsCantidad: 8, mozo: mockUsuariosMozos[2], total: 240 },
-  },
-];
-
-const mockMesas: Mesa[] = rawMesas.map((r) => buildMockMesa(r.id, r.nombre, r.capacidad, r.estado, r.habitacionVinculada));
-const mockComandasDict: Record<string, Comanda> = Object.fromEntries(
-  rawMesas
-    .filter((r) => !!r.comanda)
-    .map((r) => [
-      r.comanda!.id,
-      buildMockComanda({
-        id: r.comanda!.id,
-        numero: r.comanda!.numero,
-        mesaId: r.id,
-        habitacionCodigo: r.habitacionVinculada,
-        mozo: r.comanda!.mozo,
-        estado: {
-          abierta: 'ABIERTA',
-          cocina: 'EN_COCINA_BAR',
-          lista: 'LISTA_PARA_ENTREGAR',
-          cerrada: 'CERRADA_COBRADA',
-        }[r.comanda!.estado],
-        itemsCantidad: r.comanda!.itemsCantidad,
-        total: r.comanda!.total,
-      }),
-    ]),
-);
-void mockMesas;
-void mockComandasDict;
 
 const mesaColor: Record<EstadoMesaLabel, Color> = {
   libre: 'success',
@@ -254,18 +58,109 @@ const mesaColor: Record<EstadoMesaLabel, Color> = {
 interface ComandaBadgeCfg {
   color: Color;
   label: string;
-  icon: Icon;
 }
 
 const comandaBadge: Record<EstadoComandaLabel, ComandaBadgeCfg> = {
-  abierta: { color: 'warning', label: 'ABIERTA', icon: timeOutline },
-  cocina: { color: 'tertiary', label: 'EN COCINA', icon: alert },
-  lista: { color: 'success', label: 'LISTA', icon: checkmarkCircle },
-  cerrada: { color: 'medium', label: 'CERRADA', icon: checkmarkCircle },
+  abierta: { color: 'warning', label: 'ABIERTA' },
+  cocina: { color: 'tertiary', label: 'EN COCINA' },
+  lista: { color: 'success', label: 'LISTA' },
+  cerrada: { color: 'medium', label: 'CERRADA' },
+};
+
+const estadoMesaToLabel = (e: any): EstadoMesaLabel => {
+  const s = String(e || '').toUpperCase();
+  if (s === 'OCUPADA' || s === 'EN_USO') return 'ocupada';
+  if (s === 'SUCIA' || s === 'EN_LIMPIEZA' || s === 'LIMPIEZA') return 'sucia';
+  return 'libre';
+};
+
+const estadoComandaToLabel = (e: any): EstadoComandaLabel => {
+  const s = String(e || '').toUpperCase();
+  if (s.includes('COCINA') || s === 'EN_PREPARACION') return 'cocina';
+  if (s.includes('LISTA') || s.includes('ENTREGAR') || s.includes('ENTREGADA')) return 'lista';
+  if (s.includes('CERRADA') || s.includes('COBRADA') || s.includes('CARGADA')) return 'cerrada';
+  return 'abierta';
 };
 
 const PosPage: React.FC = () => {
   const [tomarComandaOpen, setTomarComandaOpen] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [vistaMesas, setVistaMesas] = useState<PosVistaMesaRow[]>([]);
+  const [preMesaId, setPreMesaId] = useState<string | undefined>(undefined);
+  const [preHabitacionId, setPreHabitacionId] = useState<string | undefined>(undefined);
+  const [preTipoConsumo, setPreTipoConsumo] = useState<'MESA' | 'CARGO_A_HABITACION' | undefined>(undefined);
+  const [comandaAEditarId, setComandaAEditarId] = useState<string | undefined>(undefined);
+
+  const openParaMesa = (m: PosVistaMesaRow) => {
+    setPreMesaId(m.id);
+    setPreHabitacionId(undefined);
+    setPreTipoConsumo('MESA');
+    setComandaAEditarId(m.comanda?.id);
+    setTomarComandaOpen(true);
+  };
+  const openNuevoRoomService = () => {
+    setPreMesaId(undefined);
+    setPreHabitacionId(undefined);
+    setPreTipoConsumo('MESA');
+    setComandaAEditarId(undefined);
+    setTomarComandaOpen(true);
+  };
+
+  const cargar = async () => {
+    setLoading(true);
+    try {
+      const [mesas, comandas] = await Promise.all([
+        MesaService.listarTodas(),
+        ComandaService.listarTodas({ estado: 'ABIERTA' as any }),
+      ]);
+      const comandasAbiertas = comandas.filter((c) => c.estado !== 'CERRADA_COBRADA');
+      const comandasPorMesa = new Map<string, Comanda>();
+      for (const c of comandasAbiertas) {
+        const key = (c as any).mesaId;
+        if (key && !comandasPorMesa.has(key)) comandasPorMesa.set(key, c);
+      }
+      const rows: PosVistaMesaRow[] = mesas.map((m: Mesa) => {
+        const nombre = (m as any).nombreVisible || (m as any).nombre || (m as any).codigo || `Mesa ${m.id.slice(-3)}`;
+        const capacidad = (m as any).capacidadMaxPax || (m as any).capacidadPersonas || (m as any).capacidad || 4;
+        const est = estadoMesaToLabel((m as any).estado);
+        const habitacionVinculada = (m as any).habitacionAsignadaId || (m as any).habitacionVinculada || undefined;
+        let comanda: PosVistaMesaRow['comanda'] | undefined;
+        const c = comandasPorMesa.get(m.id);
+        if (c) {
+          const detalles = (c as any).detalles || [];
+          const numStr = String(c.numeroCorrelativo || (c as any).numero || '');
+          const num = parseInt(numStr.replace(/\D/g, ''), 10) || 1000;
+          comanda = {
+            id: c.id,
+            numero: num,
+            estado: estadoComandaToLabel(c.estado),
+            itemsCantidad: detalles.length || Math.round(((c as any).totalComanda || (c as any).total || 0) / 20),
+            mozoNombre: (c as any).mozoAsignadoNombre || (c as any).usuarioIdMozoApertura || 'Mozo',
+            total: Number((c as any).totalComanda || (c as any).total || 0),
+          };
+          if (comanda.itemsCantidad === 0 && comanda.total > 0) comanda.itemsCantidad = 1;
+        } else if (est === 'ocupada' && (m as any).zona !== 'ROOM_SERVICE') {
+          // Keep as ocupada but with no comanda yet
+        }
+        return { id: m.id, nombre, capacidad, estado: est, habitacionVinculada, comanda };
+      });
+      if (rows.length === 0) {
+        setVistaMesas([]);
+      } else {
+        setVistaMesas(rows);
+      }
+    } catch (e) {
+      console.warn('[POS] Error cargando data:', e);
+      setVistaMesas([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useIonViewWillEnter(() => {
+    cargar();
+  });
+
   return (
     <IonPage>
       <IonHeader>
@@ -290,9 +185,33 @@ const PosPage: React.FC = () => {
 
         <IonGrid className="table-grid ion-margin-top">
           <IonRow>
-            {rawMesas.map((m) => (
+            {loading &&
+              [0, 1, 2, 3, 4, 5, 6, 7].map((i) => (
+                <IonCol key={i} size="12" size-sm="6" size-md="4" size-lg="4" size-xl="3">
+                  <IonCard>
+                    <IonCardHeader>
+                      <IonSkeletonText animated style={{ width: '40%' }} />
+                      <IonCardSubtitle><IonSkeletonText animated style={{ width: '70%' }} /></IonCardSubtitle>
+                    </IonCardHeader>
+                    <IonCardContent>
+                      <IonSkeletonText animated style={{ width: '90%' }} />
+                      <p><IonSkeletonText animated style={{ width: '70%' }} /></p>
+                    </IonCardContent>
+                  </IonCard>
+                </IonCol>
+              ))}
+            {!loading && vistaMesas.length === 0 && (
+              <IonCol size="12">
+                <IonCard>
+                  <IonCardContent style={{ textAlign: 'center', padding: '24px 0' }}>
+                    No hay mesas/puntos de venta registrados. Abre el SQL Editor en Supabase y carga el seed demo.
+                  </IonCardContent>
+                </IonCard>
+              </IonCol>
+            )}
+            {!loading && vistaMesas.map((m) => (
               <IonCol key={m.id} size="12" size-sm="6" size-md="4" size-lg="4" size-xl="3">
-                <IonCard button className={`pos-mesa pos-${m.estado}`}>
+                <IonCard button className={`pos-mesa pos-${m.estado}`} onClick={() => openParaMesa(m)}>
                   <IonCardHeader>
                     <div className="pos-row">
                       <IonCardTitle>{m.nombre}</IonCardTitle>
@@ -315,10 +234,10 @@ const PosPage: React.FC = () => {
                           </IonBadge>
                         </div>
                         <p className="ion-no-margin">
-                          {m.comanda.itemsCantidad} platos · Mozo: {m.comanda.mozo.nombres} {m.comanda.mozo.apellidos}
+                          {m.comanda.itemsCantidad} platos · Mozo: {m.comanda.mozoNombre}
                         </p>
                         <p className="ion-no-margin total">
-                          Total: <strong>S/ {m.comanda.total.toFixed(2)}</strong>
+                          Total: <strong>S/ {Number(m.comanda.total || 0).toFixed(2)}</strong>
                         </p>
                       </>
                     ) : (
@@ -332,7 +251,7 @@ const PosPage: React.FC = () => {
         </IonGrid>
 
         <button
-          onClick={() => setTomarComandaOpen(true)}
+          onClick={openNuevoRoomService}
           title="🧾 Nueva comanda / Room Service"
           style={{
             position: 'fixed',
@@ -360,7 +279,18 @@ const PosPage: React.FC = () => {
 
         <TomarComanda
           isOpen={tomarComandaOpen}
-          onDismiss={() => setTomarComandaOpen(false)}
+          onDismiss={() => {
+            setTomarComandaOpen(false);
+            setPreMesaId(undefined);
+            setPreHabitacionId(undefined);
+            setPreTipoConsumo(undefined);
+            setComandaAEditarId(undefined);
+            cargar();
+          }}
+          preMesaId={preMesaId}
+          preHabitacionId={preHabitacionId}
+          preTipoConsumo={preTipoConsumo}
+          comandaAEditarId={comandaAEditarId}
         />
       </IonContent>
     </IonPage>

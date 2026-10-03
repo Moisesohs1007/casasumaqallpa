@@ -1,12 +1,46 @@
 .hab-card {
-  border-radius: 12px;
-  border-left-width: 6px;
+  border-radius: 8px;
+  border-left-width: 4px;
   border-left-style: solid;
-  transition: transform 0.15s ease-in-out;
+  transition: transform 0.12s ease-in-out;
+  min-height: 0;
+  height: auto;
+  margin: 2px !important;
 }
 
 .hab-card:active {
   transform: scale(0.98);
+}
+
+.hab-card ion-card-header {
+  padding: 6px 8px 0 8px !important;
+  min-height: 0;
+}
+
+.hab-card ion-card-content {
+  padding: 2px 8px 6px 8px !important;
+  font-size: 0.8rem;
+  line-height: 1.2;
+}
+
+.hab-card ion-card-title {
+  font-size: 0.95rem;
+  font-weight: 800;
+  line-height: 1.05;
+  margin: 0;
+  letter-spacing: 0.2px;
+}
+
+.hab-card ion-card-subtitle {
+  font-size: 0.72rem;
+  margin-top: 1px;
+  opacity: 0.85;
+}
+
+.hab-card p {
+  margin: 1px 0;
+  font-size: 0.76rem;
+  line-height: 1.15;
 }
 
 .hab-libre {
@@ -15,15 +49,93 @@
 .hab-ocupada {
   border-left-color: var(--ion-color-danger, #eb445a);
 }
+.hab-reservada {
+  border-left-color: var(--ion-color-primary, #2dd36f);
+}
 .hab-limpieza {
   border-left-color: var(--ion-color-warning, #ffc409);
 }
 .hab-mantenimiento {
   border-left-color: var(--ion-color-medium, #92949c);
 }
+.hab-bloqueada {
+  border-left-color: var(--ion-color-medium, #92949c);
+}
+.hab-inspeccionada {
+  border-left-color: var(--ion-color-tertiary, #6a64ff);
+}
 
 .hab-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 4px;
+}
+
+.hab-row ion-badge {
+  font-size: 0.62rem;
+  padding: 3px 6px;
+  flex-shrink: 0;
+  white-space: nowrap;
+  min-height: 0;
+  height: 20px;
+  display: inline-flex;
+  align-items: center;
+}
+
+/* Mobile-first (default <576px): 2 columnas ULTRA compactas, sin espacio muerto */
+@media (max-width: 575.98px) {
+  .hab-grid {
+    column-gap: 2px;
+    row-gap: 2px;
+  }
+  .hab-card {
+    border-left-width: 3px;
+    min-height: 82px;
+  }
+  .hab-card ion-card-header {
+    padding: 5px 6px 0 6px !important;
+  }
+  .hab-card ion-card-content {
+    padding: 1px 6px 5px 6px !important;
+  }
+  .hab-card ion-card-title {
+    font-size: 0.88rem;
+  }
+  .hab-card ion-card-subtitle {
+    font-size: 0.65rem;
+  }
+  .hab-card p {
+    font-size: 0.7rem;
+    margin: 0.5px 0;
+  }
+  .hab-row ion-badge {
+    font-size: 0.56rem;
+    padding: 2px 5px;
+    height: 18px;
+  }
+}
+
+@media (min-width: 768px) {
+  .hab-card {
+    border-radius: 10px;
+    border-left-width: 5px;
+    margin: 4px !important;
+    min-height: 110px;
+  }
+  .hab-card ion-card-title {
+    font-size: 1.05rem;
+  }
+  .hab-card ion-card-subtitle {
+    font-size: 0.8rem;
+  }
+  .hab-card p {
+    font-size: 0.85rem;
+  }
+}
+
+@media (min-width: 1200px) {
+  .hab-card ion-card-title {
+    font-size: 1.15rem;
+  }
 }

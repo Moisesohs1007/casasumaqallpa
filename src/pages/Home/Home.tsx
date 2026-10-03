@@ -1,3 +1,4 @@
+import React, { useState, useEffect } from 'react';
 import {
   IonContent,
   IonHeader,
@@ -15,10 +16,17 @@ import {
   IonBadge,
   IonItem,
   IonIcon,
+  IonSkeletonText,
+  useIonRouter,
+  useIonViewWillEnter,
 } from '@ionic/react';
 import type { Color } from '@ionic/core';
-import { people, bed, restaurant, trendingUp, Icon } from 'ionicons/icons';
-import type { EstadoReserva, EstadoComanda, EstadoHabitacion, MetodoPago, Moneda, OrigenReserva, Usuario } from '../../types';
+import { people, bed, restaurant, trendingUp } from 'ionicons/icons';
+import {
+  ReservaService,
+  HabitacionService,
+  ComandaService,
+} from '../../services';
 import './Home.css';
 
 interface DashboardKpiItem {
@@ -26,13 +34,16 @@ interface DashboardKpiItem {
   label: string;
   value: number;
   badge?: string;
-  icon: Icon;
+  icon: string;
   color: Color;
+  loading?: boolean;
+  navigateTo?: string;
 }
 
 interface HomePageProps {}
 
 const HomePage: React.FC<HomePageProps> = () => {
+  const router = useIonRouter();
   const today = new Date().toLocaleDateString('es-PE', {
     weekday: 'long',
     year: 'numeric',
@@ -40,27 +51,47 @@ const HomePage: React.FC<HomePageProps> = () => {
     day: 'numeric',
   });
 
-  const dashboardItems: DashboardKpiItem[] = [
-    { id: 'kpi-llegadas', label: 'Llegadas hoy', value: 3, badge: '+1', icon: people, color: 'primary' },
-    { id: 'kpi-salidas', label: 'Salidas hoy', value: 2, icon: trendingUp, color: 'warning' },
-    { id: 'kpi-hab', label: 'Habitaciones ocupadas', value: 12, badge: '/15', icon: bed, color: 'tertiary' },
-    { id: 'kpi-com', label: 'Comandas activas', value: 5, icon: restaurant, color: 'success' },
-  ];
+  const [kpis, setKpis] = useState<DashboardKpiItem[]>([
+    { id: 'kpi-llegadas', label: 'Llegadas hoy', value: 0, icon: people, color: 'primary', loading: true, navigateTo: '/reservas?filter=llegadas-hoy' },
+    { id: 'kpi-salidas', label: 'Salidas hoy', value: 0, icon: trendingUp, color: 'warning', loading: true, navigateTo: '/reservas?filter=salidas-hoy' },
+    { id: 'kpi-hab', label: 'Habitaciones ocupadas', value: 0, badge: '/0', icon: bed, color: 'tertiary', loading: true, navigateTo: '/habitaciones' },
+    { id: 'kpi-com', label: 'Comandas activas', value: 0, icon: restaurant, color: 'success', loading: true, navigateTo: '/pos?filter=activas' },
+  ]);
 
-  const sessionUsuario: Usuario = {
-    id: 'usr-actual',
-    uuid: 'usr-uuid-actual',
-    iniciales: 'MO',
-    nombres: 'Moises',
-    apellidos: 'OHS',
-    correoElectronico: 'moisesohs@gmail.com',
-    rolId: 'rol-admin',
-    estado: 'ACTIVO',
-    passwordHash: '__hidden__',
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
+  const cargarKpis = async () => {
+    setKpis((prev) => prev.map((k) => ({ ...k, loading: true })));
+    try {
+      const [estReservas, habs, comandas] = await Promise.all([
+        ReservaService.estadisticasHoy(),
+        HabitacionService.listarTodas(),
+        ComandaService.listarTodas({ estado: 'ABIERTA' }),
+      ]);
+      const habsOcupadas = habs.filter((h) => h.estado === 'OCUPADA').length;
+      const totalHabs = habs.length || 0;
+      const comandasAbiertas = comandas.filter(
+        (c) => c.estado === 'ABIERTA' || c.estado === 'EN_COCINA_BAR' || c.estado === 'LISTA_PARA_ENTREGAR'
+      ).length;
+      setKpis([
+        { id: 'kpi-llegadas', label: 'Llegadas hoy', value: estReservas.llegadasHoy, icon: people, color: 'primary', navigateTo: '/reservas?filter=llegadas-hoy' },
+        { id: 'kpi-salidas', label: 'Salidas hoy', value: estReservas.salidasHoy, icon: trendingUp, color: 'warning', navigateTo: '/reservas?filter=salidas-hoy' },
+        { id: 'kpi-hab', label: 'Habitaciones ocupadas', value: habsOcupadas, badge: `/${totalHabs}`, icon: bed, color: 'tertiary', navigateTo: '/habitaciones' },
+        { id: 'kpi-com', label: 'Comandas activas', value: comandasAbiertas, icon: restaurant, color: 'success', navigateTo: '/pos?filter=activas' },
+      ]);
+    } catch (e: any) {
+      console.warn('[Home] Error cargando KPIs:', e?.message || e);
+      setKpis((prev) => prev.map((k) => ({ ...k, loading: false })));
+    }
   };
-  void sessionUsuario;
+
+  useIonViewWillEnter(() => {
+    cargarKpis();
+  });
+
+  const handleKpiClick = (item: DashboardKpiItem) => {
+    if (item.navigateTo) {
+      router.push(item.navigateTo, 'forward');
+    }
+  };
 
   return (
     <IonPage>
@@ -71,59 +102,46 @@ const HomePage: React.FC<HomePageProps> = () => {
       </IonHeader>
 
       <IonContent fullscreen className="ion-padding">
-        <IonHeader collapse="condense">
-          <IonToolbar>
-            <IonTitle size="large">Inicio</IonTitle>
-          </IonToolbar>
-        </IonHeader>
+        <IonCard className="today-card">
+          <IonCardContent style={{ padding: '10px 12px' }}>
+            <h2 className="ion-text-capitalize" style={{ margin: 0 }}>{today}</h2>
+            <p style={{ margin: '2px 0 0 0', opacity: 0.85 }}>Panel de gestión — recepción en vivo.</p>
+          </IonCardContent>
+        </IonCard>
 
-        <IonItem lines="none" className="ion-margin-bottom">
-          <IonLabel>
-            <h2 className="ion-text-capitalize">{today}</h2>
-            <p>Bienvenido(a) al panel de gestión.</p>
-          </IonLabel>
-        </IonItem>
-
-        <IonGrid>
+        <IonGrid className="table-grid dashboard-grid">
           <IonRow>
-            {dashboardItems.map((item) => (
-              <IonCol key={item.id} size="12" size-sm="6" size-md="6" size-lg="4" size-xl="3">
-                <IonCard color={`${item.color}`} className="dashboard-card">
+            {kpis.map((item) => (
+              <IonCol key={item.id} size="12" size-xs="12" size-sm="6" size-md="6" size-lg="6" size-xl="3">
+                <IonCard
+                  color={`${item.color}`}
+                  className="dashboard-card"
+                  button={!!item.navigateTo}
+                  onClick={() => handleKpiClick(item)}
+                  style={{ cursor: item.navigateTo ? 'pointer' : 'default' }}
+                >
                   <IonCardHeader>
                     <div className="card-header-row">
                       <IonIcon icon={item.icon} size="large" color="light" />
                       <IonBadge color="light" className="badge-value">
-                        {item.value}
-                        {item.badge ? <span className="badge-sub">{item.badge}</span> : null}
+                        {item.loading ? <IonSkeletonText animated style={{ width: 40 }} /> : item.value}
+                        {item.badge ? (
+                          <span className="badge-sub">
+                            {item.loading ? <IonSkeletonText animated style={{ width: 28, display: 'inline-block' }} /> : item.badge}
+                          </span>
+                        ) : null}
                       </IonBadge>
                     </div>
                     <IonCardTitle className="ion-padding-top card-title">{item.label}</IonCardTitle>
                   </IonCardHeader>
                   <IonCardContent>
-                    <small>Etapa 1 + Etapa 2 — Base preparada</small>
+                    <small style={{ opacity: 0.92 }}>{item.navigateTo ? 'Toca para ver el detalle' : 'Datos en tiempo real'}</small>
                   </IonCardContent>
                 </IonCard>
               </IonCol>
             ))}
           </IonRow>
         </IonGrid>
-
-        <IonCard className="ion-margin-top">
-          <IonCardHeader>
-            <IonCardTitle>Estructura del sistema</IonCardTitle>
-          </IonCardHeader>
-          <IonCardContent>
-            <ul className="home-ul">
-              <li>Etapa 1: Núcleo de reservas (Habitaciones, Tarifas, Calendario, Reservas, Huéspedes)</li>
-              <li>Etapa 2: Recepción, Cuenta y POS F&amp;B (Check-in/out, Folio, Cobros, Usuarios y POS)</li>
-              <li>Etapas 3-8: Operación diaria, Facturación SUNAT, Extras, Distribución, Experiencia, Admin.</li>
-            </ul>
-            <p className="ion-margin-top">
-              <strong>Siguiente paso:</strong> implementar los modelos (tipos TypeScript) y servicios mock
-              para Reservas, Habitaciones y Huéspedes (Etapa 1).
-            </p>
-          </IonCardContent>
-        </IonCard>
       </IonContent>
     </IonPage>
   );

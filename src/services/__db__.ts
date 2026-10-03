@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { seed, seedUtil, type Create, type Update } from './__seed__';
 import type {
   TipoHabitacion, Habitacion, Tarifa, Temporada, PoliticaCancelacion, CodigoPromocional,

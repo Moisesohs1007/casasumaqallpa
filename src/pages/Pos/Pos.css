@@ -1,15 +1,49 @@
 .pos-legend {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 4px;
+  padding: 0 2px;
+  margin-bottom: 0;
+}
+
+.pos-legend ion-chip {
+  font-size: 0.68rem;
+  padding: 3px 8px;
+  height: 24px;
+  margin: 0;
+  min-height: 0;
 }
 
 .pos-mesa {
-  border-radius: 12px;
-  border-left-width: 6px;
+  border-radius: 8px;
+  border-left-width: 4px;
   border-left-style: solid;
-  transition: transform 0.15s ease-in-out;
-  min-height: 180px;
+  transition: transform 0.12s ease-in-out;
+  min-height: 0;
+  margin: 2px !important;
+}
+
+.pos-mesa ion-card-header {
+  padding: 6px 8px 0 8px !important;
+  min-height: 0;
+}
+
+.pos-mesa ion-card-content {
+  padding: 2px 8px 6px 8px !important;
+  font-size: 0.78rem;
+  line-height: 1.2;
+}
+
+.pos-mesa ion-card-title {
+  font-size: 0.92rem;
+  font-weight: 800;
+  margin: 0;
+  line-height: 1.05;
+}
+
+.pos-mesa ion-card-subtitle {
+  font-size: 0.7rem;
+  margin-top: 1px;
 }
 
 .pos-mesa:active {
@@ -25,32 +59,90 @@
 .pos-sucia {
   border-left-color: var(--ion-color-warning, #ffc409);
 }
+.pos-bloqueada {
+  border-left-color: var(--ion-color-medium, #92949c);
+}
 
 .pos-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 4px;
+}
+
+.pos-row ion-badge {
+  font-size: 0.62rem;
+  padding: 3px 6px;
+  flex-shrink: 0;
+  min-height: 0;
+  height: 20px;
+  display: inline-flex;
+  align-items: center;
 }
 
 .hab-ref {
   display: block;
-  margin-top: 4px;
-  font-size: 0.85rem;
-  opacity: 0.8;
+  margin-top: 1px;
+  font-size: 0.72rem;
+  opacity: 0.82;
+  line-height: 1.1;
 }
 
 .comanda-row {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 6px;
+  margin-bottom: 1px;
+  font-size: 0.78rem;
+  gap: 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .total {
-  margin-top: 6px;
-  font-size: 1rem;
+  margin-top: 2px;
+  font-size: 0.86rem;
+  font-weight: 800;
+  letter-spacing: 0.2px;
 }
 
 .sin-comanda {
   opacity: 0.7;
+  font-size: 0.74rem;
+  font-style: italic;
+  margin: 2px 0 0 0 !important;
+}
+
+/* Mobile compacto PRIMERO — sin espacio muerto: máximo info, cero padding */
+@media (max-width: 575.98px) {
+  .pos-mesa {
+    min-height: 92px;
+  }
+  .pos-mesa ion-card-header { padding: 5px 6px 0 6px !important; }
+  .pos-mesa ion-card-content { padding: 1px 6px 5px 6px !important; }
+  .pos-mesa ion-card-title { font-size: 0.86rem; }
+  .pos-mesa ion-card-subtitle { font-size: 0.66rem; }
+  .pos-mesa p { margin: 0.5px 0; font-size: 0.72rem; line-height: 1.1; }
+  .hab-ref { font-size: 0.66rem; margin-top: 0; }
+  .total { font-size: 0.8rem; margin-top: 1px; }
+  .comanda-row { font-size: 0.72rem; }
+  .sin-comanda { font-size: 0.7rem; }
+  .pos-row ion-badge {
+    font-size: 0.56rem;
+    padding: 2px 5px;
+    height: 18px;
+  }
+}
+
+@media (min-width: 768px) {
+  .pos-mesa {
+    border-radius: 10px;
+    border-left-width: 5px;
+    min-height: 130px;
+    margin: 4px !important;
+  }
+  .pos-mesa ion-card-header { padding: 10px 12px 2px 12px !important; }
+  .pos-mesa ion-card-content { padding: 2px 12px 10px 12px !important; font-size: 0.84rem; }
+  .pos-mesa ion-card-title { font-size: 1rem; }
 }

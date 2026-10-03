@@ -1,3 +1,107 @@
 .ion-content-reservas {
   --background: transparent;
+  --padding-start: 4px;
+  --padding-end: 4px;
+  --padding-top: 4px;
+  --padding-bottom: 4px;
+}
+
+.res-card {
+  border-radius: 10px;
+  margin: 4px !important;
+  border-left-width: 5px;
+  border-left-style: solid;
+  transition: transform 0.12s ease;
+}
+
+.res-card:active {
+  transform: scale(0.99);
+}
+
+.res-card ion-card-header {
+  padding: 8px 10px 2px 10px !important;
+}
+
+.res-card ion-card-content {
+  padding: 2px 10px 8px 10px !important;
+  font-size: 0.85rem;
+  line-height: 1.35;
+}
+
+.res-card ion-card-title {
+  font-size: 0.95rem;
+  font-weight: 700;
+  line-height: 1.1;
+  margin: 0;
+}
+
+.res-card ion-card-subtitle {
+  font-size: 0.75rem;
+  margin-top: 2px;
+}
+
+.res-estado {
+  font-size: 0.68rem;
+  padding: 3px 8px;
+  flex-shrink: 0;
+}
+
+.res-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 6px;
+}
+
+.res-fechas {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+  margin-top: 2px;
+  font-size: 0.8rem;
+  opacity: 0.88;
+}
+
+.res-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 0.75rem;
+}
+
+.res-CHECKIN,
+.res-CHECKED_IN {
+  border-left-color: var(--ion-color-success, #2dd36f);
+}
+.res-PENDIENTE {
+  border-left-color: var(--ion-color-warning, #ffc409);
+}
+.res-CHECKOUT,
+.res-CHECKED_OUT {
+  border-left-color: var(--ion-color-medium, #92949c);
+}
+.res-CANCELADA,
+.res-ANULADA {
+  border-left-color: var(--ion-color-danger, #eb445a);
+}
+.res-NO_SHOW {
+  border-left-color: var(--ion-color-danger, #eb445a);
+}
+
+@media (max-width: 575.98px) {
+  .res-card ion-card-title { font-size: 0.9rem; }
+  .res-card ion-card-subtitle { font-size: 0.7rem; }
+  .res-fechas { font-size: 0.74rem; gap: 4px 8px; }
+  .res-tag { font-size: 0.7rem; }
+}
+
+@media (min-width: 768px) {
+  .res-card {
+    border-radius: 12px;
+    border-left-width: 6px;
+    margin: 6px !important;
+  }
+  .res-card ion-card-header { padding: 12px 16px 4px 16px !important; }
+  .res-card ion-card-content { padding: 4px 16px 12px 16px !important; font-size: 0.9rem; }
+  .res-card ion-card-title { font-size: 1.05rem; }
 }

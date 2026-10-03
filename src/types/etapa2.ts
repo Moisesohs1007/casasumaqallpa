@@ -744,6 +744,7 @@ export type EstadoMesa =
   | 'LIBRE'
   | 'OCUPADA'
   | 'RESERVADA'
+  | 'SUCIA'
   | 'EN_LIMPIEZA'
   | 'UNIDA_A_OTRA'
   | 'BLOQUEADA'
@@ -821,6 +822,7 @@ export type OrigenReservaMesa =
 
 export type TipoConsumoComanda =
   | 'A_HABITACION'
+  | 'CARGO_A_HABITACION'
   | 'MESA_RESTAURANTE'
   | 'PARA_LLEVAR'
   | 'DELIVERY'
