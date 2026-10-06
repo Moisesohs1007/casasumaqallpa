@@ -227,7 +227,15 @@ const NuevaReserva: React.FC = () => {
   };
 
   useEffect(() => {
+    if (paso === 2 && noches >= 1 && (adultos + ninos) >= 1) {
+      buscarHabitaciones();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [paso, checkin, checkout, adultos, ninos]);
+
+  useEffect(() => {
     calcularResumenTarifa();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [habitacionSeleccionada, noches, tarifasDisponiblesParaHab, tarifaSeleccionadaId, precioNocheManual, codPromoInput, descuentoPorcentajeManual, checkin]);
 
   // ====== Paso 4: Origen + Crear ======
@@ -460,9 +468,15 @@ const NuevaReserva: React.FC = () => {
         updatedAt: seedUtil.nowISO(),
         usuarioResponsableId: 'USR-MOISES-0001',
       } as any);
+      if (!nueva || !nueva.id || !nueva.codigoReserva) {
+        console.error('[doCrearReserva] Supabase NO retornó id/codigoReserva válido:', nueva);
+        setErrorMsg('Error de conexión con Supabase: no se pudo guardar la reserva. Verifica conexión a internet e intenta nuevamente.');
+        return;
+      }
       setReservaCreada(nueva);
     } catch (e: any) {
-      setErrorMsg(e.message || 'Error al crear la reserva.');
+      console.error('[doCrearReserva] Exception:', e);
+      setErrorMsg((e?.message || 'Error al crear la reserva.') + ' (Intenta nuevamente)');
     }
   };
 

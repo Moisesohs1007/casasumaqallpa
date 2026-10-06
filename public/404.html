@@ -3,30 +3,69 @@
   <head>
     <meta charset="UTF-8" />
     <title>Casa Sumaq Allpa - Sistema de Gestión</title>
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
     <script>
-      // GitHub Pages SPA Fallback: redirige rutas 404 al index.html preservando path + query + hash
-      // Ver: https://github.com/rafgraph/spa-github-pages
+      // =====================================================================
+      // GitHub Pages SPA 404 → Index Fallback (basado en spa-github-pages)
+      //
+      // OBJETIVO: cuando usuario entra a URL como:
+      //   https://moisesohs1007.github.io/casasumaqallpa/reservas
+      //   https://moisesohs1007.github.io/casasumaqallpa/nueva-reserva
+      //   https://moisesohs1007.github.io/casasumaqallpa/habitaciones
+      // GitHub Pages NO encuentra el archivo y sirve ESTE 404.html.
+      // Entonces ESTE script reconstruye la URL apuntando al index.html
+      // con ?p=/rutaReal , preservando también query + hash.
+      //
+      // Luego index.html (script inline) lee ?p= y usa replaceState()
+      // para restaurar la ruta real antes que Ionic / React Router arranquen.
+      // =====================================================================
       (function () {
         var l = window.location;
-        var pathSegmentsToKeep = 1; // despliegue sub-path /casasumaqallpa/ → mantener 1 segmento
-        var redirect =
+        var repoName = 'casasumaqallpa';
+        var segments = (l.pathname || '').replace(/^\/+|\/+$/g, '').split('/').filter(Boolean);
+
+        // CASO A) usuario entró SIN REPO path: ej /reservas , /habitaciones
+        //        en raíz user.github.io — lo mandamos directo al repo /casasumaqallpa/
+        if (segments.length === 0 || segments[0] !== repoName) {
+          l.replace(l.protocol + '//' + l.hostname + (l.port ? ':' + l.port : '') + '/' + repoName + '/');
+          return;
+        }
+
+        // CASO B) estamos dentro del repo → preservar 1er segmento (/casasumaqallpa/)
+        // y el resto lo codificamos como ?p=
+        var pathSegmentsToKeep = 1;
+        var basePath = '/' + segments.slice(0, pathSegmentsToKeep).join('/') + '/';
+        var rutaReal = '/' + segments.slice(pathSegmentsToKeep).join('/').replace(/&/g, '~and~');
+        var qs = l.search ? '&q=' + l.search.slice(1).replace(/&/g, '~and~') : '';
+        var target =
           l.protocol +
           '//' +
           l.hostname +
           (l.port ? ':' + l.port : '') +
-          l.pathname.split('/').slice(0, 1 + pathSegmentsToKeep).join('/') +
-          '/?p=/' +
-          l.pathname.slice(1).split('/').slice(pathSegmentsToKeep).join('/').replace(/&/g, '~and~') +
-          (l.search ? '&q=' + l.search.slice(1).replace(/&/g, '~and~') : '') +
-          l.hash;
-        // Solo redirigir si no existe ya la query de fallback
-        if (l.search.indexOf('p=/') === -1) {
-          l.replace(redirect);
+          basePath +
+          '?p=' + encodeURIComponent(rutaReal) +
+          qs +
+          (l.hash || '');
+
+        // Evitar loop: solo si todavía no tenemos el fallback ?p=
+        if (l.search.indexOf('p=') === -1) {
+          l.replace(target);
         }
       })();
     </script>
   </head>
   <body>
-    <h1>Cargando...</h1>
+    <div style="font-family: Arial, sans-serif; padding: 24px; text-align: center;">
+      <h2>Casa Sumaq Allpa</h2>
+      <p>Cargando el sistema…</p>
+      <p style="opacity:.65; font-size: 12px;">Si no se redirige automáticamente en 5s, haz clic aquí:
+        <a id="lnk" href="">ir al inicio</a>
+      </p>
+    </div>
+    <script>
+      try {
+        document.getElementById('lnk').href = '/' + (window.location.pathname || '').replace(/^\/+|\/+$/g, '').split('/').filter(Boolean)[0] + '/';
+      } catch (e) {}
+    </script>
   </body>
 </html>
