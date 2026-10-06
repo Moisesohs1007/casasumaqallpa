@@ -10,7 +10,9 @@
     "preview": "node ./node_modules/vite/bin/vite.js preview",
     "lint": "echo 'ESLint: pendiente de configurar'",
     "start": "node ./node_modules/vite/bin/vite.js",
-    "typecheck": "node ./node_modules/typescript/bin/tsc --noEmit || echo 'Typecheck info: tsc binario se resuelve cuando la instalación completa de typescript incluye carpeta bin. Ver docs.'"
+    "typecheck": "node ./node_modules/typescript/bin/tsc --noEmit || echo 'Typecheck info: tsc binario se resuelve cuando la instalación completa de typescript incluye carpeta bin. Ver docs.'",
+    "db:migrate": "node ./node_modules/tsx/dist/cli.mjs ./supabase/runSql.ts",
+    "db:cleanup-demo": "node ./node_modules/tsx/dist/cli.mjs ./supabase/cleanupReservasDemo.ts"
   },
   "dependencies": {
     "@ionic/react": "^8.0.0",

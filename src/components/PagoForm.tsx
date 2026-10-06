@@ -30,8 +30,9 @@ export const PagoForm: React.FC<Props> = ({ value, totalSugeridoSoles, onChange,
     codigoAutorizacion: '',
   });
 
-  const metodoActivo: OpcionMetodoPago | undefined = METODOS_PAGO_LISTA.find(m => m.id === v.metodoPago);
+  const metodoActivo: OpcionMetodoPago | undefined = METODOS_PAGO_LISTA.find(m => m.value === v.metodoPago);
   const requiereReferencia = !!metodoActivo?.requiereReferencia;
+  const requiereAutorizacion = !!metodoActivo?.requiereAutorizacion;
 
   const set = <K extends keyof PagoFormValue>(k: K, val: PagoFormValue[K]) => {
     const nv = { ...v, [k]: val };
@@ -48,7 +49,7 @@ export const PagoForm: React.FC<Props> = ({ value, totalSugeridoSoles, onChange,
               <IonLabel position="stacked">Medio de pago</IonLabel>
               <IonSelect value={v.metodoPago} onIonChange={e => set('metodoPago', e.detail.value as MetodoPago)} interface="action-sheet">
                 {METODOS_PAGO_LISTA.map(m => (
-                  <IonSelectOption key={m.id} value={m.id}>{m.label}</IonSelectOption>
+                  <IonSelectOption key={String(m.value ?? m.id)} value={m.value}>{m.label}</IonSelectOption>
                 ))}
               </IonSelect>
             </IonItem>
@@ -79,7 +80,7 @@ export const PagoForm: React.FC<Props> = ({ value, totalSugeridoSoles, onChange,
               </IonItem>
             </IonCol>
           )}
-          {(v.metodoPago === 'TARJETA_CREDITO' || v.metodoPago === 'TARJETA_DEBITO' || v.metodoPago === 'NIUBIZ' || v.metodoPago === 'IZIPAY') && (
+          {(requiereAutorizacion || v.metodoPago === 'TARJETA_CREDITO' || v.metodoPago === 'TARJETA_DEBITO' || v.metodoPago === 'NIUBIZ' || v.metodoPago === 'IZIPAY') && (
             <IonCol size="12">
               <IonItem lines="full">
                 <IonLabel position="stacked">Código Autorización (opcional)</IonLabel>

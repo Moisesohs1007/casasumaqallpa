@@ -1,9 +1,8 @@
-// @ts-nocheck
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   IonBadge, IonButton, IonCard, IonCardContent, IonCardHeader, IonCardSubtitle, IonCardTitle,
   IonCol, IonGrid, IonIcon, IonInput, IonItem, IonLabel, IonModal, IonNote, IonRow, IonSearchbar,
-  IonSelect, IonSelectOption, IonText, IonTextarea, IonChip, IonSkeletonText,
+  IonSelect, IonSelectOption, IonText, IonTextarea, IonChip,
 } from '@ionic/react';
 import {
   add, basket, bed, cash, checkmarkCircle, close, closeCircle,
@@ -13,15 +12,6 @@ import type { Comanda, Habitacion, Mesa, ProductoFB, Reserva } from '../../types
 import {
   CatalogoFBService, ComandaService, HabitacionService, MesaService, ReservaService, FolioService,
 } from '../../services';
-
-interface Props {
-  isOpen: boolean;
-  onDismiss: () => void;
-  preMesaId?: string;
-  preHabitacionId?: string;
-  preTipoConsumo?: 'MESA' | 'CARGO_A_HABITACION';
-  comandaAEditarId?: string;
-}
 
 const USUARIO_ACTUAL = { id: 'USR-MOISES-0001', nombres: 'Moisés', apellidos: 'Ochoa' };
 const PUNTO_VENTA_ID = 'PV-RESTAURANTE-01';
@@ -40,6 +30,10 @@ interface LineaCarrito {
 interface Props {
   isOpen: boolean;
   onDismiss: () => void;
+  preHabitacionId?: string;
+  preTipoConsumo?: string;
+  preMesaId?: string;
+  comandaAEditarId?: string;
 }
 
 const emojiCategoria = (catId: string) => {
@@ -58,27 +52,20 @@ const emojiCategoria = (catId: string) => {
   return '🍴';
 };
 
-const TomarComanda: React.FC<Props> = ({ isOpen, onDismiss, preMesaId, preHabitacionId, preTipoConsumo, comandaAEditarId }) => {
+const TomarComanda: React.FC<Props> = ({ isOpen, onDismiss }) => {
   const [paso, setPaso] = useState<'orden' | 'exito'>('orden');
   const [procesando, setProcesando] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [ultimaComanda, setUltimaComanda] = useState<Comanda | null>(null);
   const [folioCodigoCreado, setFolioCodigoCreado] = useState<string>('');
 
-  const [tipoConsumo, setTipoConsumo] = useState<TipoConsumo>('MESA');
+  const [tipoConsumo, setTipoConsumo] = useState<TipoConsumo>('CARGO_A_HABITACION');
   const [busqueda, setBusqueda] = useState('');
   const [categoriaFiltroId, setCategoriaFiltroId] = useState<string>('TODOS');
   const [habitacionSeleccionadaId, setHabitacionSeleccionadaId] = useState<string>('');
   const [mesaSeleccionadaId, setMesaSeleccionadaId] = useState<string>('');
   const [carrito, setCarrito] = useState<LineaCarrito[]>([]);
   const [refreshTick, setRefreshTick] = useState<number>(0);
-  const [modoEditarComanda, setModoEditarComanda] = useState<Comanda | null>(null);
-
-  const [categorias, setCategorias] = useState<any[]>([]);
-  const [productos, setProductos] = useState<any[]>([]);
-  const [habitacionesCheckedIn, setHabitacionesCheckedIn] = useState<Array<{ reserva: Reserva; habitacion: Habitacion; huespedNombre: string }>>([]);
-  const [mesasLibres, setMesasLibres] = useState<Mesa[]>([]);
-  const [loadingCat, setLoadingCat] = useState(true);
 
   const reset = () => {
     setPaso('orden');
@@ -92,129 +79,57 @@ const TomarComanda: React.FC<Props> = ({ isOpen, onDismiss, preMesaId, preHabita
     setHabitacionSeleccionadaId('');
     setMesaSeleccionadaId('');
     setCarrito([]);
-    setCategorias([]);
-    setProductos([]);
-    setHabitacionesCheckedIn([]);
-    setMesasLibres([]);
-    setLoadingCat(true);
-  };
-
-  const cargarCatalogo = async () => {
-    try {
-      const cats: any[] = await CatalogoFBService.listarCategorias();
-      const activas = cats.filter((c: any) => c.estado === 'ACTIVO');
-      const withTodos = [{ id: 'TODOS', nombre: '🧺 Todos los productos', orden: 0 } as any].concat(activas);
-      setCategorias(withTodos);
-      await cargarProductos(withTodos[0]?.id || 'TODOS', busqueda);
-    } finally {
-      setLoadingCat(false);
-    }
-  };
-
-  const cargarProductos = async (categoriaId: string, buscarTexto: string) => {
-    try {
-      const prods = await CatalogoFBService.listarProductos({
-        soloActivos: true,
-        buscar: buscarTexto.trim() ? buscarTexto : undefined,
-        categoriaId: categoriaId === 'TODOS' ? undefined : categoriaId,
-        puntoVentaId: PUNTO_VENTA_ID,
-      });
-      setProductos(prods as any[]);
-    } catch {
-      setProductos([]);
-    }
-  };
-
-  const cargarHabitacionesCheckedIn = async () => {
-    try {
-      const reservas = (await (ReservaService as any).listarTodas?.() || []) as Reserva[];
-      const checkedIn = reservas.filter((r) => {
-        const e = String(r.estado || '').toUpperCase().replace(/[^A-Z]/g, '');
-        return e.includes('CHECKIN') || e.includes('CHECKEDIN');
-      });
-      const lista: Array<{ reserva: Reserva; habitacion: Habitacion; huespedNombre: string }> = [];
-      for (const r of checkedIn) {
-        const habs = (r.habitaciones || []) as any[];
-        if (habs.length === 0) continue;
-        const hab0 = habs[0] as any;
-        const habId = hab0.habitacionId || hab0.habitacion?.id;
-        if (!habId) continue;
-        let hab: any;
-        try { hab = await HabitacionService.buscarPorId(habId); } catch { /* noop */ }
-        const huesped = (r as any).huesped ?? (r as any).huespedTitular ?? (hab0.habitacion?.huesped ?? null);
-        const huespedNombre = huesped ? `${huesped.nombres ?? ''} ${huesped.apellidos ?? ''}`.trim() || `Titular` : `Titular #${(r as any).huespedTitularId || (r as any).huespedId}`;
-        const codHab = hab?.codigo || hab0?.codigo || habId;
-        lista.push({ reserva: r, habitacion: hab ?? hab0.habitacion ?? { ...hab0, id: habId, codigo: codHab }, huespedNombre });
-      }
-      setHabitacionesCheckedIn(lista);
-    } catch {
-      setHabitacionesCheckedIn([]);
-    }
-  };
-
-  const cargarMesas = async () => {
-    try {
-      const ms = await MesaService.listarTodas({ puntoVentaId: PUNTO_VENTA_ID });
-      setMesasLibres(ms.filter((m: any) => m.zona !== 'ROOM_SERVICE'));
-    } catch {
-      setMesasLibres([]);
-    }
+    setRefreshTick((t) => t + 1);
   };
 
   useEffect(() => {
     if (!isOpen) return;
-    let mounted = true;
-    setTimeout(async () => {
+    setTimeout(() => {
       reset();
-      if (!mounted) return;
       setRefreshTick((t) => t + 2);
-      await Promise.all([cargarCatalogo(), cargarHabitacionesCheckedIn(), cargarMesas()]);
-      if (!mounted) return;
-      // Aplicar preselecciones
-      if (preTipoConsumo === 'MESA' || preMesaId) {
-        setTipoConsumo('MESA');
-        if (preMesaId) setMesaSeleccionadaId(preMesaId);
-      } else if (preTipoConsumo === 'CARGO_A_HABITACION' || preHabitacionId) {
-        setTipoConsumo('CARGO_A_HABITACION');
-        if (preHabitacionId) setHabitacionSeleccionadaId(preHabitacionId);
-      } else {
-        setTipoConsumo(preMesaId ? 'MESA' : 'MESA');
-        if (preMesaId) setMesaSeleccionadaId(preMesaId);
-        if (preHabitacionId) {
-          setTipoConsumo('CARGO_A_HABITACION');
-          setHabitacionSeleccionadaId(preHabitacionId);
-        }
-      }
-      // Editar comanda existente
-      if (comandaAEditarId && typeof (ComandaService as any).buscarPorId === 'function') {
-        try {
-          const c: Comanda | undefined = await (ComandaService as any).buscarPorId(comandaAEditarId);
-          if (c && mounted) {
-            setModoEditarComanda(c);
-            const lineas = (c as any).detalles || [];
-            const cart: LineaCarrito[] = lineas.map((l: any, i: number) => ({
-              key: `${l.productoId || l.id}-${i}-${Date.now()}`,
-              productoId: l.productoId || l.id,
-              nombre: l.nombre || l.descripcion || `Ítem ${i + 1}`,
-              precioUnitario: Number(l.precioUnitario || l.precio || 0),
-              cantidad: Number(l.cantidad || 1),
-              observaciones: l.observaciones || '',
-            }));
-            setCarrito(cart);
-            if ((c as any).mesaId) { setTipoConsumo('MESA'); setMesaSeleccionadaId((c as any).mesaId); }
-            if ((c as any).habitacionId) { setTipoConsumo('CARGO_A_HABITACION'); setHabitacionSeleccionadaId((c as any).habitacionId); }
-          }
-        } catch { /* ignore */ }
-      }
-    }, 60);
-    return () => { mounted = false; };
-  }, [isOpen, preMesaId, preHabitacionId, preTipoConsumo, comandaAEditarId]);
+    }, 50);
+  }, [isOpen]);
 
-  useEffect(() => {
-    if (!isOpen) return;
-    if (categorias.length === 0) return;
-    cargarProductos(categoriaFiltroId, busqueda);
+  const categorias = useMemo(() => {
+    return [{ id: 'TODOS', nombre: '🧺 Todos los productos', orden: 0 } as any].concat(
+      CatalogoFBService.listarCategorias().filter((c: any) => c.estado === 'ACTIVO')
+    );
+  }, [isOpen, refreshTick]);
+
+  const productos = useMemo(() => {
+    return CatalogoFBService.listarProductos({
+      soloActivos: true,
+      buscar: busqueda.trim() ? busqueda : undefined,
+      categoriaId: categoriaFiltroId === 'TODOS' ? undefined : categoriaFiltroId,
+      puntoVentaId: PUNTO_VENTA_ID,
+    });
   }, [categoriaFiltroId, busqueda, isOpen, refreshTick]);
+
+  const habitacionesCheckedIn = useMemo(() => {
+    const reservas = (ReservaService.listarTodas() as Reserva[]).filter((r) => {
+      const e = String(r.estado || '').toUpperCase().replace(/[^A-Z]/g, '');
+      // Cualquier variante (CHECKED_IN / CHECKIN / CHECK_IN / YAENCHECKIN) → se considera check-in activo
+      return e.includes('CHECKIN') || e.includes('CHECKEDIN');
+    });
+    const lista: Array<{ reserva: Reserva; habitacion: Habitacion; huespedNombre: string }> = [];
+    for (const r of reservas) {
+      const habs = (r.habitaciones || []) as any[];
+      if (habs.length === 0) continue;
+      const hab0 = habs[0] as any;
+      const habId = hab0.habitacionId || hab0.habitacion?.id;
+      if (!habId) continue;
+      const hab = HabitacionService.buscarPorId(habId) as any;
+      const huesped = (r as any).huesped ?? (r as any).huespedTitular ?? hab0.habitacion?.huesped ?? null;
+      const huespedNombre = huesped ? `${huesped.nombres ?? ''} ${huesped.apellidos ?? ''}`.trim() || `Titular` : `Titular #${(r as any).huespedTitularId || (r as any).huespedId}`;
+      const codHab = hab?.codigo || hab0?.codigo || habId;
+      lista.push({ reserva: r, habitacion: hab ?? hab0.habitacion ?? { ...hab0, id: habId, codigo: codHab }, huespedNombre });
+    }
+    return lista;
+  }, [isOpen, refreshTick]);
+
+  const mesasLibres = useMemo(() => {
+    return MesaService.listarTodas({ puntoVentaId: PUNTO_VENTA_ID }).filter((m) => m.zona !== 'ROOM_SERVICE');
+  }, [isOpen, refreshTick]);
 
   const totalCarrito = carrito.reduce((s, l) => s + l.cantidad * l.precioUnitario, 0);
   const nroItems = carrito.reduce((s, l) => s + l.cantidad, 0);
@@ -269,21 +184,27 @@ const TomarComanda: React.FC<Props> = ({ isOpen, onDismiss, preMesaId, preHabita
     setProcesando(true);
     setErrorMsg(null);
     try {
-      if (carrito.length === 0) throw new Error('⚠️ El carrito está vacío. Agrega al menos 1 producto.');
-      if (Number(totalCarrito) <= 0) throw new Error('⚠️ Total del carrito debe ser mayor a 0.');
+      if (carrito.length === 0) {
+        throw new Error('⚠️ El carrito está vacío. Agrega al menos 1 producto.');
+      }
+      if (Number(totalCarrito) <= 0) {
+        throw new Error('⚠️ Total del carrito debe ser mayor a 0.');
+      }
       if (tipoConsumo === 'MESA' && !mesaSeleccionadaId) {
+        // Scroll hacia arriba para mostrar el selector
         try {
           const contenedor = document.querySelector('.tomar-comanda-scroll-wrapper') as HTMLElement;
           if (contenedor) contenedor.scrollTop = 0;
         } catch { /* noop */ }
-        throw new Error('⚠️ Selecciona primero una MESA.');
+        throw new Error('⚠️ Selecciona primero una MESA (campo arriba en el modal).');
       }
       if (tipoConsumo === 'CARGO_A_HABITACION' && !habitacionSeleccionadaId) {
+        // Scroll hacia arriba para mostrar el selector
         try {
           const contenedor = document.querySelector('.tomar-comanda-scroll-wrapper') as HTMLElement;
           if (contenedor) contenedor.scrollTop = 0;
         } catch { /* noop */ }
-        throw new Error('⚠️ Selecciona primero la HABITACIÓN CHECKED-IN.');
+        throw new Error('⚠️ Selecciona primero la HABITACIÓN CHECKED-IN (campo arriba en el modal, scroll arriba).');
       }
 
       let mesaId = '';
@@ -299,14 +220,15 @@ const TomarComanda: React.FC<Props> = ({ isOpen, onDismiss, preMesaId, preHabita
         const habData = habitacionesCheckedIn.find(
           (x) => x.habitacion?.id === habitacionId || (x.habitacion as any)?.habitacionId === habitacionId
         );
-        if (!habData) throw new Error('Habitación no válida.');
+        if (!habData) throw new Error('Habitación no valida.');
         reservaId = habData.reserva.id;
         huespedTitularId =
           (habData.reserva as any).huespedId ||
           (habData.reserva as any).huespedTitularId ||
           (habData.reserva.huesped as any)?.id ||
           undefined;
-        const mesa = await MesaService.crearRoomServiceSiNoExiste({
+        // ✅ Método OFICIAL del servicio (NO hay requires dentro de React, no hay CommonJS, ESM puro Vite OK)
+        const mesa = MesaService.crearRoomServiceSiNoExiste({
           habitacionId,
           codHab: (habData.habitacion as any).codigo || 'ROOM',
           puntoVentaId: PUNTO_VENTA_ID,
@@ -315,29 +237,33 @@ const TomarComanda: React.FC<Props> = ({ isOpen, onDismiss, preMesaId, preHabita
         if (!mesa) throw new Error('Habitación sin mesa Room Service asignada. Intente nuevamente.');
         mesaId = mesa.id;
 
+        // Buscar FOLIO ABIERTO con multi-criterio (máxima tolerancia).
+        // Esto es necesario porque a veces el estado es ABIERTO vs ABIERTA o los campos reservaId/habitacionId vienen mezclados.
         let folio: any = undefined;
         try {
-          if (typeof (FolioService as any).buscarPorHabitacionAbierta === 'function') {
-            folio = await FolioService.buscarPorHabitacionAbierta(habitacionId);
+          if (FolioService.buscarPorHabitacionAbierta) {
+            folio = FolioService.buscarPorHabitacionAbierta(habitacionId);
           }
-        } catch { /* ignore */ }
-        if (!folio && typeof (FolioService as any).listarTodos === 'function') {
+        } catch {}
+        if (!folio && FolioService.listarTodos && typeof FolioService.listarTodos === 'function') {
           try {
-            const todos = await FolioService.listarTodos() || [];
+            const todos = FolioService.listarTodos() || [];
             folio =
-              (todos as any[]).find((f: any) =>
+              todos.find((f: any) =>
                 f &&
                 (String(f.reservaId) === String(reservaId) || String(f.habitacionId) === String(habitacionId)) &&
                 !String(f.estado || '').toUpperCase().includes('CERRAD')
               ) ||
-              (todos as any[]).find((f: any) =>
+              todos.find((f: any) =>
                 f && (String(f.codigo || '') || '').toUpperCase().includes(String(reservaId || '').replace(/^RES[-_]?/i, ''))
               );
-          } catch { /* ignore */ }
+          } catch {}
         }
         folioId = folio?.id;
         if (folioId) {
-          setFolioCodigoCreado(`F-${String(folioId).slice(-4).toUpperCase()}`);
+          setFolioCodigoCreado(
+            `F-${String(folioId).slice(-4).toUpperCase()}`
+          );
         }
       }
 
@@ -351,7 +277,7 @@ const TomarComanda: React.FC<Props> = ({ isOpen, onDismiss, preMesaId, preHabita
         (x) => x.habitacion?.id === habitacionId || (x.habitacion as any)?.habitacionId === habitacionId
       )?.reserva.totalAdultos || 2;
 
-      const resultado = await (ComandaService as any).crear({
+      const resultado = (ComandaService as any).crear({
         puntoVentaId: PUNTO_VENTA_ID,
         mesaId,
         usuarioIdMozoApertura: USUARIO_ACTUAL.id,
@@ -365,7 +291,7 @@ const TomarComanda: React.FC<Props> = ({ isOpen, onDismiss, preMesaId, preHabita
         paxNinos: 0,
         observacionesInternas: `Creado desde POS TomarComanda Modal por ${USUARIO_ACTUAL.id}`,
         lineas,
-      });
+      }) as any;
 
       if (resultado?.error) throw new Error(resultado.error);
       if (!resultado?.comanda) throw new Error('No se creo la comanda. Intente de nuevo.');
@@ -505,7 +431,7 @@ const TomarComanda: React.FC<Props> = ({ isOpen, onDismiss, preMesaId, preHabita
                               const habId = hab.id || hab.habitacionId;
                               return (
                                 <IonSelectOption key={habId} value={habId}>
-                                  {hab.codigo || habId} · {h.huespedNombre} · R#{(h.reserva as any).codigoReserva || h.reserva.id}
+                                  {hab.codigo || habId} · {h.huespedNombre} · R#{h.reserva.codigoReserva}
                                 </IonSelectOption>
                               );
                             })}
@@ -529,9 +455,9 @@ const TomarComanda: React.FC<Props> = ({ isOpen, onDismiss, preMesaId, preHabita
                             value={mesaSeleccionadaId}
                             onIonChange={(e) => setMesaSeleccionadaId(e.detail.value)}
                           >
-                            {mesasLibres.map((m: any) => (
+                            {mesasLibres.map((m) => (
                               <IonSelectOption key={m.id} value={m.id}>
-                                {m.codigo || m.id} - {(m.nombreVisible || m.nombre || 'Mesa')} ({m.zona || 'Salón'})
+                                {m.codigo} - {m.nombreVisible} ({m.zona}) · {m.estado} · {m.capacidadActualUsada}/{m.capacidadMaxPax} pax
                               </IonSelectOption>
                             ))}
                           </IonSelect>
@@ -563,80 +489,70 @@ const TomarComanda: React.FC<Props> = ({ isOpen, onDismiss, preMesaId, preHabita
                         placeholder="Buscar por nombre / descripción / código..."
                         style={{ marginBottom: 8 }}
                       />
-                      {loadingCat ? (
-                        <div style={{ padding: 16 }}>
-                          <IonSkeletonText animated style={{ width: '40%', height: 20, marginBottom: 8 }} />
-                          <IonSkeletonText animated style={{ width: '100%', height: 14, marginBottom: 6 }} />
-                          <IonSkeletonText animated style={{ width: '90%', height: 14 }} />
-                        </div>
-                      ) : (
-                        <>
-                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 14 }}>
-                            {categorias.map((cat: any) => (
-                              <IonChip
-                                key={cat.id}
-                                color={categoriaFiltroId === cat.id ? 'success' : 'medium'}
-                                outline={categoriaFiltroId !== cat.id}
-                                onClick={() => setCategoriaFiltroId(cat.id)}
-                                style={{ cursor: 'pointer', fontWeight: categoriaFiltroId === cat.id ? 800 : 500 }}
-                              >
-                                <span slot="start" style={{ fontSize: 16, marginRight: 4 }}>{emojiCategoria(cat.id)}</span>
-                                {cat.nombre}
-                              </IonChip>
-                            ))}
-                          </div>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 14 }}>
+                        {categorias.map((cat: any) => (
+                          <IonChip
+                            key={cat.id}
+                            color={categoriaFiltroId === cat.id ? 'success' : 'medium'}
+                            outline={categoriaFiltroId !== cat.id}
+                            onClick={() => setCategoriaFiltroId(cat.id)}
+                            style={{ cursor: 'pointer', fontWeight: categoriaFiltroId === cat.id ? 800 : 500 }}
+                          >
+                            <span slot="start" style={{ fontSize: 16, marginRight: 4 }}>{emojiCategoria(cat.id)}</span>
+                            {cat.nombre}
+                          </IonChip>
+                        ))}
+                      </div>
 
-                          <IonGrid style={{ padding: 0 }}>
-                            <IonRow>
-                              {productos.length === 0 && (
-                                <IonCol size="12">
-                                  <IonItem color="warning">
-                                    <IonIcon icon={informationCircle} slot="start" />
-                                    <IonLabel>No se encontraron productos en esta categoría / búsqueda.</IonLabel>
-                                  </IonItem>
-                                </IonCol>
-                              )}
-                              {productos.map((prod) => (
-                                <IonCol key={prod.id} size="6" sizeMd="4" sizeLg="3">
-                                  <IonCard style={{ height: '100%', position: 'relative', overflow: 'hidden' }}>
-                                    <div style={{
-                                      background: '#ecfccb',
-                                      padding: 22,
-                                      fontSize: 44,
-                                      textAlign: 'center',
-                                      borderTopLeftRadius: 12,
-                                      borderTopRightRadius: 12,
-                                    }}>
-                                      <span style={{ fontSize: 44 }}>{emojiCategoria(prod.categoriaId)}</span>
-                                    </div>
-                                    <IonCardContent style={{ padding: 12 }}>
-                                      <IonCardTitle style={{ fontSize: 15, margin: 0, fontWeight: 800, lineHeight: 1.2 }}>
-                                        {prod.nombre}
-                                      </IonCardTitle>
-                                      <IonCardSubtitle style={{ marginTop: 4, fontSize: 12, minHeight: 34 }}>
-                                        {(prod as any).descripcion || ''}
-                                      </IonCardSubtitle>
-                                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 8 }}>
-                                        <IonText color="primary" style={{ fontSize: 16, fontWeight: 900 }}>
-                                          S/ {Number(prod.precioVentaBase || 0).toFixed(2)}
-                                        </IonText>
-                                        <IonButton color="success" size="small" onClick={() => agregarProducto(prod)}>
-                                          <IonIcon slot="icon-only" icon={add} />
-                                        </IonButton>
-                                      </div>
-                                      {(prod as any).estadoProducto && (prod as any).estadoProducto !== 'ACTIVO' && (
-                                        <IonBadge color="warning" style={{ marginTop: 6 }}>
-                                          {(prod as any).estadoProducto}
-                                        </IonBadge>
-                                      )}
-                                    </IonCardContent>
-                                  </IonCard>
-                                </IonCol>
-                              ))}
-                            </IonRow>
-                          </IonGrid>
-                        </>
-                      )}
+                      <IonGrid style={{ padding: 0 }}>
+                        <IonRow>
+                          {productos.length === 0 && (
+                            <IonCol size="12">
+                              <IonItem color="warning">
+                                <IonIcon icon={informationCircle} slot="start" />
+                                <IonLabel>No se encontraron productos en esta categoría / búsqueda.</IonLabel>
+                              </IonItem>
+                            </IonCol>
+                          )}
+                          {productos.map((prod) => (
+                            <IonCol key={prod.id} size="6" sizeMd="4" sizeLg="3">
+                              <IonCard style={{ height: '100%', position: 'relative', overflow: 'hidden' }}>
+                                <div style={{
+                                  background: '#ecfccb',
+                                  padding: 22,
+                                  fontSize: 44,
+                                  textAlign: 'center',
+                                  borderTopLeftRadius: 12,
+                                  borderTopRightRadius: 12,
+                                }}>
+                                  <span style={{ fontSize: 44 }}>{emojiCategoria(prod.categoriaId)}</span>
+                                </div>
+                                <IonCardContent style={{ padding: 12 }}>
+                                  <IonCardTitle style={{ fontSize: 15, margin: 0, fontWeight: 800, lineHeight: 1.2 }}>
+                                    {prod.nombre}
+                                  </IonCardTitle>
+                                  <IonCardSubtitle style={{ marginTop: 4, fontSize: 12, minHeight: 34 }}>
+                                    {(prod as any).descripcion || ''}
+                                  </IonCardSubtitle>
+                                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 8 }}>
+                                    <IonText color="primary" style={{ fontSize: 16, fontWeight: 900 }}>
+                                      S/ {Number(prod.precioVentaBase || 0).toFixed(2)}
+                                    </IonText>
+                                    <IonButton color="success" size="small" onClick={() => agregarProducto(prod)}>
+                                      <IonIcon slot="icon-only" icon={add} />
+                                    </IonButton>
+                                  </div>
+                                  {(prod as any).estadoProducto && (prod as any).estadoProducto !== 'ACTIVO' && (
+                                    <IonBadge color="warning" style={{ marginTop: 6 }}>
+                                      {(prod as any).estadoProducto}
+                                    </IonBadge>
+                                  )}
+                                </IonCardContent>
+                              </IonCard>
+                            </IonCol>
+                          ))}
+                        </IonRow>
+                      </IonGrid>
                     </IonCardContent>
                   </IonCard>
                 </IonCol>
@@ -646,7 +562,7 @@ const TomarComanda: React.FC<Props> = ({ isOpen, onDismiss, preMesaId, preHabita
                     <IonCardHeader>
                       <IonCardTitle>🛒 Tu pedido ({nroItems})</IonCardTitle>
                       <IonCardSubtitle>
-                        Revisa cantidades y observaciones.
+                        Revisa cantidades y observaciones (ej: sin hielo, sin cebolla).
                       </IonCardSubtitle>
                     </IonCardHeader>
                     <IonCardContent>
@@ -756,8 +672,8 @@ const TomarComanda: React.FC<Props> = ({ isOpen, onDismiss, preMesaId, preHabita
                           <IonIcon icon={informationCircle} slot="start" />
                           <IonLabel>
                             {tipoConsumo === 'CARGO_A_HABITACION'
-                              ? '⚠️ Falta seleccionar una habitación CHECKED_IN.'
-                              : '⚠️ Falta seleccionar una mesa.'}
+                              ? '⚠️ Falta seleccionar una habitación CHECKED_IN (scroll hacia arriba en el modal).'
+                              : '⚠️ Falta seleccionar una mesa (scroll hacia arriba en el modal).'}
                           </IonLabel>
                         </IonItem>
                       )}
@@ -777,13 +693,13 @@ const TomarComanda: React.FC<Props> = ({ isOpen, onDismiss, preMesaId, preHabita
                 <IonItem color="success" lines="none">
                   <IonIcon icon={documentText} slot="start" />
                   <IonLabel>
-                    #<strong>{(ultimaComanda as any).numeroCorrelativo || ultimaComanda.numero}</strong> ·{' '}
+                    #<strong>{ultimaComanda.numeroCorrelativo}</strong> ·{' '}
                     <IonBadge color="light" style={{ color: '#2dd36f', fontWeight: 800 }}>
                       {(ultimaComanda as any).estado || 'ABIERTA'}
                     </IonBadge>
                     {' · '}
                     <IonBadge color="light" style={{ color: '#10b981', fontWeight: 800 }}>
-                      {(ultimaComanda as any).tipoComanda || 'MESA'}
+                      {(ultimaComanda as any).tipoComanda}
                     </IonBadge>
                   </IonLabel>
                 </IonItem>
@@ -807,7 +723,7 @@ const TomarComanda: React.FC<Props> = ({ isOpen, onDismiss, preMesaId, preHabita
                   <IonItem color="success" lines="none">
                     <IonIcon icon={cash} slot="start" />
                     <IonLabel>
-                      Pedido enviado a Cocina / Caja. Cuando el cliente pague, cobrar desde opción Cobrar.
+                      Pedido enviado a Cocina / Caja. Cuando el cliente pague, cobrar desde opción Cobrar (próximamente).
                     </IonLabel>
                   </IonItem>
                 )}

@@ -2,12 +2,12 @@ import React, { useEffect, useState } from 'react';
 import {
   IonAlert, IonBadge, IonButton, IonCard, IonCardContent, IonCardHeader, IonCardSubtitle, IonCardTitle,
   IonCol, IonIcon, IonInput, IonItem, IonLabel, IonModal, IonNote, IonRow, IonSelect, IonSelectOption,
-  IonText, IonTextarea, IonSkeletonText,
+  IonText, IonTextarea,
 } from '@ionic/react';
 import {
   cash, checkmarkCircle, closeCircle, documentText, informationCircle, person, bed, pricetags,
 } from 'ionicons/icons';
-import type { Folio, Reserva, Huesped, Habitacion } from '../../types';
+import type { Folio, Reserva } from '../../types';
 import { FolioService, ReservaService, HabitacionService, HuespedService } from '../../services';
 
 const USUARIO_ACTUAL = { id: 'USR-MOISES-0001', nombres: 'Moisés', apellidos: 'Ochoa' };
@@ -28,9 +28,6 @@ const CheckoutModal: React.FC<Props> = ({ isOpen, onDismiss, reservaId }) => {
   const [reserva, setReserva] = useState<Reserva | undefined>(undefined);
   const [folio, setFolio] = useState<Folio | undefined>(undefined);
   const [confirmarEarlyOpen, setConfirmarEarlyOpen] = useState(false);
-  const [huesped, setHuesped] = useState<Huesped | undefined>(undefined);
-  const [habitacion, setHabitacion] = useState<Habitacion | undefined>(undefined);
-  const [loading, setLoading] = useState(false);
 
   const [montoAdelanto, setMontoAdelanto] = useState<string>('0');
   const [montoPagoFinal, setMontoPagoFinal] = useState<string>('0');
@@ -50,74 +47,34 @@ const CheckoutModal: React.FC<Props> = ({ isOpen, onDismiss, reservaId }) => {
   };
 
   useEffect(() => {
-    if (!isOpen || !reservaId) return;
-    let mounted = true;
-    (async () => {
-      reset();
-      setLoading(true);
-      try {
-        const r = await ReservaService.buscarPorId(reservaId);
-        if (!mounted) return;
-        setReserva(r || undefined);
-        if (r) {
-          const hid = (r as any).huespedTitularId || (r as any).huespedId;
-          if (hid) {
-            try {
-              const h = await HuespedService.buscarPorId(hid);
-              if (mounted) setHuesped(h as any || ((r as any).huesped ?? (r as any).huespedTitular));
-            } catch { if (mounted) setHuesped(((r as any).huesped ?? (r as any).huespedTitular) as any); }
-          } else if (mounted) {
-            setHuesped(((r as any).huesped ?? (r as any).huespedTitular) as any);
-          }
-          const hab0 = ((r as any).habitaciones || [])[0];
-          const habId = hab0?.habitacionId || hab0?.habitacion?.id;
-          if (habId) {
-            try {
-              const hh = await HabitacionService.buscarPorId(habId);
-              if (mounted) setHabitacion((hh as any) || hab0?.habitacion);
-            } catch { if (mounted) setHabitacion(hab0?.habitacion); }
-          } else if (mounted) {
-            setHabitacion(hab0?.habitacion);
-          }
-          let f: Folio | undefined;
-          try {
-            const todos: Folio[] = await FolioService.listarTodos() as any[];
-            f = (todos as any[]).find((x: any) => x.reservaId === r.id || x.reserva?.id === r.id);
-            if (!f) {
-              try { f = await FolioService.buscarPorId((r as any).folioId || ''); } catch { /* noop */ }
-            }
-          } catch { /* ignore */ }
-          if (mounted) {
-            setFolio(f);
-            const adelanto = Math.max(
-              0,
-              Number((f as any)?.pagoAdelanto?.monto ?? 0) ||
-              Number((f as any)?.montoPagoAdelanto ?? 0) ||
-              0
-            );
-            const totalReserva = Number((r as any)?.montoTotalReserva ?? 0) || 0;
-            const totalCargosFolio =
-              Number((f as any)?.totalCargos ?? 0) ||
-              Number((f as any)?.montoTotal ?? 0) ||
-              0;
-            const totalFolio = Math.max(totalReserva, totalCargosFolio);
-            setMontoAdelanto(String(adelanto.toFixed(2)));
-            const resta = Math.max(0, totalFolio - adelanto);
-            setMontoPagoFinal(String(resta.toFixed(2)));
-            setCodigoComprobante('BOLETA-' + Math.floor(Math.random() * 90000 + 10000));
-          }
-        } else {
-          if (mounted) {
-            setFolio(undefined);
-            setHuesped(undefined);
-            setHabitacion(undefined);
-          }
-        }
-      } finally {
-        if (mounted) setLoading(false);
-      }
-    })();
-    return () => { mounted = false; };
+    if (!isOpen) return;
+    reset();
+    const r = (reservaId ? (ReservaService.buscarPorId(reservaId) ?? undefined) : undefined) as (Reserva | undefined);
+    setReserva(r);
+    if (r) {
+      const todos = (FolioService.listarTodos ? FolioService.listarTodos() : []) as Folio[];
+      const f = todos.find((x: any) => x.reservaId === r.id || x.reserva?.id === r.id);
+      setFolio(f);
+      const adelanto = Math.max(
+        0,
+        Number((f as any)?.pagoAdelanto?.monto ?? 0) ||
+        Number((f as any)?.montoPagoAdelanto ?? 0) ||
+        0
+      );
+      const totalReserva = Number((r as any)?.montoTotalReserva ?? 0) || 0;
+      const totalCargosFolio =
+        Number((f as any)?.totalCargos ?? 0) ||
+        Number((f as any)?.montoTotal ?? 0) ||
+        0;
+      // El total que se usa para cobrar es max(totalFolio, totalReserva)
+      const totalFolio = Math.max(totalReserva, totalCargosFolio);
+      setMontoAdelanto(String(adelanto.toFixed(2)));
+      const resta = Math.max(0, totalFolio - adelanto);
+      setMontoPagoFinal(String(resta.toFixed(2)));
+      setCodigoComprobante('BOLETA-' + Math.floor(Math.random() * 90000 + 10000));
+    } else {
+      setFolio(undefined);
+    }
   }, [isOpen, reservaId]);
 
   const cerrar = () => {
@@ -125,7 +82,13 @@ const CheckoutModal: React.FC<Props> = ({ isOpen, onDismiss, reservaId }) => {
     onDismiss();
   };
 
+  const huesped = reserva
+    ? (reserva as any).huesped ?? (HuespedService.buscarPorId((reserva as any).huespedTitularId || (reserva as any).huespedId) as any)
+    : undefined;
   const hab0: any = (reserva as any)?.habitaciones?.[0];
+  const habitacion = hab0
+    ? ((HabitacionService.buscarPorId(hab0.habitacionId || hab0.habitacion?.id) as any) ?? hab0.habitacion)
+    : undefined;
   const codHab = habitacion ? (habitacion as any).codigo : hab0?.habitacionId || '—';
   const noches = Number((reserva as any)?.totalNoches || 0);
   const totalReserva = Number((reserva as any)?.montoTotalReserva || 0);
@@ -139,17 +102,20 @@ const CheckoutModal: React.FC<Props> = ({ isOpen, onDismiss, reservaId }) => {
   const saldoPendiente = Math.max(0, totalReserva - totalPagado);
   const puedeConfirmar = !procesando && reserva && pagoFinal >= 0;
 
+  // Detecta si check-out es ANTES de la fecha salida programada (EARLY CHECK-OUT).
+  // Solo en ese caso se muestra alerta de doble confirmación anti-error.
   const fechaCheckoutProgramada = new Date((reserva as any)?.fechaCheckout || (reserva as any)?.fechaCheckOut || 0);
   const fechaHoy = new Date();
   const diffMs = fechaCheckoutProgramada.getTime() - fechaHoy.getTime();
   const horasFaltantes = diffMs / (1000 * 60 * 60);
-  const esEarlyCheckOut = !!reserva && horasFaltantes > 6;
+  const esEarlyCheckOut = !!reserva && horasFaltantes > 6; // > 6h antes = se considera anticipado
   const nochesNoUsadas = esEarlyCheckOut
     ? Math.max(0, Math.ceil((horasFaltantes - 12) / 24))
     : 0;
 
   const handleConfirmar = async (skipEarlyCheck = false) => {
     if (!puedeConfirmar || !reserva?.id || !folio?.id) return;
+    // Si es early y no se confirmó todavía, mostrar alerta anti-error y NO ejecutar
     if (esEarlyCheckOut && !skipEarlyCheck) {
       setConfirmarEarlyOpen(true);
       return;
@@ -157,10 +123,8 @@ const CheckoutModal: React.FC<Props> = ({ isOpen, onDismiss, reservaId }) => {
     setProcesando(true);
     setErrorMsg(null);
     try {
-      let tx: any;
-      try {
-        if (typeof (FolioService as any).registrarCheckOut === 'function') {
-          tx = await (FolioService as any).registrarCheckOut({
+      const tx: any = (FolioService as any).registrarCheckOut
+        ? (FolioService as any).registrarCheckOut({
             folioId: folio.id,
             usuarioId: USUARIO_ACTUAL.id,
             pagos: [{
@@ -173,38 +137,29 @@ const CheckoutModal: React.FC<Props> = ({ isOpen, onDismiss, reservaId }) => {
             observaciones: observaciones || undefined,
             codigoComprobante: codigoComprobante || undefined,
             comprobanteSunat: { tipo: (medioPago === 'EFECTIVO' ? 'BOLETA' : 'FACTURA'), serie: '001', correlativo: codigoComprobante || '00001' } as any,
-          });
-        }
-      } catch (_) { /* noop */ }
+          })
+        : undefined;
 
       if (tx?.error) throw new Error(tx.error);
 
-      let reservaActualizada = tx?.reservaActualizada;
-      if (!reservaActualizada) {
-        try { reservaActualizada = await ReservaService.buscarPorId(reserva.id); } catch { /* noop */ }
-      }
+      const reservaActualizada = tx?.reservaActualizada ?? ReservaService.buscarPorId(reserva.id);
       const folioActualizado = tx?.folio ?? folio;
 
-      if (reservaActualizada && !['CHECKOUT'].includes((reservaActualizada as any).estado)) {
+      // Garantizar cambio de estado si tx no lo hizo
+      if (reservaActualizada && !['CHECKED_OUT'].includes((reservaActualizada as any).estado)) {
         try {
-          const cambiarFn = (ReservaService as any).cambiarEstado;
-          if (typeof cambiarFn === 'function') {
-            await cambiarFn(reservaActualizada.id, 'CHECKOUT', {
-              usuarioResponsableId: USUARIO_ACTUAL.id,
-              comentario: 'Check-out desde Detalle Reserva',
-              informacionAdicional: { fechaCheckoutReal: new Date().toISOString() } as any,
-            });
-            reservaActualizada = await ReservaService.buscarPorId(reservaActualizada.id) || reservaActualizada;
-          }
+          ReservaService.cambiarEstado(reservaActualizada.id, 'CHECKED_OUT', {
+            usuarioResponsableId: USUARIO_ACTUAL.id,
+            comentario: 'Check-out desde Detalle Reserva',
+            informacionAdicional: { fechaCheckoutReal: new Date().toISOString() } as any,
+          });
         } catch (_) { /* ya estaba */ }
       }
+      // Liberar habitaciones a LIMPIEZA
       for (const rh of (reservaActualizada as any)?.habitaciones || []) {
         const habId = rh.habitacionId || rh.habitacion?.id;
         if (habId) {
-          try {
-            const cambiarEstadoFn = (HabitacionService as any).cambiarEstado;
-            if (typeof cambiarEstadoFn === 'function') await cambiarEstadoFn(habId, 'LIMPIEZA', USUARIO_ACTUAL.id);
-          } catch (_) { /* ya */ }
+          try { HabitacionService.cambiarEstado(habId, 'LIMPIEZA', USUARIO_ACTUAL.id); } catch (_) { /* ya */ }
         }
       }
       setReserva(reservaActualizada);
@@ -251,7 +206,7 @@ const CheckoutModal: React.FC<Props> = ({ isOpen, onDismiss, reservaId }) => {
             ×
           </button>
           <div style={{ fontSize: 16, fontWeight: 700, letterSpacing: 0.2 }}>
-            {paso === 'formulario' ? `Check-out · ${reserva ? (reserva as any).codigoReserva || reserva.id : ''}` : 'Check-out · Exitoso'}
+            {paso === 'formulario' ? `Check-out · ${reserva ? reserva.codigoReserva : ''}` : 'Check-out · Exitoso'}
           </div>
           <button
             onClick={cerrar}
@@ -267,16 +222,7 @@ const CheckoutModal: React.FC<Props> = ({ isOpen, onDismiss, reservaId }) => {
         </div>
 
         <div style={{ flex: 1, overflowY: 'auto', background: '#f7f7f7', padding: 16 }}>
-          {loading && (
-            <IonCard>
-              <IonCardContent>
-                <IonSkeletonText animated style={{ width: '50%', height: 18, marginBottom: 10 }} />
-                <IonSkeletonText animated style={{ width: '100%', height: 14, marginBottom: 8 }} />
-                <IonSkeletonText animated style={{ width: '85%', height: 14 }} />
-              </IonCardContent>
-            </IonCard>
-          )}
-          {!loading && !reserva && (
+          {!reserva && (
             <IonCard>
               <IonCardContent>
                 <IonItem color="danger"><IonIcon icon={informationCircle} slot="start" /><IonLabel>No se encontró la reserva.</IonLabel></IonItem>
@@ -284,7 +230,7 @@ const CheckoutModal: React.FC<Props> = ({ isOpen, onDismiss, reservaId }) => {
             </IonCard>
           )}
 
-          {!loading && reserva && paso === 'formulario' && (
+          {reserva && paso === 'formulario' && (
             <IonRow>
               <IonCol size="12">
                 {errorMsg && (
@@ -296,7 +242,7 @@ const CheckoutModal: React.FC<Props> = ({ isOpen, onDismiss, reservaId }) => {
 
                 <IonCard>
                   <IonCardHeader>
-                    <IonCardTitle>#{(reserva as any).codigoReserva || reserva.id}</IonCardTitle>
+                    <IonCardTitle>#{reserva.codigoReserva}</IonCardTitle>
                     <IonCardSubtitle>Origen: {((reserva as any).origen || '').toUpperCase()}</IonCardSubtitle>
                   </IonCardHeader>
                   <IonCardContent>
@@ -316,7 +262,7 @@ const CheckoutModal: React.FC<Props> = ({ isOpen, onDismiss, reservaId }) => {
                       <IonIcon icon={bed} color="medium" slot="start" />
                       <IonLabel>
                         <h3 style={{ margin: 0 }}>{codHab}{habitacion ? ` · ${(habitacion as any).nombre || ''}` : ''}</h3>
-                        <IonNote>{noches} noche{noches === 1 ? '' : 's'} · {(reserva as any).totalPersonas || (reserva as any).totalAdultos || 1} pax</IonNote>
+                        <IonNote>{noches} noche{noches === 1 ? '' : 's'} · {reserva.totalPersonas || reserva.totalAdultos} pax</IonNote>
                       </IonLabel>
                     </IonItem>
                     <IonItem lines="none">
@@ -437,8 +383,8 @@ const CheckoutModal: React.FC<Props> = ({ isOpen, onDismiss, reservaId }) => {
                     </IonButton>
                   </IonCol>
                   <IonCol size="12" sizeMd="6">
-                    <IonButton expand="block" color="primary" onClick={() => handleConfirmar(false)} disabled={!puedeConfirmar}>
-                      {procesando ? 'Procesando…' : `✔ CONFIRMAR CHECK-OUT · ${(reserva as any).codigoReserva || reserva.id}`}
+                    <IonButton expand="block" color="primary" onClick={() => handleConfirmar()} disabled={!puedeConfirmar}>
+                      {procesando ? 'Procesando…' : `✔ CONFIRMAR CHECK-OUT · ${reserva.codigoReserva}`}
                     </IonButton>
                   </IonCol>
                 </IonRow>
@@ -446,7 +392,7 @@ const CheckoutModal: React.FC<Props> = ({ isOpen, onDismiss, reservaId }) => {
             </IonRow>
           )}
 
-          {!loading && reserva && paso === 'exito' && (
+          {reserva && paso === 'exito' && (
             <IonCard color="success">
               <IonCardContent>
                 <IonRow>
@@ -455,8 +401,8 @@ const CheckoutModal: React.FC<Props> = ({ isOpen, onDismiss, reservaId }) => {
                     <IonItem color="success" lines="none">
                       <IonIcon icon={documentText} slot="start" />
                       <IonLabel>
-                        Reserva <strong>#{(reserva as any).codigoReserva || reserva.id}</strong> pasa a estado{' '}
-                        <IonBadge color="light" style={{ color: '#2dd36f', fontWeight: 800 }}>CHECKOUT</IonBadge>
+                        Reserva <strong>#{reserva.codigoReserva}</strong> pasa a estado{' '}
+                        <IonBadge color="light" style={{ color: '#2dd36f', fontWeight: 800 }}>CHECKED_OUT</IonBadge>
                       </IonLabel>
                     </IonItem>
                     <IonItem color="success" lines="none">
@@ -499,7 +445,7 @@ const CheckoutModal: React.FC<Props> = ({ isOpen, onDismiss, reservaId }) => {
           isOpen={confirmarEarlyOpen}
           onDidDismiss={() => setConfirmarEarlyOpen(false)}
           header="⚠️ Salida anticipada detectada"
-          subHeader={`${reserva ? `#${(reserva as any).codigoReserva || reserva.id}` : ''} · Cliente sale antes de lo programado`}
+          subHeader={`${reserva ? `#${reserva.codigoReserva}` : ''} · Cliente sale antes de lo programado`}
           message={
             esEarlyCheckOut
               ? `Faltan aproximadamente ${Math.round(horasFaltantes)} horas (~${nochesNoUsadas} noche(s) no usadas) para la fecha de salida reservada. ¿Estás 100% seguro que deseas cerrar este Check-out ahora? El folio se cerrará y NO podrá reabrirse desde este botón (tendrás que editar manualmente si es un error).`

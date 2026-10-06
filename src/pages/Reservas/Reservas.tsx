@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { IonContent, IonHeader, IonPage, IonTitle, IonToolbar, IonList, IonItem, IonLabel, IonBadge, IonFab, IonFabButton, IonIcon, useIonRouter, useIonViewWillEnter, IonButton, IonButtons, IonSkeletonText } from '@ionic/react';
+import { IonContent, IonHeader, IonPage, IonTitle, IonToolbar, IonList, IonItem, IonLabel, IonBadge, IonFab, IonFabButton, IonIcon, useIonRouter, useIonViewWillEnter, IonButton, IonButtons } from '@ionic/react';
 import { addCircle, logIn, create } from 'ionicons/icons';
 import type { Color } from '@ionic/core';
 import {
@@ -17,26 +17,31 @@ const estadoColor: Record<EstadoReserva, Color> = {
   PENDIENTE: 'warning',
   CONFIRMADA: 'tertiary',
   CHECKIN: 'success',
+  CHECKED_IN: 'success',
   CHECKOUT: 'medium',
+  CHECKED_OUT: 'medium',
   CANCELADA: 'danger',
   NO_SHOW: 'danger',
   MODIFICADA: 'primary',
+  EN_ESPERA: 'warning',
 };
 
 const estadoLabel: Record<EstadoReserva, string> = {
   PENDIENTE: 'Pendiente',
   CONFIRMADA: 'Confirmada',
   CHECKIN: 'Check-in',
+  CHECKED_IN: 'Check-in',
   CHECKOUT: 'Check-out',
+  CHECKED_OUT: 'Check-out',
   CANCELADA: 'Cancelada',
   NO_SHOW: 'No show',
   MODIFICADA: 'Modificada',
+  EN_ESPERA: 'En espera',
 };
 
 const ReservasPage: React.FC = () => {
   const router = useIonRouter();
   const [reservas, setReservas] = useState<Reserva[]>([]);
-  const [loading, setLoading] = useState(false);
   const [modalCheckinOpen, setModalCheckinOpen] = useState(false);
   const [reservaIdParaCheckin, setReservaIdParaCheckin] = useState<string | null>(null);
 
@@ -47,10 +52,9 @@ const ReservasPage: React.FC = () => {
     setModalCheckinOpen(true);
   };
 
-  const cargar = async () => {
-    setLoading(true);
+  useIonViewWillEnter(() => {
     try {
-      const todas = await ReservaService.listarTodas();
+      const todas = ReservaService.listarTodas ? ReservaService.listarTodas() : [];
       const ordenadas = [...todas].sort((a: any, b: any) => {
         const fa = new Date(a.fechaCreacion || a.createdAt || 0).getTime();
         const fb = new Date(b.fechaCreacion || b.createdAt || 0).getTime();
@@ -59,13 +63,7 @@ const ReservasPage: React.FC = () => {
       setReservas(ordenadas as any);
     } catch {
       setReservas([]);
-    } finally {
-      setLoading(false);
     }
-  };
-
-  useIonViewWillEnter(() => {
-    cargar();
   });
 
   return (
@@ -83,20 +81,7 @@ const ReservasPage: React.FC = () => {
         </IonHeader>
 
         <IonList inset>
-          {loading && (
-            <>
-              {[0, 1, 2, 3, 4].map((i) => (
-                <IonItem key={i}>
-                  <IonLabel>
-                    <IonSkeletonText animated style={{ width: '60%' }} />
-                    <p><IonSkeletonText animated style={{ width: '90%' }} /></p>
-                    <p><IonSkeletonText animated style={{ width: '70%' }} /></p>
-                  </IonLabel>
-                </IonItem>
-              ))}
-            </>
-          )}
-          {!loading && reservas.map((r: any) => {
+          {reservas.map((r: any) => {
             const hab0 = (r.habitaciones || [])[0];
             const codHab = hab0?.habitacion?.codigo ?? hab0?.tipoHabitacionNombre ?? hab0?.habitacionId ?? '—';
             const titular = r.huesped
@@ -151,7 +136,7 @@ const ReservasPage: React.FC = () => {
               </IonItem>
             );
           })}
-          {!loading && reservas.length === 0 && (
+          {reservas.length === 0 && (
             <IonItem lines="none">
               <IonLabel style={{ textAlign: 'center', padding: '24px 0' }}>
                 No hay reservas todavía. Toca el botón [+] para crear la primera.
@@ -171,7 +156,16 @@ const ReservasPage: React.FC = () => {
           onDidDismiss={() => {
             setModalCheckinOpen(false);
             setReservaIdParaCheckin(null);
-            cargar();
+            // Refrescar listado después de check-in
+            try {
+              const todas = ReservaService.listarTodas ? ReservaService.listarTodas() : [];
+              const ordenadas = [...todas].sort((a: any, b: any) => {
+                const fa = new Date(a.fechaCreacion || a.createdAt || 0).getTime();
+                const fb = new Date(b.fechaCreacion || b.createdAt || 0).getTime();
+                return fb - fa;
+              });
+              setReservas(ordenadas as any);
+            } catch {}
           }}
           reservaId={reservaIdParaCheckin}
           usuarioActual={USUARIO_ACTUAL}

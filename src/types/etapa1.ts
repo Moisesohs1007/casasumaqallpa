@@ -24,6 +24,7 @@ export interface TipoHabitacion extends AuditFields {
   serviciosIncluidos: string[];
   fotos: string[];
   estado: EstadoGeneral;
+  precioBaseNoche?: number;
 }
 
 export interface CamaHabitacion {
@@ -41,13 +42,13 @@ export interface CamaHabitacion {
 
 export type EstadoHabitacion =
   | 'LIBRE'
+  | 'DISPONIBLE'
   | 'OCUPADA'
   | 'RESERVADA'
   | 'BLOQUEADA'
   | 'LIMPIEZA'
   | 'INSPECCIONADA'
-  | 'MANTENIMIENTO'
-  | 'DISPONIBLE';
+  | 'MANTENIMIENTO';
 
 export interface Habitacion extends AuditFields {
   id: ID;
@@ -55,16 +56,19 @@ export interface Habitacion extends AuditFields {
   nombre?: string;
   tipoHabitacionId: ID;
   tipoHabitacion?: TipoHabitacion;
-  piso?: string | number;
+  piso?: string;
   ubicacion?: string;
   estado: EstadoHabitacion;
+  capacidadMaximaPax?: number;
+  capacidadMaximaPersonas?: number;
+  vista?: string;
+  vistaEfectiva?: string;
+  camas?: CamaHabitacion[];
+  estadoLimpieza?: string;
   notasInternas?: string;
   bloqueadaHasta?: DateISO;
   motivoBloqueo?: string;
-  capacidadMaximaPersonas?: number;
-  capacidadAdultosOverride?: number;
-  capacidadNinosOverride?: number;
-  precioBaseNoche?: number;
+  [key: string]: any;
 }
 
 // ───────────────────────────────────────────────
@@ -130,7 +134,10 @@ export interface ImpuestoTarifa {
   nombre: 'IGV' | 'IGV_SELVA' | 'INAFECTO' | 'EXONERADO' | 'OTRO';
   porcentaje: number;
   base?: 'PRECIO_BASE' | 'TOTAL';
+  tipo?: string;
+  valor?: number;
   descripcion?: string;
+  [key: string]: any;
 }
 
 export interface CodigoPromocional extends AuditFields {
@@ -216,9 +223,12 @@ export type OrigenReserva =
 
 export type EstadoReserva =
   | 'PENDIENTE'
+  | 'EN_ESPERA'
   | 'CONFIRMADA'
   | 'CHECKIN'
+  | 'CHECKED_IN'
   | 'CHECKOUT'
+  | 'CHECKED_OUT'
   | 'CANCELADA'
   | 'NO_SHOW'
   | 'MODIFICADA';
@@ -234,18 +244,25 @@ export interface HabitacionReserva {
   fechaCheckIn: DateISO;
   fechaCheckOut: DateISO;
   noches: number;
+  totalNoches?: number;
   adultos: number;
   ninos: number;
   precioTotalReservaHabitacion: number;
+  precioBaseAcordadoPorNoche?: number;
   moneda: Moneda;
   notas?: string;
+  observaciones?: string;
+  [key: string]: any;
 }
 
 export interface Reserva extends AuditFields {
   id: ID;
   codigo: string;
+  codigoReserva?: string;
   huespedTitularId: ID;
   huespedTitular?: Huesped;
+  huesped?: Huesped;
+  huespedId?: ID;
   acompaniantes?: Acompaniante[];
   habitaciones: HabitacionReserva[];
   origen: OrigenReserva;
@@ -255,17 +272,25 @@ export interface Reserva extends AuditFields {
   fechaConfirmacion?: DateTimeISO;
   fechaCheckIn: DateISO;
   fechaCheckOut: DateISO;
+  fechaCheckin?: DateISO;
+  fechaCheckout?: DateISO;
+  fechaCheckinReal?: DateTimeISO;
+  fechaCheckoutReal?: DateTimeISO;
   horaEstimadaLlegada?: string;
   horaEstimadaSalida?: string;
   noches: number;
+  totalNoches?: number;
   adultosTotal: number;
   ninosTotal: number;
+  totalAdultos?: number;
+  totalPersonas?: number;
   moneda: Moneda;
   subTotalAlojamiento: number;
   impuestos: number;
   descuentos: number;
   codigoPromocionalId?: ID;
   totalReserva: number;
+  montoTotalReserva?: number;
   anticipo?: number;
   metodoPagoAnticipo?: string;
   fechaAnticipo?: DateTimeISO;
@@ -278,6 +303,9 @@ export interface Reserva extends AuditFields {
   mascotas?: MascotaInfo;
   notasInternas?: string;
   historialCambios: CambioReserva[];
+  checkInInfo?: any;
+  checkOutInfo?: any;
+  [key: string]: any;
 }
 
 export interface Acompaniante {
@@ -343,6 +371,7 @@ export interface Huesped extends AuditFields {
   uuid: UUID;
   nombres: string;
   apellidos: string;
+  nombreCompleto?: string;
   tipoDocumento: TipoDocumento;
   numeroDocumento: string;
   fechaNacimiento?: DateISO;
@@ -354,6 +383,7 @@ export interface Huesped extends AuditFields {
   telefonoCelular: string;
   telefonoFijo?: string;
   correoElectronico?: string;
+  email?: string;
   whatsapp?: boolean;
   preferenciasAlimentarias: PreferenciaAlimentaria;
   otrasRestriccionesAlimentarias?: string;
@@ -367,9 +397,12 @@ export interface Huesped extends AuditFields {
   profesion?: string;
   motivoViaje?: string;
   comoSeEntero?: string;
+  programaFidelidad?: { activo?: boolean; nivel?: string; nivelActual?: string; puntosAcumulados?: number; totalVisitas?: number } | any;
   tags: EtiquetaHuesped[];
   notasInternas?: string;
   foto?: string;
+  fechaUltimaEstadia?: DateTimeISO;
+  [key: string]: any;
 }
 
 export interface ContactoEmergencia {

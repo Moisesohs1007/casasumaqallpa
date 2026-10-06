@@ -70,6 +70,24 @@ const PRODUCTOS_STOCK_DEMO: Array<ProductoFB & { _stock?: number; _stockMin?: nu
   { id: 'PROD-SNACK-GALLETA', sku: 'SNK-001', nombre: 'Snack / Galleta', categoriaId: 'CAT-BEBIDAS-FRIAS', precioVentaBase: 3, moneda: 'PEN', impuesto: 'IGV', estadoProducto: 'ACTIVO', estado: 'ACTIVO', requierePreparacion: false, permiteInventarioNegativo: false, stockActual: 48, stockMinimo: 12, _stock: 48, _stockMin: 12 } as any,
   { id: 'PROD-EXTRA-TOALLA', sku: 'EXT-001', nombre: 'Toalla Extra', categoriaId: 'CAT-BEBIDAS-FRIAS', precioVentaBase: 15, moneda: 'PEN', impuesto: 'IGV', estadoProducto: 'ACTIVO', estado: 'ACTIVO', requierePreparacion: false, permiteInventarioNegativo: false, stockActual: 20, stockMinimo: 5, _stock: 20, _stockMin: 5 } as any,
 ];
+// Demo: H202 = habitación ocupada con huésped Jorge Perez, folio 700 (3 noches * 180) + desayuno2pax (60) + 1 agua500
+const FOLIOS_MOCK: Record<string, {
+  huesped: { nombres: string; apellidos: string; dni: string; telefono?: string; email?: string };
+  reserva: { id: string; checkin: string; checkout: string; noches: number; precioNoche: number; totalAlojamiento: number };
+  lineas: LineaCargo[];
+  pagos: RegistroPago[];
+}> = {
+  'HAB-H202': {
+    huesped: { nombres: 'Jorge Luis', apellidos: 'Perez Soto', dni: '10203040', telefono: '+51 914629285', email: 'jorge.perez@example.com' },
+    reserva: { id: 'RES-R1001', checkin: '2026-10-06', checkout: '2026-10-09', noches: 3, precioNoche: 180, totalAlojamiento: 540 },
+    lineas: [
+      { id: 'L1', tipo: 'ALOJAMIENTO', nombre: 'Alojamiento 3 noches · H202 Hab Doble', cantidad: 3, precioUnit: 180, fecha: '2026-10-06 14:10' },
+      { id: 'L2', tipo: 'ROOM_SERVICE', nombre: 'Desayuno 2 pax (Americano)', cantidad: 2, precioUnit: 30, fecha: '2026-10-06 08:35' },
+      { id: 'L3', tipo: 'PRODUCTO_STOCK', nombre: 'Agua Mineral 500ml', cantidad: 1, precioUnit: 3.5, fecha: '2026-10-06 10:12' },
+    ],
+    pagos: [],
+  },
+};
 
 const fmtSoles = (n: number) => `S/ ${Number(n || 0).toFixed(2)}`;
 const fechaHoy = () => {
@@ -107,12 +125,7 @@ const HabitacionesPage: React.FC = () => {
   const [productosStockGlobal, setProductosStockGlobal] = useState(PRODUCTOS_STOCK_DEMO);
 
   // Estado de lineas/pagos del folio
-  const [foliosLocal, setFoliosLocal] = useState<Record<string, {
-    huesped: { nombres: string; apellidos: string; dni: string; telefono?: string; email?: string };
-    reserva: { id: string; checkin: string; checkout: string; noches: number; precioNoche: number; totalAlojamiento: number };
-    lineas: LineaCargo[];
-    pagos: RegistroPago[];
-  }>>({});
+  const [foliosLocal, setFoliosLocal] = useState<typeof FOLIOS_MOCK>(JSON.parse(JSON.stringify(FOLIOS_MOCK)));
   // Cantidades seleccionadas para vender stock
   const [cantidadesVenta, setCantidadesVenta] = useState<Record<string, number>>({});
   // Servicio extra form
@@ -381,7 +394,7 @@ const HabitacionesPage: React.FC = () => {
       };
     });
     setModalRegistrarPago(false);
-    const metodo = METODOS_PAGO_LISTA.find(m => m.id === pagoForm.metodoPago)?.label || pagoForm.metodoPago;
+    const metodo = METODOS_PAGO_LISTA.find(m => m.value === pagoForm.metodoPago)?.label || pagoForm.metodoPago;
     mostrarToast(`✅ Pago registrado · ${metodo} · ${fmtSoles(Number(pagoForm.monto))}`);
   };
 
@@ -511,7 +524,7 @@ const HabitacionesPage: React.FC = () => {
                   <h4 style={{ margin: '14px 2px 8px 2px', opacity: 0.9 }}>Pagos realizados</h4>
                   <IonList lines="full" className="lineas-folio">
                     {folioActivo.pagos.map((p: RegistroPago) => {
-                      const nombreMet = METODOS_PAGO_LISTA.find(m => m.id === p.metodoPago)?.label || p.metodoPago;
+                      const nombreMet = METODOS_PAGO_LISTA.find(m => m.value === p.metodoPago)?.label || p.metodoPago;
                       return (
                         <IonItem key={p.id}>
                           <IonLabel>
@@ -670,7 +683,7 @@ const HabitacionesPage: React.FC = () => {
           const totalPagado = calcularTotalPagos(folio?.pagos || []);
           const saldo = total - totalPagado;
           const metodoPago = pagos[0]?.metodoPago || 'EFECTIVO_PEN';
-          const metodoLabel = METODOS_PAGO_LISTA.find(m => m.id === metodoPago)?.label || metodoPago;
+          const metodoLabel = METODOS_PAGO_LISTA.find(m => m.value === metodoPago)?.label || metodoPago;
           const nombreHuesped = `${folio?.huesped?.nombres || 'Huesped'} ${folio?.huesped?.apellidos || ''}`.trim() || 'Cliente Eventual';
           return (
             <div className="modal-backdrop modal-wide no-print-bg" onClick={e => { if (e.target === e.currentTarget) setNotaVentaCheckout(null); }}>
@@ -720,7 +733,7 @@ const HabitacionesPage: React.FC = () => {
                     {totalPagado > 0 && <div className="nv-total-row nv-pagado"><span>MONTO PAGADO ({metodoLabel}):</span><span>{fmtSoles(totalPagado)}</span></div>}
                     {pagos.length > 1 && pagos.slice(1).map((p: any, i: number) => (
                       <div key={p.id || i} className="nv-total-row" style={{ fontSize: 11 }}>
-                        <span>Otro pago ({METODOS_PAGO_LISTA.find(m => m.id === p.metodoPago)?.label || p.metodoPago}):</span>
+                        <span>Otro pago ({METODOS_PAGO_LISTA.find(m => m.value === p.metodoPago)?.label || p.metodoPago}):</span>
                         <span>{fmtSoles(p.monto)}</span>
                       </div>
                     ))}

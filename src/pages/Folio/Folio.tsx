@@ -5,7 +5,7 @@ import {
   IonCardSubtitle, IonCardTitle, IonCol, IonContent, IonGrid, IonHeader, IonIcon,
   IonItem, IonItemDivider, IonLabel, IonList, IonNote, IonPage, IonRow, IonTitle,
   IonToolbar, IonBadge, IonChip, IonSegment, IonSegmentButton, useIonViewWillEnter,
-  useIonRouter, useIonToast, IonFooter, IonSkeletonText,
+  useIonRouter, useIonToast, IonFooter,
 } from '@ionic/react';
 import {
   arrowBack, documentText, bed, person, calendar, pricetags, alertCircle, logIn,
@@ -97,31 +97,25 @@ const fmtFecha = (iso: string | undefined | null) => {
   }
 };
 
-const FolioPage: React.FC = () => {
+const Folio: React.FC = () => {
   const router = useIonRouter();
   const { id } = useParams<{ id: string }>();
   const [folio, setFolio] = useState<Folio | null>(null);
   const [noEncontrado, setNoEncontrado] = useState(false);
-  const [loading, setLoading] = useState(false);
   const [tab, setTab] = useState<'cargos' | 'pagos'>('cargos');
   const [presentToast] = useIonToast();
 
-  const cargar = async (folioId: string) => {
-    setLoading(true);
-    setNoEncontrado(false);
+  const cargar = (folioId: string) => {
     try {
       let f: any = null;
       try {
         const servicio = FolioService as any;
-        const todos: any[] = (await servicio.listarTodos?.() || []).filter(Boolean);
-        const encontrar = async (idB: string) => {
-          if (!idB) return undefined;
-          try {
-            const b = await servicio.buscarPorId?.(idB);
-            return (b === null || b === undefined) ? undefined : b;
-          } catch { return undefined; }
+        const todos: any[] = (servicio.listarTodos?.() || []).filter(Boolean);
+        const encontrado = (id: string) => {
+          if (!id) return undefined;
+          try { const b = servicio.buscarPorId?.(id); return (b === null || b === undefined) ? undefined : b; } catch { return undefined; }
         };
-        f = await encontrar(folioId);
+        f = encontrado(folioId);
         if (!f) {
           f = todos.find((x) =>
             x && (
@@ -136,9 +130,9 @@ const FolioPage: React.FC = () => {
             )
           ) || undefined;
         }
-        if (f && f.id) try { await servicio.recalcularTotales?.(f.id); } catch {}
+        if (f && f.id) try { servicio.recalcularTotales?.(f.id); } catch {}
         if (f && f.id) {
-          const f3 = await encontrar(f.id);
+          const f3 = encontrado(f.id);
           if (f3) f = f3;
         }
       } catch (e) { f = null; }
@@ -151,10 +145,9 @@ const FolioPage: React.FC = () => {
         pagos: Array.isArray(f.pagos) ? f.pagos.filter(Boolean) : [],
       };
       setFolio(folioFinal as Folio);
+      setNoEncontrado(false);
     } catch (e) {
       setFolio(null); setNoEncontrado(true);
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -184,6 +177,8 @@ const FolioPage: React.FC = () => {
       s + (((c as any).descuentosMontoDesglosado || []).reduce((s2: number, x: any) => s2 + Number(x?.montoDescuento || 0), 0)), 0);
     totalCargos = cargos.reduce((s, c) => s + Number((c as any).total || (c as any).monto || 0), 0);
   } catch {}
+  // Anti redondeo SUNAT (evita 840.00 vs 840.01): La suma subtotal+igv18+igv5-descuentos DEBE coincidir con el total nominal real.
+  // Si hay desfase de centavos (0.01) por toFixed(2) separados, se absorbe en el subtotal para cuadre.
   const subCuadre = Number((subTotalCargos + igv18 + igv5 - descuentosTot).toFixed(2));
   const desfase = Number((totalCargos - subCuadre).toFixed(2));
   if (Math.abs(desfase) > 0 && Math.abs(desfase) <= 0.03) {
@@ -197,6 +192,7 @@ const FolioPage: React.FC = () => {
   const pagosTot = Math.max(totalPagos, adelantoAloj);
   const totalFolioCalc = Number((subTotalCargos + igv18 + igv5 - descuentosTot).toFixed(2));
   const totalFolioSeed = Number((f as any)?.totalFolio || (f as any)?.totalPeriodo || 0);
+  // Preferir siempre el total real de ítems (totalCargos) para evitar cualquier desfase residual
   const totalFolio = Number((totalCargos > 0 ? Math.max(totalCargos, totalFolioSeed) : Math.max(totalFolioCalc, totalFolioSeed)).toFixed(2));
   const saldo = Number((totalFolio - pagosTot).toFixed(2));
 
@@ -234,23 +230,7 @@ const FolioPage: React.FC = () => {
         <IonGrid>
           <IonRow className="ion-justify-content-center ion-padding-start ion-padding-end ion-padding-bottom">
             <IonCol size="12" size-lg="10" size-xl="8">
-              {loading && (
-                <IonCard style={{ borderRadius: 20 }}>
-                  <IonCardHeader>
-                    <IonSkeletonText animated style={{ width: '50%' }} />
-                    <IonCardSubtitle><IonSkeletonText animated style={{ width: '70%' }} /></IonCardSubtitle>
-                  </IonCardHeader>
-                  <IonCardContent>
-                    {[0,1,2,3].map(i => (
-                      <IonItem key={i} lines="none" className="ion-no-padding">
-                        <IonLabel><IonSkeletonText animated style={{ width: '40%' }} /><p><IonSkeletonText animated style={{ width: '60%' }} /></p></IonLabel>
-                      </IonItem>
-                    ))}
-                  </IonCardContent>
-                </IonCard>
-              )}
-              {!loading && (
-              <>
+              {/* INFO CARD */}
               <IonCard style={{ borderRadius: 20, border: '1px solid #e4efea' }}>
                 <IonCardHeader style={{ paddingBottom: 8 }}>
                   <IonCardTitle style={{ fontSize: 19, fontWeight: 800, color: '#1b5e20' }}>
@@ -296,6 +276,7 @@ const FolioPage: React.FC = () => {
                 </IonCardContent>
               </IonCard>
 
+              {/* TABS */}
               <IonSegment value={tab} onIonChange={(e) => setTab(e.detail.value as any)} style={{ margin: '0 4px 14px 4px' }}>
                 <IonSegmentButton value="cargos">
                   <IonLabel style={{ fontWeight: 700 }}>🧾 Cargos ({cargos.length})</IonLabel>
@@ -305,6 +286,7 @@ const FolioPage: React.FC = () => {
                 </IonSegmentButton>
               </IonSegment>
 
+              {/* TAB CARGOS */}
               {tab === 'cargos' && (
                 <IonCard style={{ borderRadius: 20, border: '1px solid #e4efea' }}>
                   <IonCardContent className="ion-no-padding">
@@ -384,6 +366,7 @@ const FolioPage: React.FC = () => {
                 </IonCard>
               )}
 
+              {/* TAB PAGOS */}
               {tab === 'pagos' && (
                 <IonCard style={{ borderRadius: 20, border: '1px solid #e4efea' }}>
                   <IonCardContent className="ion-no-padding">
@@ -458,6 +441,7 @@ const FolioPage: React.FC = () => {
                 </IonCard>
               )}
 
+              {/* RESUMEN TOTALES */}
               <IonCard style={{ borderRadius: 20, border: '2px solid #1b5e20', marginBottom: 120 }}>
                 <IonCardHeader style={{ paddingBottom: 6 }}>
                   <IonCardTitle style={{ fontSize: 16, fontWeight: 800, color: '#1b5e20' }}>
@@ -538,8 +522,6 @@ const FolioPage: React.FC = () => {
                   </IonCardContent>
                 </IonCard>
               )}
-              </>
-              )}
             </IonCol>
           </IonRow>
         </IonGrid>
@@ -579,4 +561,4 @@ const cargoAutoColor = (c: any, _idx: number) => {
   return <IonBadge color="medium" style={{ marginTop: 4, fontSize: 10 }}>✍️ MANUAL</IonBadge>;
 };
 
-export default FolioPage;
+export default Folio;

@@ -132,6 +132,8 @@ export interface Folio extends AuditFields {
   habitacion?: Habitacion;
   huespedTitularId?: ID;
   huespedTitular?: Huesped;
+  huespedId?: ID;
+  huesped?: Huesped;
   grupoId?: ID;
   nombreGrupo?: string;
   folioMaestroId?: ID;
@@ -160,6 +162,13 @@ export interface Folio extends AuditFields {
   motivoAnulacion?: string;
   usuarioAnulacionId?: ID;
   fechaAnulacion?: DateTimeISO;
+  numeroFolio?: string | number;
+  totalFolio?: number;
+  totalPagado?: number;
+  totalDescuentos?: number;
+  totalImpuestos?: number;
+  totalPropinas?: number;
+  [key: string]: any;
 }
 
 export interface CargoFolioImpuestoDetalle {
@@ -257,16 +266,19 @@ export type OrigenCargoFolio =
 // ───────────────────────────────────────────────
 
 export type MetodoPago =
+  | 'EFECTIVO'
   | 'EFECTIVO_PEN'
   | 'EFECTIVO_USD'
   | 'TARJETA_CREDITO'
   | 'TARJETA_DEBITO'
+  | 'DEBITO'
+  | 'CREDITO'
   | 'TRANSFERENCIA_BANCARIA'
-  | 'QR_CCI'
   | 'YAPE'
   | 'PLIN'
   | 'NIUBIZ'
   | 'IZIPAY'
+  | 'QR_CCI'
   | 'BIZUM'
   | 'PAYPAL'
   | 'PASARELA_ONLINE'
@@ -278,29 +290,30 @@ export type MetodoPago =
   | 'OTRO';
 
 export interface OpcionMetodoPago {
-  id: MetodoPago;
+  value: MetodoPago;
+  id?: string;
   label: string;
-  icono?: string;
-  color?: string;
   requiereReferencia?: boolean;
+  requiereAutorizacion?: boolean;
+  soportaMonedaUSD?: boolean;
+  orden?: number;
 }
 
 export const METODOS_PAGO_LISTA: OpcionMetodoPago[] = [
-  { id: 'EFECTIVO_PEN',        label: '💵 Efectivo (Soles PEN)', color: 'success' },
-  { id: 'EFECTIVO_USD',        label: '💲 Efectivo (Dólares USD)', color: 'success' },
-  { id: 'YAPE',                label: '🟦 Yape', color: 'primary' },
-  { id: 'PLIN',                label: '🟪 Plin', color: 'primary' },
-  { id: 'NIUBIZ',              label: '✅ Niubiz (Visa/MC)', color: 'primary' },
-  { id: 'IZIPAY',              label: '✅ Izipay', color: 'primary' },
-  { id: 'QR_CCI',              label: '📱 QR CCI (Transferencia)', color: 'tertiary', requiereReferencia: true },
-  { id: 'TARJETA_DEBITO',      label: '💳 Débito', color: 'warning' },
-  { id: 'TARJETA_CREDITO',     label: '💳 Crédito Visa/Mastercard', color: 'warning' },
-  { id: 'TRANSFERENCIA_BANCARIA', label: '🏦 Transferencia Bancaria', color: 'tertiary', requiereReferencia: true },
-  { id: 'CORTESIA',            label: '🎁 Cortesía', color: 'medium' },
-  { id: 'CUENTA_POR_COBRAR',   label: '⏳ Cuenta por cobrar', color: 'danger' },
-  { id: 'OTRO',                label: '⚙️ Otro', color: 'medium', requiereReferencia: true },
+  { value: 'EFECTIVO_PEN', label: 'Efectivo PEN', orden: 1 },
+  { value: 'EFECTIVO_USD', label: 'Efectivo USD', soportaMonedaUSD: true, orden: 2 },
+  { value: 'YAPE', label: 'Yape', requiereReferencia: true, orden: 3 },
+  { value: 'PLIN', label: 'Plin', requiereReferencia: true, orden: 4 },
+  { value: 'NIUBIZ', label: 'Niubiz', requiereReferencia: true, requiereAutorizacion: true, orden: 5 },
+  { value: 'IZIPAY', label: 'Izipay', requiereReferencia: true, requiereAutorizacion: true, orden: 6 },
+  { value: 'QR_CCI', label: 'QR CCI', requiereReferencia: true, orden: 7 },
+  { value: 'DEBITO', label: 'Débito', requiereAutorizacion: true, orden: 8 },
+  { value: 'CREDITO', label: 'Crédito', requiereAutorizacion: true, orden: 9 },
+  { value: 'TRANSFERENCIA_BANCARIA', label: 'Transferencia Bancaria', requiereReferencia: true, orden: 10 },
+  { value: 'CORTESIA', label: 'Cortesía', orden: 11 },
+  { value: 'CUENTA_POR_COBRAR', label: 'Cuenta x Cobrar', orden: 12 },
+  { value: 'OTRO', label: 'Otro', requiereReferencia: true, orden: 13 },
 ];
-
 
 export type EstadoPago = 'PENDIENTE' | 'APROBADO' | 'DECLINADO' | 'ANULADO' | 'DEVUELTO';
 
@@ -320,6 +333,7 @@ export interface PagoFolio extends AuditFields {
   fechaPago: DateTimeISO;
   estado: EstadoPago;
   usuarioRegistroId: ID;
+  usuarioId?: ID;
   usuarioCajaId?: ID;
   cajaSesionId?: ID;
   comprobanteId?: ID;
@@ -329,6 +343,14 @@ export interface PagoFolio extends AuditFields {
   observaciones?: string;
   pagadorNombre?: string;
   pagadorDocumento?: string;
+  subMetodoPago?: string;
+  tipoCambioMonedaReferencia?: any;
+  montoMonedaOriginal?: any;
+  referenciaBancaria?: string;
+  aprobacionCodigo?: string;
+  esPropina?: boolean;
+  total?: number;
+  [key: string]: any;
 }
 
 export interface PagoPos extends AuditFields {
@@ -773,7 +795,6 @@ export type EstadoMesa =
   | 'LIBRE'
   | 'OCUPADA'
   | 'RESERVADA'
-  | 'SUCIA'
   | 'EN_LIMPIEZA'
   | 'UNIDA_A_OTRA'
   | 'BLOQUEADA'
@@ -782,6 +803,7 @@ export type EstadoMesa =
 export interface Mesa extends AuditFields {
   id: ID;
   nombre: string;
+  nombreVisible?: string;
   codigo?: string;
   puntoVentaId: ID;
   puntoVenta?: PuntoVenta;
@@ -792,6 +814,8 @@ export interface Mesa extends AuditFields {
   alto?: number;
   formaGeometrica?: 'CIRCULO' | 'CUADRADO' | 'RECTANGULO' | 'OTRO';
   capacidadPersonas: number;
+  capacidadMaxPax?: number;
+  capacidadActualUsada?: number;
   capacidadMinima?: number;
   sillas?: number;
   sillasAdicionalesMaximasPermitidas?: number;
@@ -851,7 +875,6 @@ export type OrigenReservaMesa =
 
 export type TipoConsumoComanda =
   | 'A_HABITACION'
-  | 'CARGO_A_HABITACION'
   | 'MESA_RESTAURANTE'
   | 'PARA_LLEVAR'
   | 'DELIVERY'
@@ -937,6 +960,7 @@ export interface Comanda extends AuditFields {
   instruccionesEntregaRoomService?: InstruccionesRoomService;
   confirmacionEntrega?: ConfirmacionEntrega;
   items: ComandaDetalle[];
+  detalles?: ComandaDetalle[];
   historialEstados: HistorialEstadoComanda[];
   auditoriaModificaciones?: AuditoriaModificacionComanda[];
   pagos: PagoPos[];

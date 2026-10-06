@@ -1,5 +1,4 @@
-// @ts-nocheck
-import React, { useMemo, useState, useEffect } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   IonBackButton, IonButton, IonButtons, IonCard, IonCardContent, IonCardHeader, IonCardSubtitle,
   IonCardTitle, IonCol, IonContent, IonDatetime, IonGrid, IonHeader, IonIcon, IonInput,
@@ -13,7 +12,6 @@ import {
   HabitacionService,
   ReservaService,
   TarifaService,
-  seedUtil,
 } from '../../services';
 
 import type {
@@ -23,6 +21,7 @@ import type {
   TipoDocumento,
   Reserva,
 } from '../../types';
+import { seedUtil } from '../../services/__db__';
 
 const hoyMas = (dias = 1): string => {
   const d = new Date();
@@ -94,50 +93,35 @@ const NuevaReserva: React.FC = () => {
     ));
   }, [checkin, checkout]);
 
-  // ====== Paso 3: Tarifa + Promo ======
+  // ====== Paso 3: Tarifa + Promo (con lista seleccionable + override manual) ======
   const [codPromoInput, setCodPromoInput] = useState('');
   const [precioNocheManual, setPrecioNocheManual] = useState<string>('');
-  const [descuentoPorcentajeManual, setDescuentoPorcentajeManual] = useState<string>('');
   const [tarifaSeleccionadaId, setTarifaSeleccionadaId] = useState<string | null>(null);
   const [promoValidacionMsg, setPromoValidacionMsg] = useState<{ ok: boolean; texto: string } | null>(null);
 
-  const [tarifasDisponiblesParaHab, setTarifasDisponiblesParaHab] = useState<any[]>([]);
-
-  const cargarTarifasDisponibles = async () => {
-    if (!habitacionSeleccionada) { setTarifasDisponiblesParaHab([]); return; }
-    try {
-      const base: any[] = await ((TarifaService as any).listarTodas?.({
-        tipoHabitacionId: habitacionSeleccionada.tipoHabitacionId,
-        estado: 'ACTIVO',
-        vigentesEnFecha: `${checkin}T15:00:00.000Z`,
-      }) ?? []) || [];
-      const tipos = await HabitacionService.listarTipos();
-      const tipoHab = tipos.find((t: any) => t.id === habitacionSeleccionada.tipoHabitacionId);
-      const result = [...base];
-      if (result.length === 0 && tipoHab) {
-        result.push({
-          id: `TAR-DYN-${tipoHab.id}`,
-          tipoHabitacionId: tipoHab.id,
-          nombre: `Tarifa Base ${tipoHab.nombre} (auto)`,
-          descripcion: 'Tarifa por defecto tipo de habitación',
-          precioPorNoche: Number((tipoHab as any).precioBaseNoche) || 350,
-          moneda: 'PEN',
-        });
-      }
-      setTarifasDisponiblesParaHab(result);
-    } catch {
-      setTarifasDisponiblesParaHab([]);
+  const tarifasDisponiblesParaHab = useMemo(() => {
+    if (!habitacionSeleccionada) return [];
+    const base = (TarifaService as any).listarTodas?.({
+      tipoHabitacionId: habitacionSeleccionada.tipoHabitacionId,
+      estado: 'ACTIVO',
+      vigentesEnFecha: `${checkin}T15:00:00.000Z`,
+    }) ?? [];
+    const tipoHab = HabitacionService.listarTipos().find((t) => t.id === habitacionSeleccionada.tipoHabitacionId);
+    if (base.length === 0 && tipoHab) {
+      base.push({
+        id: `TAR-DYN-${tipoHab.id}`,
+        tipoHabitacionId: tipoHab.id,
+        nombre: `Tarifa Base ${tipoHab.nombre} (auto)`,
+        descripcion: 'Tarifa por defecto tipo de habitación',
+        precioPorNoche: Number(tipoHab.precioBaseNoche) || 350,
+        moneda: 'PEN',
+      });
     }
-  };
-
-  useEffect(() => {
-    cargarTarifasDisponibles();
+    return base;
   }, [habitacionSeleccionada, checkin]);
 
-  const [resumenTarifa, setResumenTarifa] = useState<any>(null);
-
-  const calcularResumenTarifa = async () => {
-    if (!habitacionSeleccionada || noches < 1) { setResumenTarifa(null); return; }
+  const resumenTarifa = useMemo(() => {
+    if (!habitacionSeleccionada || noches < 1) return null;
     let precioNoche: number;
     let tarifaNombre = '';
     let tarifaId: string | null = null;
@@ -154,12 +138,11 @@ const NuevaReserva: React.FC = () => {
         tarifa = tarifasDisponiblesParaHab[tarifasDisponiblesParaHab.length - 1];
       }
       if (!tarifa) {
-        const tipos = await HabitacionService.listarTipos();
-        const tipoHab: any = tipos.find((t: any) => t.id === habitacionSeleccionada.tipoHabitacionId);
+        const tipoHab = HabitacionService.listarTipos().find((t) => t.id === habitacionSeleccionada.tipoHabitacionId);
         precioNoche = Number(tipoHab?.precioBaseNoche) || 350;
         tarifaNombre = `Tarifa Base ${tipoHab?.nombre || 'Habitación'}`;
       } else {
-        const factorPct = await ((TarifaService as any).TemporadaService?.calcularFactorPorcentaje?.(`${checkin}T15:00:00.000Z`) ?? 0) || 0;
+        const factorPct = (TarifaService as any).TemporadaService?.calcularFactorPorcentaje?.(`${checkin}T15:00:00.000Z`) ?? 0;
         precioNoche = Number((Number(tarifa.precioPorNoche || 0) * (1 + factorPct / 100)).toFixed(2));
         tarifaNombre = tarifa.nombre;
         tarifaId = tarifa.id;
@@ -167,14 +150,14 @@ const NuevaReserva: React.FC = () => {
     }
 
     const subTotalSinImpuestos = Number((precioNoche * noches).toFixed(2));
-    const imps: any[] = await ((TarifaService as any).ImpuestoService?.listarTodos?.() ?? []) || [];
+    const imps = (TarifaService as any).ImpuestoService?.listarTodos?.() ?? [];
     const impuestosDetalle = imps.map((i: any) => {
       const porc = i.tipo === 'PORCENTAJE' ? i.valor : 0;
       return {
         impuesto: i,
         monto: Number(((subTotalSinImpuestos * porc) / 100).toFixed(2)),
       };
-    }).filter((x) => x.impuesto && x.impuesto.id !== 'IMP-SELVA-5');
+    });
     const montoImpuestos = Number(impuestosDetalle.reduce((s: number, x: any) => s + Number(x.monto || 0), 0).toFixed(2));
     const subTotalConImpuestos = Number((subTotalSinImpuestos + montoImpuestos).toFixed(2));
 
@@ -184,15 +167,15 @@ const NuevaReserva: React.FC = () => {
     if (codPromoInput.trim()) {
       const cod = codPromoInput.trim().toUpperCase();
       try {
-        const validacion = await ((TarifaService as any).CodigoPromocionalService?.validarYAplicar?.({
+        const validacion = (TarifaService as any).CodigoPromocionalService?.validarYAplicar?.({
           codigo: cod,
           totalNoches: noches,
           montoBaseReserva: subTotalConImpuestos,
           tiposHabitacionIds: [habitacionSeleccionada.tipoHabitacionId],
           tarifasIds: tarifaId ? [tarifaId] : undefined,
           fechaAplicacionISO: `${checkin}T15:00:00.000Z`,
-        }) ?? {});
-        if (validacion?.valido && validacion?.descuentoMonto) {
+        }) ?? {};
+        if (validacion.valido && validacion.descuentoMonto) {
           descuentoPromo = Number(validacion.descuentoMonto);
           promoAplicada = validacion.promo;
           promoValida = true;
@@ -200,16 +183,9 @@ const NuevaReserva: React.FC = () => {
       } catch { /* ignore */ }
     }
 
-    let descuentoManualPct = 0;
-    let descuentoManualMonto = 0;
-    if (descuentoPorcentajeManual.trim() && !isNaN(Number(descuentoPorcentajeManual))) {
-      descuentoManualPct = Math.max(0, Math.min(100, Number(descuentoPorcentajeManual)));
-      descuentoManualMonto = Number(((subTotalConImpuestos - descuentoPromo) * descuentoManualPct / 100).toFixed(2));
-    }
+    const totalFinal = Number(Math.max(0, subTotalConImpuestos - descuentoPromo).toFixed(2));
 
-    const totalFinal = Number(Math.max(0, subTotalConImpuestos - descuentoPromo - descuentoManualMonto).toFixed(2));
-
-    setResumenTarifa({
+    return {
       tarifaNombre,
       tarifaId,
       precioNoche,
@@ -220,23 +196,9 @@ const NuevaReserva: React.FC = () => {
       descuentoPromo,
       promoAplicada,
       promoValida,
-      descuentoManualPct,
-      descuentoManualMonto,
       totalFinal,
-    });
-  };
-
-  useEffect(() => {
-    if (paso === 2 && noches >= 1 && (adultos + ninos) >= 1) {
-      buscarHabitaciones();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [paso, checkin, checkout, adultos, ninos]);
-
-  useEffect(() => {
-    calcularResumenTarifa();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [habitacionSeleccionada, noches, tarifasDisponiblesParaHab, tarifaSeleccionadaId, precioNocheManual, codPromoInput, descuentoPorcentajeManual, checkin]);
+    };
+  }, [habitacionSeleccionada, noches, tarifasDisponiblesParaHab, tarifaSeleccionadaId, precioNocheManual, codPromoInput, checkin]);
 
   // ====== Paso 4: Origen + Crear ======
   const [origen, setOrigen] = useState<OrigenReserva>('WEB_OFICIAL');
@@ -246,37 +208,37 @@ const NuevaReserva: React.FC = () => {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   // ===== Acciones Paso 1 =====
-  const doBuscarPorDoc = async () => {
+  const doBuscarPorDoc = () => {
     setErrorMsg(null);
     if (!buscarDoc.trim()) {
       setBusquedas([]);
       setHuespedEncontrado(null);
       return;
     }
-    const r = await HuespedService.buscarPorDocumento(buscarTipoDoc, buscarDoc.trim());
+    const r = HuespedService.buscarPorDocumento(buscarTipoDoc, buscarDoc.trim());
     setHuespedEncontrado(r || null);
     setBusquedas(r ? [r] : []);
   };
-  const doBuscarPorTexto = async () => {
+  const doBuscarPorTexto = () => {
     setErrorMsg(null);
     if (!buscarTexto.trim()) {
       setBusquedas([]);
       return;
     }
-    setBusquedas((await HuespedService.buscarPorTexto(buscarTexto.trim())).slice(0, 10));
+    setBusquedas(HuespedService.buscarPorTexto(buscarTexto.trim()).slice(0, 10));
   };
   const elegirHuespedExistente = (h: Huesped) => {
     setHuespedFinal(h);
     setHuespedEncontrado(h);
   };
-  const crearNuevoHuesped = async () => {
+  const crearNuevoHuesped = () => {
     setErrorMsg(null);
     if (!nuevoHuesped.numeroDocumento || !nuevoHuesped.nombres || !nuevoHuesped.apellidos || !nuevoHuesped.telefonoCelular) {
       setErrorMsg('Por favor completa los campos obligatorios (*) del nuevo huésped.');
       return;
     }
     try {
-      const h = await HuespedService.crear({
+      const h = HuespedService.crear({
         ...nuevoHuesped,
         tipoDocumento: (nuevoHuesped.tipoDocumento as TipoDocumento) || 'DNI',
         numeroDocumento: nuevoHuesped.numeroDocumento!,
@@ -328,7 +290,7 @@ const NuevaReserva: React.FC = () => {
   };
 
   // ===== Acciones Paso 2 =====
-  const buscarHabitaciones = async () => {
+  const buscarHabitaciones = () => {
     setErrorMsg(null);
     if (noches < 1) {
       setErrorMsg('Check-out debe ser después de check-in.');
@@ -340,7 +302,7 @@ const NuevaReserva: React.FC = () => {
       setHabitacionesDisponibles([]);
       return;
     }
-    const list = await HabitacionService.listarTodas({
+    const list = HabitacionService.listarTodas({
       disponiblesParaFechas: { checkinISO: `${checkin}T15:00:00.000Z`, checkoutISO: `${checkout}T11:00:00.000Z` },
       capacidadMinimaPax: adultos + ninos,
     });
@@ -352,15 +314,14 @@ const NuevaReserva: React.FC = () => {
   };
 
   // ===== Paso 4: Crear =====
-  const doCrearReserva = async () => {
+  const doCrearReserva = () => {
     setErrorMsg(null);
     if (!huespedFinal) { setErrorMsg('Paso 1: Selecciona o crea un huésped.'); return; }
     if (!habitacionSeleccionada || noches < 1) { setErrorMsg('Paso 2: Selecciona fechas válidas y una habitación.'); return; }
     if (!resumenTarifa) { setErrorMsg('Paso 3: Calcula tarifa antes de confirmar.'); return; }
-    const tipos = await HabitacionService.listarTipos();
-    const tipoHabitacion: any = tipos.find((t: any) => t.id === habitacionSeleccionada.tipoHabitacionId)!;
+    const tipoHabitacion = HabitacionService.listarTipos().find((t) => t.id === habitacionSeleccionada.tipoHabitacionId)!;
     try {
-      const nueva = await ReservaService.crear({
+      const nueva = ReservaService.crear({
         codigoReserva: '',
         huespedId: huespedFinal.id,
         huesped: huespedFinal,
@@ -468,15 +429,9 @@ const NuevaReserva: React.FC = () => {
         updatedAt: seedUtil.nowISO(),
         usuarioResponsableId: 'USR-MOISES-0001',
       } as any);
-      if (!nueva || !nueva.id || !nueva.codigoReserva) {
-        console.error('[doCrearReserva] Supabase NO retornó id/codigoReserva válido:', nueva);
-        setErrorMsg('Error de conexión con Supabase: no se pudo guardar la reserva. Verifica conexión a internet e intenta nuevamente.');
-        return;
-      }
       setReservaCreada(nueva);
     } catch (e: any) {
-      console.error('[doCrearReserva] Exception:', e);
-      setErrorMsg((e?.message || 'Error al crear la reserva.') + ' (Intenta nuevamente)');
+      setErrorMsg(e.message || 'Error al crear la reserva.');
     }
   };
 
@@ -513,8 +468,6 @@ const NuevaReserva: React.FC = () => {
     setReservaCreada(null);
     setErrorMsg(null);
     setPaso(1);
-    setTarifasDisponiblesParaHab([]);
-    setResumenTarifa(null);
   });
 
   const limpiarYCargarNuevoFormulario = () => {
@@ -550,8 +503,6 @@ const NuevaReserva: React.FC = () => {
     setReservaCreada(null);
     setErrorMsg(null);
     setPaso(1);
-    setTarifasDisponiblesParaHab([]);
-    setResumenTarifa(null);
   };
 
   return (
@@ -574,16 +525,16 @@ const NuevaReserva: React.FC = () => {
               <IonCardHeader>
                 <IonCardTitle style={{ color: 'white' }}>
                   <IonIcon icon={checkmarkDone} style={{ marginRight: 8 }} />
-                  Reserva {(reservaCreada as any).codigoReserva} creada ✅
+                  Reserva {reservaCreada.codigoReserva} creada ✅
                 </IonCardTitle>
                 <IonCardSubtitle style={{ color: 'rgba(255,255,255,0.85)' }}>
-                  {(reservaCreada as any).huesped?.nombreCompleto} · {((reservaCreada as any).habitaciones || [])[0]?.habitacion?.codigo} · {(reservaCreada as any).totalNoches} noches
+                  {reservaCreada.huesped?.nombreCompleto} · {reservaCreada.habitaciones[0]?.habitacion?.codigo} · {reservaCreada.totalNoches} noches
                 </IonCardSubtitle>
               </IonCardHeader>
               <IonCardContent style={{ color: 'white' }}>
-                <p><b>Total:</b> S/ {Number((reservaCreada as any).montoTotalReserva).toFixed(2)}</p>
-                <p><b>Estado:</b> <IonBadge color="warning">{(reservaCreada as any).estado}</IonBadge> &nbsp; <b>Origen:</b> <IonBadge>{(reservaCreada as any).origen}</IonBadge></p>
-                <p><b>Check-in:</b> {String((reservaCreada as any).fechaCheckin || '').slice(0, 10)} &nbsp; <b>Check-out:</b> {String((reservaCreada as any).fechaCheckout || '').slice(0, 10)}</p>
+                <p><b>Total:</b> S/ {Number(reservaCreada.montoTotalReserva).toFixed(2)}</p>
+                <p><b>Estado:</b> <IonBadge color="warning">{reservaCreada.estado}</IonBadge> &nbsp; <b>Origen:</b> <IonBadge>{reservaCreada.origen}</IonBadge></p>
+                <p><b>Check-in:</b> {(reservaCreada.fechaCheckin ?? reservaCreada.fechaCheckIn ?? '').slice(0, 10)} &nbsp; <b>Check-out:</b> {(reservaCreada.fechaCheckout ?? reservaCreada.fechaCheckOut ?? '').slice(0, 10)}</p>
                 <IonRow className="ion-justify-content-end">
                   <IonCol size="12" sizeMd="4">
                     <IonButton expand="block" fill="outline" color="light" onClick={limpiarYCargarNuevoFormulario}>
@@ -666,10 +617,10 @@ const NuevaReserva: React.FC = () => {
                             {busquedas.map((h) => (
                               <IonItem key={h.id} button onClick={() => elegirHuespedExistente(h)}>
                                 <IonLabel>
-                                  <h2>{(h as any).nombres} {(h as any).apellidos}</h2>
-                                  <p>{(h as any).tipoDocumento}: {(h as any).numeroDocumento} · {(h as any).telefonoCelular}</p>
-                                  <p><IonChip color="tertiary" outline={huespedFinal?.id !== h.id}>{((h as any).programaFidelidad as any)?.nivelActual || 'NUEVO'}</IonChip> &nbsp;
-                                    Visitas: {((h as any).programaFidelidad as any)?.totalVisitas || 0}</p>
+                                  <h2>{h.nombres} {h.apellidos}</h2>
+                                  <p>{h.tipoDocumento}: {h.numeroDocumento} · {h.telefonoCelular}</p>
+                                  <p><IonChip color="tertiary" outline={huespedFinal?.id !== h.id}>{h.programaFidelidad?.nivelActual || 'NUEVO'}</IonChip> &nbsp;
+                                    Visitas: {h.programaFidelidad?.totalVisitas || 0}</p>
                                 </IonLabel>
                                 {huespedFinal?.id === h.id && <IonIcon icon={checkmark} color="success" slot="end" />}
                               </IonItem>
@@ -697,19 +648,19 @@ const NuevaReserva: React.FC = () => {
                                 <IonSelectOption value="RUC">RUC</IonSelectOption>
                               </IonSelect>
                             </IonItem></IonCol>
-                            <IonCol size="6"><IonItem><IonLabel position="stacked">N° doc *</IonLabel><IonInput value={nuevoHuesped.numeroDocumento} onIonInput={(e) => setNuevoHuesped({ ...nuevoHuesped, numeroDocumento: e.detail.value })} /></IonItem></IonCol>
+                            <IonCol size="6"><IonItem><IonLabel position="stacked">N° doc *</IonLabel><IonInput value={nuevoHuesped.numeroDocumento} onIonInput={(e) => setNuevoHuesped({ ...nuevoHuesped, numeroDocumento: e.detail.value ?? undefined })} /></IonItem></IonCol>
                           </IonRow>
                           <IonRow>
-                            <IonCol size="6"><IonItem><IonLabel position="stacked">Nombres *</IonLabel><IonInput value={nuevoHuesped.nombres} onIonInput={(e) => setNuevoHuesped({ ...nuevoHuesped, nombres: e.detail.value })} /></IonItem></IonCol>
-                            <IonCol size="6"><IonItem><IonLabel position="stacked">Apellidos *</IonLabel><IonInput value={nuevoHuesped.apellidos} onIonInput={(e) => setNuevoHuesped({ ...nuevoHuesped, apellidos: e.detail.value })} /></IonItem></IonCol>
+                            <IonCol size="6"><IonItem><IonLabel position="stacked">Nombres *</IonLabel><IonInput value={nuevoHuesped.nombres} onIonInput={(e) => setNuevoHuesped({ ...nuevoHuesped, nombres: e.detail.value ?? undefined })} /></IonItem></IonCol>
+                            <IonCol size="6"><IonItem><IonLabel position="stacked">Apellidos *</IonLabel><IonInput value={nuevoHuesped.apellidos} onIonInput={(e) => setNuevoHuesped({ ...nuevoHuesped, apellidos: e.detail.value ?? undefined })} /></IonItem></IonCol>
                           </IonRow>
                           <IonRow>
-                            <IonCol size="12" sizeMd="6"><IonItem><IonLabel position="stacked">Teléfono *</IonLabel><IonInput type="tel" value={nuevoHuesped.telefonoCelular} onIonInput={(e) => setNuevoHuesped({ ...nuevoHuesped, telefonoCelular: e.detail.value })} /></IonItem></IonCol>
-                            <IonCol size="12" sizeMd="6"><IonItem><IonLabel position="stacked">Email</IonLabel><IonInput type="email" value={nuevoHuesped.email} onIonInput={(e) => setNuevoHuesped({ ...nuevoHuesped, email: e.detail.value })} /></IonItem></IonCol>
+                            <IonCol size="12" sizeMd="6"><IonItem><IonLabel position="stacked">Teléfono *</IonLabel><IonInput type="tel" value={nuevoHuesped.telefonoCelular} onIonInput={(e) => setNuevoHuesped({ ...nuevoHuesped, telefonoCelular: e.detail.value ?? undefined })} /></IonItem></IonCol>
+                            <IonCol size="12" sizeMd="6"><IonItem><IonLabel position="stacked">Email</IonLabel><IonInput type="email" value={nuevoHuesped.email} onIonInput={(e) => setNuevoHuesped({ ...nuevoHuesped, email: e.detail.value ?? undefined })} /></IonItem></IonCol>
                           </IonRow>
                           <IonRow>
                             <IonCol size="12" sizeMd="4"><IonItem><IonLabel position="stacked">Nacionalidad</IonLabel>
-                              <IonSelect value={nuevoHuesped.nacionalidad || 'PERU'} onIonChange={(e) => setNuevoHuesped({ ...nuevoHuesped, nacionalidad: e.detail.value })}>
+                              <IonSelect value={nuevoHuesped.nacionalidad || 'PERU'} onIonChange={(e) => setNuevoHuesped({ ...nuevoHuesped, nacionalidad: (e.detail.value ?? undefined) as any })}>
                                 <IonSelectOption value="PERU">🇵🇪 Perú</IonSelectOption>
                                 <IonSelectOption value="ARGENTINA">🇦🇷 Argentina</IonSelectOption>
                                 <IonSelectOption value="CHILE">🇨🇱 Chile</IonSelectOption>
@@ -720,7 +671,7 @@ const NuevaReserva: React.FC = () => {
                                 <IonSelectOption value="OTRO">🌍 Otro</IonSelectOption>
                               </IonSelect>
                             </IonItem></IonCol>
-                            <IonCol size="12" sizeMd="8"><IonItem><IonLabel position="stacked">Dirección</IonLabel><IonInput value={nuevoHuesped.direccion} onIonInput={(e) => setNuevoHuesped({ ...nuevoHuesped, direccion: e.detail.value })} /></IonItem></IonCol>
+                            <IonCol size="12" sizeMd="8"><IonItem><IonLabel position="stacked">Dirección</IonLabel><IonInput value={nuevoHuesped.direccion} onIonInput={(e) => setNuevoHuesped({ ...nuevoHuesped, direccion: e.detail.value ?? undefined })} /></IonItem></IonCol>
                           </IonRow>
                         </IonGrid>
                         <IonButton expand="block" color="secondary" onClick={crearNuevoHuesped} style={{ marginTop: 8 }}>
@@ -733,8 +684,8 @@ const NuevaReserva: React.FC = () => {
                       <IonCard color="success" style={{ marginTop: 12 }}>
                         <IonCardContent style={{ color: 'white' }}>
                           <b>✅ Seleccionado:</b><br />
-                          {(huespedFinal as any).nombres} {(huespedFinal as any).apellidos} · {(huespedFinal as any).tipoDocumento} {(huespedFinal as any).numeroDocumento}<br />
-                          📞 {(huespedFinal as any).telefonoCelular} &nbsp; ✉️ {(huespedFinal as any).email || '(sin email)'}
+                          {huespedFinal.nombres} {huespedFinal.apellidos} · {huespedFinal.tipoDocumento} {huespedFinal.numeroDocumento}<br />
+                          📞 {huespedFinal.telefonoCelular} &nbsp; ✉️ {huespedFinal.email || '(sin email)'}
                         </IonCardContent>
                       </IonCard>
                     )}
@@ -755,12 +706,12 @@ const NuevaReserva: React.FC = () => {
                         <IonItem>
                           <IonIcon icon={calendar} slot="start" color="primary" />
                           <IonLabel position="stacked">Check-in (15:00 hrs)</IonLabel>
-                          <IonDatetime value={checkin} onIonChange={(e) => { const v = (e.detail.value as string).slice(0, 10); setCheckin(v); if (new Date(v) >= new Date(checkout)) setCheckout(hoyMas(2)); }} presentation="date" style={{ maxWidth: '100%' }} />
+                          <IonDatetime value={checkin} onIonChange={(e) => { const v = (e.detail.value as string).slice(0, 10); setCheckin(v); if (new Date(v) >= new Date(checkout)) setCheckout(hoyMas(2)); }} style={{ maxWidth: '100%' }} />
                         </IonItem>
                         <IonItem>
                           <IonIcon icon={time} slot="start" color="primary" />
                           <IonLabel position="stacked">Check-out (11:00 hrs)</IonLabel>
-                          <IonDatetime value={checkout} onIonChange={(e) => setCheckout((e.detail.value as string).slice(0, 10))} presentation="date" style={{ maxWidth: '100%' }} />
+                          <IonDatetime value={checkout} onIonChange={(e) => setCheckout((e.detail.value as string).slice(0, 10))} style={{ maxWidth: '100%' }} />
                         </IonItem>
                         <IonRow>
                           <IonCol size="6"><IonItem><IonLabel position="stacked">Adultos</IonLabel>
@@ -797,7 +748,7 @@ const NuevaReserva: React.FC = () => {
                           </IonNote>
                         ) : (
                           <IonList>
-                            {habitacionesDisponibles.map((h: any) => (
+                            {habitacionesDisponibles.map((h) => (
                               <IonItem key={h.id} button onClick={() => setHabitacionSeleccionada(h)}>
                                 <IonLabel>
                                   <h2>
@@ -880,24 +831,8 @@ const NuevaReserva: React.FC = () => {
                                 onIonInput={(e) => setPrecioNocheManual(e.detail.value || '')}
                               />
                             </IonItem>
-                            <IonItem style={{ marginTop: 8 }}>
-                              <IonLabel position="stacked">
-                                🏷️ Descuento directo % (negociación recepción)
-                              </IonLabel>
-                              <IonInput
-                                type="number"
-                                placeholder="Ej: 10 (resta 10% al total)"
-                                value={descuentoPorcentajeManual}
-                                onIonInput={(e) => setDescuentoPorcentajeManual(e.detail.value || '')}
-                              />
-                            </IonItem>
-                            {descuentoPorcentajeManual.trim() && (
-                              <IonNote color="warning" style={{ display: 'block', marginTop: 6 }}>
-                                Descuento aplicado: <b>{Number(descuentoPorcentajeManual).toFixed(0)}%</b> - S/ {Number(resumenTarifa?.descuentoManualMonto || 0).toFixed(2)}
-                              </IonNote>
-                            )}
                             <IonNote color="medium" style={{ display: 'block', marginTop: 8 }}>
-                              💡 Para desactivar, borra el contenido del campo.
+                              💡 Para desactivar modo manual, borra el número del campo.
                             </IonNote>
                           </IonList>
                         )}
@@ -912,7 +847,7 @@ const NuevaReserva: React.FC = () => {
                       <IonCardContent>
                         <IonItem>
                           <IonIcon icon={pricetags} slot="start" />
-                          <IonInput placeholder="Ej: 10OFFWEB" value={codPromoInput} onIonInput={(e) => setCodPromoInput((e.detail.value || '').toUpperCase())} />
+                          <IonInput placeholder="Ej: 10OFFWEB" value={codPromoInput} onIonInput={(e) => setCodPromoInput(e.detail.value!.toUpperCase())} />
                         </IonItem>
                         {codPromoInput.trim() && (
                           <IonCard
@@ -954,7 +889,7 @@ const NuevaReserva: React.FC = () => {
                               <IonLabel>Tarifa aplicada</IonLabel>
                               <IonLabel slot="end" style={{ textAlign: 'right' }}>
                                 <IonBadge color={precioNocheManual.trim() ? 'warning' : 'primary'}>
-                                  {precioNocheManual.trim() ? 'MANUAL' : (resumenTarifa.tarifaNombre || '').slice(0, 20)}
+                                  {precioNocheManual.trim() ? 'MANUAL' : resumenTarifa.tarifaNombre?.slice(0, 20)}
                                 </IonBadge>
                               </IonLabel>
                             </IonItem>
@@ -966,8 +901,8 @@ const NuevaReserva: React.FC = () => {
                               <IonLabel>Subtotal alojamiento ({noches} noches, sin impuestos)</IonLabel>
                               <IonLabel slot="end">S/ {Number(resumenTarifa.subTotalSinImpuestos).toFixed(2)}</IonLabel>
                             </IonItem>
-                            {(resumenTarifa.impuestosDetalle || []).map((d: any, i: number) => (
-                              <IonItem key={d.impuesto?.id || i}>
+                            {resumenTarifa.impuestosDetalle.map((d: any) => (
+                              <IonItem key={d.impuesto?.id || Math.random()}>
                                 <IonLabel>{d.impuesto?.nombre || 'Impuesto'} ({d.impuesto?.valor || 0}%)</IonLabel>
                                 <IonLabel slot="end">S/ {Number(d.monto || 0).toFixed(2)}</IonLabel>
                               </IonItem>
@@ -976,12 +911,6 @@ const NuevaReserva: React.FC = () => {
                               <IonItem color="success">
                                 <IonLabel>🎁 Descuento promoción</IonLabel>
                                 <IonLabel slot="end" color="success">−S/ {Number(resumenTarifa.descuentoPromo).toFixed(2)}</IonLabel>
-                              </IonItem>
-                            )}
-                            {Number(resumenTarifa.descuentoManualMonto) > 0 && (
-                              <IonItem color="warning">
-                                <IonLabel>🏷️ Descuento recepción ({Number(resumenTarifa.descuentoManualPct).toFixed(0)}%)</IonLabel>
-                                <IonLabel slot="end" color="warning">−S/ {Number(resumenTarifa.descuentoManualMonto).toFixed(2)}</IonLabel>
                               </IonItem>
                             )}
                             <IonItem lines="none">
@@ -1032,7 +961,7 @@ const NuevaReserva: React.FC = () => {
                       </IonCardHeader>
                       <IonCardContent>
                         <IonList lines="full">
-                          <IonItem><IonLabel>Huésped</IonLabel><IonLabel slot="end"><b>{huespedFinal ? `${(huespedFinal as any).nombres} ${(huespedFinal as any).apellidos}` : '—'}</b></IonLabel></IonItem>
+                          <IonItem><IonLabel>Huésped</IonLabel><IonLabel slot="end"><b>{huespedFinal ? `${huespedFinal.nombres} ${huespedFinal.apellidos}` : '—'}</b></IonLabel></IonItem>
                           <IonItem><IonLabel>Habitación</IonLabel><IonLabel slot="end">{habitacionSeleccionada?.codigo || '—'}</IonLabel></IonItem>
                           <IonItem><IonLabel>Check-in / Check-out</IonLabel><IonLabel slot="end">{checkin || '—'} → {checkout || '—'}</IonLabel></IonItem>
                           <IonItem><IonLabel>{noches} {noches === 1 ? 'noche' : 'noches'} · Pax</IonLabel><IonLabel slot="end">{adultos}A {ninos > 0 ? `${ninos}N` : ''}</IonLabel></IonItem>

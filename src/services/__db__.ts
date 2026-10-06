@@ -3,8 +3,11 @@ import { seed, seedUtil, type Create, type Update } from './__seed__';
 import type {
   TipoHabitacion, Habitacion, Tarifa, Temporada, PoliticaCancelacion, CodigoPromocional,
   Reserva, Huesped, Folio, CargoFolio, PagoFolio,
-  Usuario, Rol, PuntoVenta, CategoriaFB, ProductoFB, PresentacionProducto, ModificadorProducto,
-  AlergenoProducto, Mesa, Comanda, ComandaDetalle, ImpuestoTarifa
+  Usuario, Rol, PuntoVenta, CategoriaFB, ProductoFB, PresentacionProducto, ModificadorGrupo,
+  AlergenoProducto, Mesa, Comanda, ComandaDetalle, ImpuestoTarifa,
+  EstadoHabitacion, EstadoFolio, EstadoPago, MetodoPago,
+  EstadoComanda, TipoConsumoComanda, TipoComanda, PrioridadComanda,
+  EstadoReserva, OrigenReserva
 } from '../types';
 
 type CollectionKey =
@@ -38,11 +41,11 @@ class InMemoryDB {
       puntosVenta: CLONE(seed.puntosVenta),
       mesas: CLONE(seed.mesas),
       reservas: CLONE(seed.reservas),
-      folios: CLONE(seed.folios),
-      cargosFolio: CLONE(seed.folios.flatMap((f) => f.cargos || [])),
-      pagosFolio: CLONE([...seed.pagosFolio, ...seed.folios.flatMap((f) => f.pagos || [])]),
-      comandas: CLONE(seed.comandas),
-      comandasDetalles: CLONE(seed.comandas.flatMap((c) => c.detalles?.map((d) => ({ ...d, comandaId: c.id })) || [])),
+      folios: CLONE(seed.folios as any[]),
+      cargosFolio: CLONE((seed.folios as any[]).flatMap((f: any) => f.cargos || [])),
+      pagosFolio: CLONE([...(seed.pagosFolio as any[]), ...(seed.folios as any[]).flatMap((f: any) => f.pagos || [])]),
+      comandas: CLONE(seed.comandas as any[]),
+      comandasDetalles: CLONE((seed.comandas as any[]).flatMap((c: Comanda) => (c.detalles ?? c.items ?? []).map((d: ComandaDetalle) => ({ ...d, comandaId: c.id })) || [])),
     };
   }
 
@@ -126,6 +129,8 @@ export { seedUtil, type Create, type Update };
 export type {
   TipoHabitacion, Habitacion, Tarifa, Temporada, PoliticaCancelacion, CodigoPromocional,
   Reserva, Huesped, Folio, CargoFolio, PagoFolio,
-  Usuario, Rol, PuntoVenta, CategoriaFB, ProductoFB, PresentacionProducto, ModificadorProducto,
-  AlergenoProducto, Mesa, Comanda, ComandaDetalle, ImpuestoTarifa
+  Usuario, Rol, PuntoVenta, CategoriaFB, ProductoFB, PresentacionProducto, ModificadorGrupo,
+  AlergenoProducto, Mesa, Comanda, ComandaDetalle, ImpuestoTarifa,
+  EstadoHabitacion, EstadoFolio, EstadoPago, MetodoPago,
+  EstadoComanda, TipoConsumoComanda, TipoComanda, PrioridadComanda
 };

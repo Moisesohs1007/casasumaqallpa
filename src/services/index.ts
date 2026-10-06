@@ -5,4 +5,4 @@ export * from './ReservaService';
 export * from './FolioService';
 export * from './PosService';
 export * from './supabaseClient';
-export * from './__supabase_db__';
+export * from './__db__';
