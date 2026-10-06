@@ -11,7 +11,8 @@ export default defineConfig({
       targets: ['defaults', 'not IE 11'],
     }),
     VitePWA({
-      registerType: 'autoUpdate',
+      registerType: 'prompt',
+      selfDestroying: true,
       includeAssets: ['favicon.svg', 'favicon.ico', 'robots.txt', 'apple-touch-icon.png'],
       manifest: {
         name: 'Casa Sumaq Allpa - Gestión Lodge',
@@ -21,8 +22,8 @@ export default defineConfig({
         background_color: '#ffffff',
         display: 'standalone',
         orientation: 'any',
-        scope: './',
-        start_url: './',
+        scope: '/casasumaqallpa/',
+        start_url: '/casasumaqallpa/',
         icons: [
           {
             src: 'pwa-192x192.png',

@@ -29,7 +29,7 @@ setupIonicReact({
 const App: React.FC = () => {
   return (
     <IonApp>
-      <IonReactRouter>
+      <IonReactRouter basename="/casasumaqallpa">
         <IonTabs>
           <IonRouterOutlet>
             <Route exact path="/home">
