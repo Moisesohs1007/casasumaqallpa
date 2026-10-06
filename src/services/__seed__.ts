@@ -135,40 +135,76 @@ const productosFBSeedBase: Array<Omit<ProductoFB, 'presentacionesIds' | 'present
 
   /* ================ 🧊 BEBIDAS FRÍAS (Orden 3) ================ */
   {
-    id: 'PROD-AGUA-MINERAL', categoriaId: 'CAT-BEBIDAS-FRIAS', codigo: 'BEB401', nombre: 'Agua Mineral',
-    descripcion: 'Agua mineral sin gas, S/ 3.00.',
-    precioVentaBase: 3.00, costoAproximado: 1.20, moneda: 'PEN',
-    permiteModificadores: false, requierePreparacion: false, estado: 'ACTIVO', ...auditSeed
+    id: 'PROD-AGUA-MINERAL-1L', categoriaId: 'CAT-BEBIDAS-FRIAS', codigo: 'BEB401', nombre: 'Agua Mineral 1L',
+    descripcion: 'Agua mineral sin gas 1 Litro.',
+    precioVentaBase: 5.00, costoAproximado: 1.80, moneda: 'PEN',
+    permiteModificadores: false, requierePreparacion: false,
+    permiteInventarioNegativo: false, stockActual: 48, stockMinimo: 6,
+    estadoProducto: 'ACTIVO', estado: 'ACTIVO', ...auditSeed
   },
   {
-    id: 'PROD-GASEOSA', categoriaId: 'CAT-BEBIDAS-FRIAS', codigo: 'BEB402', nombre: 'Gaseosa (1/2 L)',
-    descripcion: 'Inca Kola / Coca Cola / Sprite, 500ml. Especificar marca en observaciones.',
-    precioVentaBase: 5.00, costoAproximado: 2.00, moneda: 'PEN',
-    permiteModificadores: false, requierePreparacion: false, estado: 'ACTIVO', ...auditSeed
+    id: 'PROD-AGUA-MINERAL-500ML', categoriaId: 'CAT-BEBIDAS-FRIAS', codigo: 'BEB401B', nombre: 'Agua Mineral 500ml',
+    descripcion: 'Agua mineral sin gas 500ml.',
+    precioVentaBase: 3.50, costoAproximado: 1.20, moneda: 'PEN',
+    permiteModificadores: false, requierePreparacion: false,
+    permiteInventarioNegativo: false, stockActual: 72, stockMinimo: 12,
+    estadoProducto: 'ACTIVO', estado: 'ACTIVO', ...auditSeed
+  },
+  {
+    id: 'PROD-GASEOSA-COCA-500ML', categoriaId: 'CAT-BEBIDAS-FRIAS', codigo: 'BEB402A', nombre: 'Coca Cola 500ml',
+    descripcion: 'Gaseosa Coca Cola 500ml.',
+    precioVentaBase: 7.00, costoAproximado: 2.80, moneda: 'PEN',
+    permiteModificadores: false, requierePreparacion: false,
+    permiteInventarioNegativo: false, stockActual: 24, stockMinimo: 6,
+    estadoProducto: 'ACTIVO', estado: 'ACTIVO', ...auditSeed
+  },
+  {
+    id: 'PROD-GASEOSA-INKA-500ML', categoriaId: 'CAT-BEBIDAS-FRIAS', codigo: 'BEB402B', nombre: 'Inca Kola 500ml',
+    descripcion: 'Gaseosa Inca Kola 500ml.',
+    precioVentaBase: 7.00, costoAproximado: 2.80, moneda: 'PEN',
+    permiteModificadores: false, requierePreparacion: false,
+    permiteInventarioNegativo: false, stockActual: 24, stockMinimo: 6,
+    estadoProducto: 'ACTIVO', estado: 'ACTIVO', ...auditSeed
+  },
+  {
+    id: 'PROD-GASEOSA-SPRITE-500ML', categoriaId: 'CAT-BEBIDAS-FRIAS', codigo: 'BEB402C', nombre: 'Sprite 500ml',
+    descripcion: 'Gaseosa Sprite Lima-Limón 500ml.',
+    precioVentaBase: 7.00, costoAproximado: 2.80, moneda: 'PEN',
+    permiteModificadores: false, requierePreparacion: false,
+    permiteInventarioNegativo: false, stockActual: 12, stockMinimo: 4,
+    estadoProducto: 'ACTIVO', estado: 'ACTIVO', ...auditSeed
   },
   {
     id: 'PROD-GATORADE', categoriaId: 'CAT-BEBIDAS-FRIAS', codigo: 'BEB403', nombre: 'Gatorade (1L)',
     descripcion: 'Bebida isotónica 1 Litro.',
-    precioVentaBase: 4.00, costoAproximado: 1.60, moneda: 'PEN',
-    permiteModificadores: false, requierePreparacion: false, estado: 'ACTIVO', ...auditSeed
+    precioVentaBase: 8.00, costoAproximado: 3.20, moneda: 'PEN',
+    permiteModificadores: false, requierePreparacion: false,
+    permiteInventarioNegativo: false, stockActual: 18, stockMinimo: 4,
+    estadoProducto: 'ACTIVO', estado: 'ACTIVO', ...auditSeed
   },
   {
     id: 'PROD-CHICHA-MORADA-1L', categoriaId: 'CAT-BEBIDAS-FRIAS', codigo: 'BEB404', nombre: 'Chicha Morada (1L)',
-    descripcion: 'Chicha morada tradicional.',
+    descripcion: 'Chicha morada tradicional 1L.',
     precioVentaBase: 14.00, costoAproximado: 5.00, moneda: 'PEN',
-    permiteModificadores: true, requierePreparacion: false, estado: 'ACTIVO', ...auditSeed
+    permiteModificadores: true, requierePreparacion: false,
+    permiteInventarioNegativo: true,
+    estadoProducto: 'ACTIVO', estado: 'ACTIVO', ...auditSeed
   },
   {
     id: 'PROD-LIMONADA-1L', categoriaId: 'CAT-BEBIDAS-FRIAS', codigo: 'BEB405', nombre: 'Limonada (1L)',
     descripcion: 'Limonada natural 1 litro.',
     precioVentaBase: 14.00, costoAproximado: 5.00, moneda: 'PEN',
-    permiteModificadores: true, requierePreparacion: false, estado: 'ACTIVO', ...auditSeed
+    permiteModificadores: true, requierePreparacion: false,
+    permiteInventarioNegativo: true,
+    estadoProducto: 'ACTIVO', estado: 'ACTIVO', ...auditSeed
   },
   {
     id: 'PROD-MARACUYA-1L', categoriaId: 'CAT-BEBIDAS-FRIAS', codigo: 'BEB406', nombre: 'Maracuyá (1L)',
     descripcion: 'Jugo de maracuyá 1 litro.',
     precioVentaBase: 14.00, costoAproximado: 5.00, moneda: 'PEN',
-    permiteModificadores: true, requierePreparacion: false, estado: 'ACTIVO', ...auditSeed
+    permiteModificadores: true, requierePreparacion: false,
+    permiteInventarioNegativo: true,
+    estadoProducto: 'ACTIVO', estado: 'ACTIVO', ...auditSeed
   },
 
   /* ================ ☕ BEBIDAS CALIENTES (Orden 4) ================ */
@@ -205,22 +241,86 @@ const productosFBSeedBase: Array<Omit<ProductoFB, 'presentacionesIds' | 'present
 
   /* ================ 🍻 BEBIDAS ALCOHOL / Bar (Orden 5) ================ */
   {
+    id: 'PROD-CERVEZA-PILSEN-620ML', categoriaId: 'CAT-BEBIDAS-ALCOHOL', codigo: 'BAR601A', nombre: 'Cerveza Pilsen 620ml',
+    descripcion: 'Cerveza Pilsen Callao botella 620ml.',
+    precioVentaBase: 8.00, costoAproximado: 3.20, moneda: 'PEN',
+    permiteModificadores: false, requierePreparacion: false,
+    permiteInventarioNegativo: false, stockActual: 36, stockMinimo: 6,
+    estadoProducto: 'ACTIVO', estado: 'ACTIVO', ...auditSeed
+  },
+  {
+    id: 'PROD-CERVEZA-CUSQUENA-620ML', categoriaId: 'CAT-BEBIDAS-ALCOHOL', codigo: 'BAR601B', nombre: 'Cerveza Cusqueña 620ml',
+    descripcion: 'Cerveza Cusqueña botella 620ml.',
+    precioVentaBase: 9.00, costoAproximado: 3.60, moneda: 'PEN',
+    permiteModificadores: false, requierePreparacion: false,
+    permiteInventarioNegativo: false, stockActual: 24, stockMinimo: 6,
+    estadoProducto: 'ACTIVO', estado: 'ACTIVO', ...auditSeed
+  },
+  {
     id: 'PROD-CERVEZA-ARTESANAL', categoriaId: 'CAT-BEBIDAS-ALCOHOL', codigo: 'BAR601', nombre: 'Cerveza Artesanal',
     descripcion: 'Cerveza artesanal local. S/ 15.00',
     precioVentaBase: 15.00, costoAproximado: 6.00, moneda: 'PEN',
-    permiteModificadores: true, requierePreparacion: false, estado: 'ACTIVO', ...auditSeed
+    permiteModificadores: true, requierePreparacion: false,
+    permiteInventarioNegativo: false, stockActual: 12, stockMinimo: 3,
+    estadoProducto: 'ACTIVO', estado: 'ACTIVO', ...auditSeed
   },
   {
     id: 'PROD-VINO-SANTIAGO-QUEIROLO', categoriaId: 'CAT-BEBIDAS-ALCOHOL', codigo: 'BAR602', nombre: 'Vino Santiago Queirolo',
-    descripcion: 'Botella 750ml. S/ 25.00 (Boca, Magdalena y borgoñita).',
-    precioVentaBase: 25.00, costoAproximado: 10.00, moneda: 'PEN',
-    permiteModificadores: false, requierePreparacion: false, estado: 'ACTIVO', ...auditSeed
+    descripcion: 'Botella 750ml. S/ 55.00 (Boca, Magdalena y borgoñita).',
+    precioVentaBase: 55.00, costoAproximado: 22.00, moneda: 'PEN',
+    permiteModificadores: false, requierePreparacion: false,
+    permiteInventarioNegativo: false, stockActual: 6, stockMinimo: 2,
+    estadoProducto: 'ACTIVO', estado: 'ACTIVO', ...auditSeed
   },
   {
     id: 'PROD-CALIENTITO-TRADICIONAL', categoriaId: 'CAT-BEBIDAS-ALCOHOL', codigo: 'BAR603', nombre: 'Calientito Tradicional 1LT',
-    descripcion: 'Bebida tradicional de yerva luisa, flor de Jamaica, naranja, limón y piña. S/ 20.00.',
-    precioVentaBase: 20.00, costoAproximado: 7.50, moneda: 'PEN',
-    permiteModificadores: true, requierePreparacion: true, estado: 'ACTIVO', ...auditSeed
+    descripcion: 'Bebida tradicional de yerva luisa, flor de Jamaica, naranja, limón y piña. S/ 25.00.',
+    precioVentaBase: 25.00, costoAproximado: 9.00, moneda: 'PEN',
+    permiteModificadores: true, requierePreparacion: true,
+    permiteInventarioNegativo: true,
+    estadoProducto: 'ACTIVO', estado: 'ACTIVO', ...auditSeed
+  },
+
+  /* ================ 🧃 SNACKS / EXTRAS LODGE ================ */
+  {
+    id: 'PROD-SNACK-GALLETA', categoriaId: 'CAT-BEBIDAS-FRIAS', codigo: 'SNK-001', nombre: 'Snack / Galleta',
+    descripcion: 'Galleta o snack de paquete surtido.',
+    precioVentaBase: 3.00, costoAproximado: 1.20, moneda: 'PEN',
+    permiteModificadores: false, requierePreparacion: false,
+    permiteInventarioNegativo: false, stockActual: 48, stockMinimo: 12,
+    estadoProducto: 'ACTIVO', estado: 'ACTIVO', ...auditSeed
+  },
+  {
+    id: 'PROD-SNACK-CHICHARRON', categoriaId: 'CAT-BEBIDAS-FRIAS', codigo: 'SNK-002', nombre: 'Chicharrón de Maíz',
+    descripcion: 'Cancha / chicharrón de maíz tostado.',
+    precioVentaBase: 4.00, costoAproximado: 1.50, moneda: 'PEN',
+    permiteModificadores: false, requierePreparacion: false,
+    permiteInventarioNegativo: false, stockActual: 36, stockMinimo: 8,
+    estadoProducto: 'ACTIVO', estado: 'ACTIVO', ...auditSeed
+  },
+  {
+    id: 'PROD-EXTRA-TOALLA', categoriaId: 'CAT-BEBIDAS-FRIAS', codigo: 'EXT-001', nombre: 'Toalla Extra',
+    descripcion: 'Toalla de baño adicional.',
+    precioVentaBase: 15.00, costoAproximado: 0, moneda: 'PEN',
+    permiteModificadores: false, requierePreparacion: false,
+    permiteInventarioNegativo: false, stockActual: 20, stockMinimo: 5,
+    estadoProducto: 'ACTIVO', estado: 'ACTIVO', ...auditSeed
+  },
+  {
+    id: 'PROD-EXTRA-SABANA', categoriaId: 'CAT-BEBIDAS-FRIAS', codigo: 'EXT-002', nombre: 'Sábana Extra',
+    descripcion: 'Sábana / cubrecama adicional.',
+    precioVentaBase: 20.00, costoAproximado: 0, moneda: 'PEN',
+    permiteModificadores: false, requierePreparacion: false,
+    permiteInventarioNegativo: false, stockActual: 10, stockMinimo: 2,
+    estadoProducto: 'ACTIVO', estado: 'ACTIVO', ...auditSeed
+  },
+  {
+    id: 'PROD-EXTRA-BOTELLON-AGUA', categoriaId: 'CAT-BEBIDAS-FRIAS', codigo: 'EXT-003', nombre: 'Botellón Agua 7.5L',
+    descripcion: 'Bidón / botellón de agua 7.5 litros para habitación.',
+    precioVentaBase: 18.00, costoAproximado: 6.00, moneda: 'PEN',
+    permiteModificadores: false, requierePreparacion: false,
+    permiteInventarioNegativo: false, stockActual: 8, stockMinimo: 2,
+    estadoProducto: 'ACTIVO', estado: 'ACTIVO', ...auditSeed
   },
 
   /* ================ 🥪 SANDWICH (Orden 6) ================ */

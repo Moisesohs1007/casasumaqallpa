@@ -46,7 +46,8 @@ export type EstadoHabitacion =
   | 'BLOQUEADA'
   | 'LIMPIEZA'
   | 'INSPECCIONADA'
-  | 'MANTENIMIENTO';
+  | 'MANTENIMIENTO'
+  | 'DISPONIBLE';
 
 export interface Habitacion extends AuditFields {
   id: ID;
@@ -54,12 +55,16 @@ export interface Habitacion extends AuditFields {
   nombre?: string;
   tipoHabitacionId: ID;
   tipoHabitacion?: TipoHabitacion;
-  piso?: string;
+  piso?: string | number;
   ubicacion?: string;
   estado: EstadoHabitacion;
   notasInternas?: string;
   bloqueadaHasta?: DateISO;
   motivoBloqueo?: string;
+  capacidadMaximaPersonas?: number;
+  capacidadAdultosOverride?: number;
+  capacidadNinosOverride?: number;
+  precioBaseNoche?: number;
 }
 
 // ───────────────────────────────────────────────

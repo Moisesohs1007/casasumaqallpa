@@ -97,6 +97,7 @@ const NuevaReserva: React.FC = () => {
   // ====== Paso 3: Tarifa + Promo ======
   const [codPromoInput, setCodPromoInput] = useState('');
   const [precioNocheManual, setPrecioNocheManual] = useState<string>('');
+  const [descuentoPorcentajeManual, setDescuentoPorcentajeManual] = useState<string>('');
   const [tarifaSeleccionadaId, setTarifaSeleccionadaId] = useState<string | null>(null);
   const [promoValidacionMsg, setPromoValidacionMsg] = useState<{ ok: boolean; texto: string } | null>(null);
 
@@ -199,7 +200,14 @@ const NuevaReserva: React.FC = () => {
       } catch { /* ignore */ }
     }
 
-    const totalFinal = Number(Math.max(0, subTotalConImpuestos - descuentoPromo).toFixed(2));
+    let descuentoManualPct = 0;
+    let descuentoManualMonto = 0;
+    if (descuentoPorcentajeManual.trim() && !isNaN(Number(descuentoPorcentajeManual))) {
+      descuentoManualPct = Math.max(0, Math.min(100, Number(descuentoPorcentajeManual)));
+      descuentoManualMonto = Number(((subTotalConImpuestos - descuentoPromo) * descuentoManualPct / 100).toFixed(2));
+    }
+
+    const totalFinal = Number(Math.max(0, subTotalConImpuestos - descuentoPromo - descuentoManualMonto).toFixed(2));
 
     setResumenTarifa({
       tarifaNombre,
@@ -212,13 +220,15 @@ const NuevaReserva: React.FC = () => {
       descuentoPromo,
       promoAplicada,
       promoValida,
+      descuentoManualPct,
+      descuentoManualMonto,
       totalFinal,
     });
   };
 
   useEffect(() => {
     calcularResumenTarifa();
-  }, [habitacionSeleccionada, noches, tarifasDisponiblesParaHab, tarifaSeleccionadaId, precioNocheManual, codPromoInput, checkin]);
+  }, [habitacionSeleccionada, noches, tarifasDisponiblesParaHab, tarifaSeleccionadaId, precioNocheManual, codPromoInput, descuentoPorcentajeManual, checkin]);
 
   // ====== Paso 4: Origen + Crear ======
   const [origen, setOrigen] = useState<OrigenReserva>('WEB_OFICIAL');
@@ -856,8 +866,24 @@ const NuevaReserva: React.FC = () => {
                                 onIonInput={(e) => setPrecioNocheManual(e.detail.value || '')}
                               />
                             </IonItem>
+                            <IonItem style={{ marginTop: 8 }}>
+                              <IonLabel position="stacked">
+                                🏷️ Descuento directo % (negociación recepción)
+                              </IonLabel>
+                              <IonInput
+                                type="number"
+                                placeholder="Ej: 10 (resta 10% al total)"
+                                value={descuentoPorcentajeManual}
+                                onIonInput={(e) => setDescuentoPorcentajeManual(e.detail.value || '')}
+                              />
+                            </IonItem>
+                            {descuentoPorcentajeManual.trim() && (
+                              <IonNote color="warning" style={{ display: 'block', marginTop: 6 }}>
+                                Descuento aplicado: <b>{Number(descuentoPorcentajeManual).toFixed(0)}%</b> - S/ {Number(resumenTarifa?.descuentoManualMonto || 0).toFixed(2)}
+                              </IonNote>
+                            )}
                             <IonNote color="medium" style={{ display: 'block', marginTop: 8 }}>
-                              💡 Para desactivar modo manual, borra el número del campo.
+                              💡 Para desactivar, borra el contenido del campo.
                             </IonNote>
                           </IonList>
                         )}
@@ -936,6 +962,12 @@ const NuevaReserva: React.FC = () => {
                               <IonItem color="success">
                                 <IonLabel>🎁 Descuento promoción</IonLabel>
                                 <IonLabel slot="end" color="success">−S/ {Number(resumenTarifa.descuentoPromo).toFixed(2)}</IonLabel>
+                              </IonItem>
+                            )}
+                            {Number(resumenTarifa.descuentoManualMonto) > 0 && (
+                              <IonItem color="warning">
+                                <IonLabel>🏷️ Descuento recepción ({Number(resumenTarifa.descuentoManualPct).toFixed(0)}%)</IonLabel>
+                                <IonLabel slot="end" color="warning">−S/ {Number(resumenTarifa.descuentoManualMonto).toFixed(2)}</IonLabel>
                               </IonItem>
                             )}
                             <IonItem lines="none">

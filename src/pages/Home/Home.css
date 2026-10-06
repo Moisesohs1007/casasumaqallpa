@@ -1,169 +1,104 @@
-.dashboard-grid {
+.home-page {
+  padding: 8px 8px 80px 8px;
+}
+
+.home-logo-wrap {
+  text-align: center;
+  padding: 12px 10px 10px 10px;
+  margin: 0 2px 12px 2px;
+  background: linear-gradient(180deg, rgba(255,255,255,0.9), rgba(240,253,244,0.95));
+  border-radius: 16px;
+  box-shadow: 0 2px 12px rgba(16,185,129,0.12);
+}
+.home-logo {
+  width: 100%;
+  max-width: 460px;
+  height: auto;
   display: block;
+  margin: 0 auto 4px auto;
 }
-
-.dashboard-card {
-  min-height: 108px;
-  border-radius: 10px;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
-  padding: 0;
-  margin: 4px !important;
-  transition: transform 0.12s ease;
+.home-subtitle {
+  font-size: 1.4rem;
+  font-weight: 800;
+  color: #064e3b;
+  margin: 0 0 2px 0;
+  letter-spacing: 0.3px;
 }
-
-.dashboard-card:active {
-  transform: scale(0.98);
+.home-fecha {
+  font-size: 0.95rem;
+  color: #065f46;
+  margin: 0 0 4px 0;
+  font-weight: 600;
+  text-transform: capitalize;
 }
-
-.dashboard-card ion-card-header {
-  padding: 8px 10px 2px 10px !important;
-}
-
-.dashboard-card ion-card-content {
-  padding: 2px 10px 10px 10px !important;
-  font-size: 0.75rem;
+.home-lead {
+  font-size: 0.85rem;
+  color: #334155;
+  margin: 0;
   opacity: 0.95;
 }
 
-.card-header-row {
+.home-kpis {
+  padding: 0 2px !important;
+}
+.kpi-card {
+  min-height: 104px;
+  border-radius: 12px !important;
+  margin: 4px 2px !important;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+}
+.kpi-card ion-card-header {
+  padding: 8px 10px 2px 10px !important;
+}
+.kpi-card ion-card-subtitle {
+  font-size: 0.78rem;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 6px;
-}
-
-.card-header-row ion-icon {
-  font-size: 1.8rem !important;
-  flex-shrink: 0;
-  width: 36px;
-  height: 36px;
-  min-width: 36px;
-}
-
-.badge-value {
-  font-size: 1.05rem;
-  font-weight: 800;
-  padding: 5px 10px;
-  border-radius: 999px;
-  white-space: nowrap;
-  min-width: 64px;
-  text-align: center;
-  line-height: 1.2;
-}
-
-.badge-sub {
-  margin-left: 3px;
-  opacity: 0.8;
-  font-size: 0.75rem;
-  font-weight: 500;
-}
-
-.card-title {
-  font-size: 0.88rem;
+  gap: 4px;
   font-weight: 600;
-  margin: 4px 0 0 0 !important;
-  line-height: 1.15;
+  color: #334155;
+}
+.kpi-card ion-card-subtitle ion-icon { font-size: 1rem; }
+.kpi-value {
+  font-size: 1.4rem;
+  font-weight: 800;
+  color: #0f172a;
+  margin: 2px 0 0 0 !important;
+}
+.kpi-card ion-card-content {
+  padding: 2px 10px 10px 10px !important;
+  font-size: 0.72rem;
+  opacity: 0.85;
+}
+.kpi-hab { border-left: 4px solid #10b981; }
+.kpi-com { border-left: 4px solid #f59e0b; }
+.kpi-ll  { border-left: 4px solid #3b82f6; }
+.kpi-sa  { border-left: 4px solid #8b5cf6; }
+
+.home-shortcuts {
+  padding: 8px 2px 0 2px !important;
+}
+.home-shortcuts ion-col { padding: 4px !important; }
+.home-shortcuts ion-button {
+  --border-radius: 12px;
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+.home-pad {
+  height: 20px;
 }
 
-/* Pantallas MUY pequeñas (<360px): 1 KPI x fila, grande */
-@media (max-width: 359.98px) {
-  .dashboard-card {
-    min-height: 120px;
-  }
-  .badge-value {
-    font-size: 1.25rem;
-    padding: 6px 12px;
-  }
-  .card-title {
-    font-size: 1rem;
-  }
-  .card-header-row ion-icon {
-    font-size: 2.2rem !important;
-    width: 42px;
-    height: 42px;
-  }
+/* Mobile small */
+@media (max-width: 360px) {
+  .home-subtitle { font-size: 1.2rem; }
+  .kpi-value { font-size: 1.2rem; }
 }
-
-/* Mobile standard 360-575px: 2 cols compactas (1 fila = 2 KPIs) */
-@media (min-width: 360px) and (max-width: 575.98px) {
-  .dashboard-card {
-    min-height: 112px;
-  }
-  .badge-value {
-    font-size: 1.1rem;
-  }
-  .card-title {
-    font-size: 0.9rem;
-  }
-}
-
-/* Tablet MD+: 2 cols grandes */
+/* Tablet+ */
 @media (min-width: 768px) {
-  .dashboard-card {
-    min-height: 140px;
-    border-radius: 12px;
-    margin: 8px !important;
-  }
-  .dashboard-card ion-card-header {
-    padding: 14px 16px 6px 16px !important;
-  }
-  .dashboard-card ion-card-content {
-    padding: 4px 16px 16px 16px !important;
-    font-size: 0.85rem;
-  }
-  .card-header-row ion-icon {
-    font-size: 2.4rem !important;
-    width: 48px;
-    height: 48px;
-    min-width: 48px;
-  }
-  .badge-value {
-    font-size: 1.5rem;
-    padding: 8px 16px;
-  }
-  .badge-sub {
-    font-size: 0.95rem;
-    margin-left: 6px;
-  }
-  .card-title {
-    font-size: 1.1rem;
-    margin: 8px 0 0 0 !important;
-  }
-}
-
-/* Desktop XL+: 4 cols perfectas */
-@media (min-width: 1200px) {
-  .dashboard-card {
-    min-height: 156px;
-  }
-  .badge-value {
-    font-size: 1.6rem;
-  }
-  .card-title {
-    font-size: 1.15rem;
-  }
-}
-
-.today-card {
-  margin: 4px 6px 6px 6px !important;
-  border-radius: 10px;
-}
-.today-card h2 {
-  margin: 0;
-  font-size: 1rem;
-  font-weight: 700;
-  line-height: 1.2;
-}
-.today-card p {
-  margin: 2px 0 0 0;
-  font-size: 0.85rem;
-  opacity: 0.8;
-}
-
-@media (min-width: 768px) {
-  .today-card {
-    margin: 8px 10px 10px 10px !important;
-  }
-  .today-card h2 { font-size: 1.25rem; }
-  .today-card p { font-size: 0.95rem; }
+  .home-logo { max-width: 580px; }
+  .home-subtitle { font-size: 1.9rem; }
+  .home-fecha { font-size: 1.1rem; }
+  .home-lead { font-size: 1rem; }
+  .kpi-card { min-height: 130px; }
+  .kpi-value { font-size: 1.8rem; }
 }

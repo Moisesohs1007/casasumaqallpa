@@ -257,12 +257,16 @@ export type OrigenCargoFolio =
 // ───────────────────────────────────────────────
 
 export type MetodoPago =
-  | 'EFECTIVO'
+  | 'EFECTIVO_PEN'
+  | 'EFECTIVO_USD'
   | 'TARJETA_CREDITO'
   | 'TARJETA_DEBITO'
   | 'TRANSFERENCIA_BANCARIA'
+  | 'QR_CCI'
   | 'YAPE'
   | 'PLIN'
+  | 'NIUBIZ'
+  | 'IZIPAY'
   | 'BIZUM'
   | 'PAYPAL'
   | 'PASARELA_ONLINE'
@@ -272,6 +276,31 @@ export type MetodoPago =
   | 'CUENTA_POR_COBRAR'
   | 'CONTRA_NOTA_CREDITO'
   | 'OTRO';
+
+export interface OpcionMetodoPago {
+  id: MetodoPago;
+  label: string;
+  icono?: string;
+  color?: string;
+  requiereReferencia?: boolean;
+}
+
+export const METODOS_PAGO_LISTA: OpcionMetodoPago[] = [
+  { id: 'EFECTIVO_PEN',        label: '💵 Efectivo (Soles PEN)', color: 'success' },
+  { id: 'EFECTIVO_USD',        label: '💲 Efectivo (Dólares USD)', color: 'success' },
+  { id: 'YAPE',                label: '🟦 Yape', color: 'primary' },
+  { id: 'PLIN',                label: '🟪 Plin', color: 'primary' },
+  { id: 'NIUBIZ',              label: '✅ Niubiz (Visa/MC)', color: 'primary' },
+  { id: 'IZIPAY',              label: '✅ Izipay', color: 'primary' },
+  { id: 'QR_CCI',              label: '📱 QR CCI (Transferencia)', color: 'tertiary', requiereReferencia: true },
+  { id: 'TARJETA_DEBITO',      label: '💳 Débito', color: 'warning' },
+  { id: 'TARJETA_CREDITO',     label: '💳 Crédito Visa/Mastercard', color: 'warning' },
+  { id: 'TRANSFERENCIA_BANCARIA', label: '🏦 Transferencia Bancaria', color: 'tertiary', requiereReferencia: true },
+  { id: 'CORTESIA',            label: '🎁 Cortesía', color: 'medium' },
+  { id: 'CUENTA_POR_COBRAR',   label: '⏳ Cuenta por cobrar', color: 'danger' },
+  { id: 'OTRO',                label: '⚙️ Otro', color: 'medium', requiereReferencia: true },
+];
+
 
 export type EstadoPago = 'PENDIENTE' | 'APROBADO' | 'DECLINADO' | 'ANULADO' | 'DEVUELTO';
 
