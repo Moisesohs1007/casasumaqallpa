@@ -11,6 +11,7 @@ export default defineConfig({
       targets: ['defaults', 'not IE 11'],
     }),
     VitePWA({
+      disable: true,
       registerType: 'prompt',
       selfDestroying: true,
       includeAssets: ['favicon.svg', 'favicon.ico', 'robots.txt', 'apple-touch-icon.png'],
