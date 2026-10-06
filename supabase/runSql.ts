@@ -1,7 +1,28 @@
 // ============================================================
-// RUNNER SQL AUTOMÁTICO - BYPASS popup Run/Skip de TRAE
-// Uso: node ./node_modules/tsx/dist/cli.mjs ./supabase/runSql.ts <archivo.sql>
-//      npm run db:migrate ./supabase/migrations/000_initial.sql
+// RUNNER SQL AUTOMÁTICO - BYPASS TOTAL popup Run/Skip de TRAE
+// ------------------------------------------------------------
+// RAZÓN PRINCIPAL: La herramienta integrada supabase_apply_migration
+// de TRAE muestra un popup "Run/Skip" que se queda COLGADO INDEFINIDAMENTE
+// aunque el usuario presione "Run". Este script reemplaza COMPLETAMENTE
+// esa herramienta para ejecutar SQL directo via Supabase JS service_role
+// SIN NINGUNA INTERVENCIÓN MANUAL, SIN PREGUNTAS, SIN POPUPS.
+// ------------------------------------------------------------
+// Uso (0 confirmación, 0 popup):
+//   npm run db:migrate -- --file ./supabase/migrations/001_inicial.sql
+//   npm run db:migrate -- --file ./ruta/archivo.sql --dry    (simulación, NO ejecuta)
+//   node ./node_modules/tsx/dist/cli.mjs ./supabase/runSql.ts --file x.sql --dry
+// ------------------------------------------------------------
+// CONTROL DE ERRORES:
+//  · Si falta SUPABASE_SERVICE_ROLE_KEY en .env → exit 1 con mensaje claro
+//  · Si no existe el archivo .sql → exit 2 con ruta
+//  · Statements se parsean respetando bloques BEGIN..COMMIT
+//  · Cada sentencia DELETE/UPDATE se ejecuta via sb.from().eq/.in/.is
+//  · Error en 1 statement NO detiene el resto (continueOnError)
+//  · Dry run siempre lista statements sin tocar la BD (exit 0 seguro)
+// ------------------------------------------------------------
+// SEGURIDAD:
+//  · Usa SUPABASE_SERVICE_ROLE_KEY (backend-only, NUNCA sale al frontend)
+//  · El .env está en .gitignore, la key NUNCA se sube al repo
 // ============================================================
 import { createClient } from '@supabase/supabase-js';
 import * as fs from 'fs';

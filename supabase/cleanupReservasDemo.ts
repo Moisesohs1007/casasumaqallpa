@@ -1,6 +1,31 @@
 // ============================================================
 // SCRIPT AUTOMATIZADO - LIMPIEZA RESERVAS DEMO SIN POPUPS
-// Se ejecuta DIRECTAMENTE con service_role (sin TRAE supabase_apply_migration)
+// ------------------------------------------------------------
+// RAZÓN de este script: La herramienta TRAE `supabase_apply_migration`
+// muestra un popup "Run/Skip" indefinidamente que no responde aunque
+// el usuario presione "Run", bloqueando el flujo de trabajo.
+//
+// EJECUCIÓN AUTOMÁTICA — 0 preguntas, 0 popups, 0 intervención manual:
+//   npm run db:cleanup-demo
+//
+// QUÉ HACE:
+//   1. Busca reservas demo por código: R-1001, R-1005, R-1002
+//   2. Borra dependencias FK en orden: comandas -> pagos_folio ->
+//      cargos_folio -> folios -> habitaciones_reserva -> reservas
+//   3. Reestablece 5 habitaciones REALES del lodge
+//      (H201, H202, H203 LIBRE | SUITE LIBRE | CABAÑA MANTENIMIENTO)
+//   4. Muestra al final el conteo de reservas restantes en BD
+//
+// CONTROL DE ERRORES:
+//   - Falta de .env → exit(1)
+//   - Error consulta Supabase → exit(2)
+//   - Error borrado FK → exit(3)
+//   - Cada paso loguea [OK] / [ERROR] + detalles por consola
+//
+// SEGURIDAD:
+//   - Usa SUPABASE_SERVICE_ROLE_KEY (backend admin, NO para frontend)
+//   - Persistencia de sesión: desactivada (persistSession: false)
+//   - Script local tsx; NUNCA exponga la service_role al cliente
 // ============================================================
 import { createClient } from '@supabase/supabase-js';
 import * as fs from 'fs';

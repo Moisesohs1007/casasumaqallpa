@@ -9,10 +9,52 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="Sumaq Allpa" />
     <meta name="description" content="Sistema de Gestión para Lodge Casa Sumaq Allpa - Reservas, Recepción, POS y más." />
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate, max-age=0" />
+    <meta http-equiv="Pragma" content="no-cache" />
+    <meta http-equiv="Expires" content="0" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <link rel="manifest" href="/manifest.webmanifest" />
     <title>Casa Sumaq Allpa - Sistema de Gestión</title>
+    <script>
+      (function () {
+        try {
+          if ('serviceWorker' in navigator) {
+            var killSW = function () {
+              navigator.serviceWorker.getRegistrations().then(function (regs) {
+                var killed = 0;
+                regs.forEach(function (r) {
+                  r.unregister();
+                  killed++;
+                });
+                if (killed > 0 && window.console) {
+                  console.log('[SW Cleanup] Se desactivaron ' + killed + ' service workers antiguos. Refresh ahora.');
+                }
+              }).catch(function () {});
+              if ('caches' in window) {
+                caches.keys().then(function (keys) {
+                  return Promise.all(keys.map(function (k) { return caches.delete(k); }));
+                }).catch(function () {});
+              }
+            };
+            killSW();
+            navigator.serviceWorker.addEventListener('controllerchange', function () {
+              window.location.reload();
+            });
+          }
+          if (window.performance && performance.navigation && performance.navigation.type === 1) {
+            window.sessionStorage.setItem('__no_sw_loop__', '1');
+          }
+        } catch (e) {}
+        var href = window.location.href;
+        var ghPagesBase = '/casasumaqallpa/';
+        var host = window.location.hostname;
+        if ((host === 'moisesohs1007.github.io' || host.indexOf('github.io') !== -1) && href.indexOf(ghPagesBase) === -1 && href.indexOf('404') === -1) {
+          var rest = window.location.pathname === '/' ? '' : window.location.pathname;
+          window.location.replace('/casasumaqallpa/' + (rest[0] === '/' ? rest.slice(1) : rest) + window.location.search + window.location.hash);
+        }
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>
