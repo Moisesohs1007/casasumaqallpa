@@ -111,9 +111,9 @@ const LOGO_SVG = `data:image/svg+xml;utf8,` + encodeURIComponent(`
 
 const Home: React.FC = () => {
   const today = useMemo(() => new Date().toLocaleDateString('es-PE', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }), []);
-  const ocupadas = 1; // H202 CHECKED_IN
+  const ocupadas = 0;
   const totalHab = 5;
-  const comandasActivas = 1;
+  const comandasActivas = 0;
   const llegadasHoy = 0;
   const salidasHoy = 0;
 

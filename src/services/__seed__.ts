@@ -1475,7 +1475,7 @@ const reserva5: Reserva = {
   ...auditSeed
 };
 
-const reservasSeed: Reserva[] = [reserva1, reserva2, reserva5];
+const reservasSeed: Reserva[] = [];
 
 // ===== FOLIOS =====
 const buildCargoAlojamiento = (folioId: string, rh: Reserva['habitaciones'][number], folioNum: string): CargoFolio => {
@@ -1646,10 +1646,7 @@ const folioCerradoCheckOut = (r: Reserva, folioNum: string, num = 'F-2026-0920',
   };
 };
 
-const foliosSeed: Folio[] = [
-  folioCheckIn(reserva1, 'F-2026-0920-001', 'F-2026-0920-001'),
-  folioCerradoCheckOut(reserva5, 'F-2026-0917-005', 'F-2026-0917-005', 637.20),
-];
+const foliosSeed: Folio[] = [];
 
 const pagoFolioCerrado: PagoFolio = {
   id: generateUUID(),
@@ -1834,19 +1831,7 @@ const prod = (id: string): ProductoFB => {
   return productosFBSeed.find((p) => p.id === 'PROD-AGUA-MINERAL') || productosFBSeed[productosFBSeed.length - 1] || productosFBSeed[0];
 };
 
-const comandasSeed: Comanda[] = [
-  buildComandaRoomService('HAB-H202', reserva1, '801', [
-    buildComandaDetalle('', prod('PROD-DESAY-CONTINENTAL'), 2),
-    buildComandaDetalle('', prod('PROD-CAFE'), 2, 'Café poco azúcar'),
-    buildComandaDetalle('', prod('PROD-JUGO-NARANJA'), 1),
-    buildComandaDetalle('', prod('PROD-AGUA-MINERAL'), 1, 'Sin gas, bien fría'),
-  ], {
-    estado: 'EN_COCINA_BAR' as any,
-    estadoEntrega: 'EN_PROCESO' as any,
-    usuarioIdMozoApertura: 'USR-RS-0005',
-    observacionesInternas: 'Room Service Hab H202. Entregar con cubertería de 2 + servilletas de tela. Cargo automático al folio #F-2026-0920-001 (huésped R1001).',
-  }),
-];
+const comandasSeed: Comanda[] = [];
 
 export const seed = {
   audit: auditSeed,
@@ -1870,7 +1855,7 @@ export const seed = {
   mesas: mesasSeed,
   reservas: reservasSeed,
   folios: foliosSeed,
-  pagosFolio: [pagoFolioCerrado],
+  pagosFolio: [],
   comandas: comandasSeed,
   propinasSugeridasPorcentaje: propinasSugeridas,
   meta: {
