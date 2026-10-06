@@ -507,71 +507,43 @@ const productosFBSeed: ProductoFB[] = productosFBSeedBase.map((p) => {
 
 const tiposHabitacionSeed: TipoHabitacion[] = [
   {
-    id: 'TIPO-CABANA-DOBLE', nombre: 'Cabaña Doble', codigo: 'CAB-DOBLE',
-    descripcion: 'Cabaña de madera con cama matrimonial king size + baño privado + balcón con hamaca al río',
-    capacidadAdultos: 2, capacidadNinos: 0, camas: [{ tipoCama: 'KING', cantidad: 1 }],
-    superficieM2: 28, vista: 'RIO', amenities: ['AIRE_ACONDICIONADO', 'AGUA_CALIENTE', 'WIFI_5G', 'TV_SMART', 'BANO_PRIVADO', 'MINIBAR', 'CAJA_FUERTE', 'SECADOR'],
-    precioBaseNoche: 280.00, monedaPrecioBase: 'PEN', estado: 'ACTIVO', ...auditSeed
+    id: 'TIPO-HAB-DOBLE', nombre: 'Habitación Doble', codigo: 'H20X',
+    descripcion: 'Habitación privada 2do piso, cama queen size, baño privado, vista al jardín.',
+    capacidadAdultos: 2, capacidadNinos: 1, camas: [{ tipoCama: 'QUEEN', cantidad: 1 }],
+    superficieM2: 22, vista: 'JARDIN', amenities: ['AIRE_ACONDICIONADO', 'AGUA_CALIENTE', 'WIFI_5G', 'TV_SMART', 'BANO_PRIVADO', 'MINIBAR', 'CAJA_FUERTE', 'SECADOR'],
+    precioBaseNoche: 180.00, monedaPrecioBase: 'PEN', estado: 'ACTIVO', ...auditSeed
   },
   {
-    id: 'TIPO-CABANA-TRIPLE', nombre: 'Cabaña Triple', codigo: 'CAB-TRIPLE',
-    descripcion: 'Cabaña con 1 cama queen + 1 cama twin individual. Para 3 personas o familia pequeña.',
-    capacidadAdultos: 3, capacidadNinos: 1, camas: [{ tipoCama: 'QUEEN', cantidad: 1 }, { tipoCama: 'TWIN', cantidad: 1 }],
-    superficieM2: 34, vista: 'SELVA_MONTANA', amenities: ['AIRE_ACONDICIONADO', 'AGUA_CALIENTE', 'WIFI_5G', 'TV_SMART', 'BANO_PRIVADO', 'MINIBAR', 'CAJA_FUERTE', 'SECADOR', 'TERRAZA'],
-    precioBaseNoche: 360.00, monedaPrecioBase: 'PEN', estado: 'ACTIVO', ...auditSeed
-  },
-  {
-    id: 'TIPO-DOBLE-ECONOMICA', nombre: 'Habitación Doble Económica', codigo: 'DOB-ECON',
-    descripcion: 'Habitación privada doble con baño, sin balcón. Opción económica.',
-    capacidadAdultos: 2, capacidadNinos: 1, camas: [{ tipoCama: 'FULL', cantidad: 1 }],
-    superficieM2: 20, vista: 'JARDIN', amenities: ['VENTILADOR_TECHO', 'AGUA_CALIENTE', 'WIFI_2_4G', 'BANO_PRIVADO', 'MINIBAR_BASICO'],
-    precioBaseNoche: 220.00, monedaPrecioBase: 'PEN', estado: 'ACTIVO', ...auditSeed
-  },
-  {
-    id: 'TIPO-SUITE-VISTA', nombre: 'Suite con Vista al Río', codigo: 'SUI-VISTA',
-    descripcion: 'Suite premium, jacuzzi privado en terraza, sala de estar independiente, minibar premium, vista panorámica al río y cerros.',
+    id: 'TIPO-SUITE', nombre: 'Suite', codigo: 'SUITE',
+    descripcion: 'Suite piso superior, jacuzzi privado terraza, sala de estar, minibar premium, vista al río.',
     capacidadAdultos: 2, capacidadNinos: 2, camas: [{ tipoCama: 'KING', cantidad: 1 }],
-    superficieM2: 52, vista: 'RIO_PANORAMICA', amenities: ['AIRE_ACONDICIONADO', 'AGUA_CALIENTE', 'WIFI_5G', 'TV_SMART_55', 'BANO_PRIVADO', 'JACUZZI_PRIVADO', 'MINIBAR_PREMIUM', 'CAJA_FUERTE', 'SECADOR', 'BATA_PANTUFLAS', 'TERRAZA'],
-    precioBaseNoche: 520.00, monedaPrecioBase: 'PEN', estado: 'ACTIVO', ...auditSeed
+    superficieM2: 48, vista: 'RIO_PANORAMICA', amenities: ['AIRE_ACONDICIONADO', 'AGUA_CALIENTE', 'WIFI_5G', 'TV_SMART_55', 'BANO_PRIVADO', 'JACUZZI_PRIVADO', 'MINIBAR_PREMIUM', 'CAJA_FUERTE', 'SECADOR', 'BATA_PANTUFLAS', 'TERRAZA'],
+    precioBaseNoche: 380.00, monedaPrecioBase: 'PEN', estado: 'ACTIVO', ...auditSeed
   },
   {
-    id: 'TIPO-FAMILIAR-4P', nombre: 'Familiar 4 Personas', codigo: 'FAM-4P',
-    descripcion: 'Cabaña familiar con 1 cama king + 2 camas twin + 1 sofá cama opcional. Ideal para 4 personas o 2 adultos + 2 niños.',
-    capacidadAdultos: 4, capacidadNinos: 3, camas: [{ tipoCama: 'KING', cantidad: 1 }, { tipoCama: 'TWIN', cantidad: 2 }],
-    superficieM2: 42, vista: 'JARDIN_RIO', amenities: ['AIRE_ACONDICIONADO', 'AGUA_CALIENTE', 'WIFI_5G', 'TV_SMART', 'BANO_PRIVADO_DOBLE', 'MINIBAR', 'CAJA_FUERTE', 'SECADOR', 'TERRAZA', 'INFANTIL'],
-    precioBaseNoche: 420.00, monedaPrecioBase: 'PEN', estado: 'ACTIVO', ...auditSeed
-  },
-  {
-    id: 'TIPO-FAMILIAR-5P', nombre: 'Familiar 5 Personas Grande', codigo: 'FAM-5P',
-    descripcion: 'Cabaña grande con 1 cama king + 3 camas twin. Zona común living + mini cocina equipada. Perfecta familias grandes o grupos.',
-    capacidadAdultos: 5, capacidadNinos: 3, camas: [{ tipoCama: 'KING', cantidad: 1 }, { tipoCama: 'TWIN', cantidad: 3 }],
-    superficieM2: 56, vista: 'SELVA_MONTANA', amenities: ['AIRE_ACONDICIONADO', 'AGUA_CALIENTE', 'WIFI_5G', 'TV_SMART', 'BANO_PRIVADO_DOBLE', 'MINIBAR', 'CAJA_FUERTE', 'SECADOR', 'TERRAZA', 'INFANTIL', 'MINI_COCINA'],
-    precioBaseNoche: 500.00, monedaPrecioBase: 'PEN', estado: 'ACTIVO', ...auditSeed
+    id: 'TIPO-CABANA', nombre: 'Cabaña', codigo: 'CABANA',
+    descripcion: 'Cabaña de madera independiente, balcón con hamaca, cama king + 1 twin, baño privado.',
+    capacidadAdultos: 3, capacidadNinos: 1, camas: [{ tipoCama: 'KING', cantidad: 1 }, { tipoCama: 'TWIN', cantidad: 1 }],
+    superficieM2: 30, vista: 'BOSQUE', amenities: ['AIRE_ACONDICIONADO', 'AGUA_CALIENTE', 'WIFI_5G', 'TV_SMART', 'BANO_PRIVADO', 'MINIBAR', 'CAJA_FUERTE', 'SECADOR', 'TERRAZA'],
+    precioBaseNoche: 260.00, monedaPrecioBase: 'PEN', estado: 'ACTIVO', ...auditSeed
   },
 ];
 
 const habitacionesSeed: Habitacion[] = [
-  { id: 'HAB-CAB-01', codigo: 'CAB-01', nombre: 'Cabaña 01', tipoHabitacionId: 'TIPO-CABANA-DOBLE', numeroPiso: 1, numeroPuerta: 'C-01', ubicacionDescripcion: 'Al norte, primera fila frente al río', vistaEfectiva: 'RIO', estado: 'OCUPADA', estadoLimpieza: 'LIMPIA', ultimaLimpiezaAt: hoy(), amenidadesExtra: [], observaciones: '', ...auditSeed, tipoHabitacion: tiposHabitacionSeed.find((t) => t.id === 'TIPO-CABANA-DOBLE') as TipoHabitacion },
-  { id: 'HAB-CAB-02', codigo: 'CAB-02', nombre: 'Cabaña 02', tipoHabitacionId: 'TIPO-CABANA-DOBLE', numeroPiso: 1, numeroPuerta: 'C-02', ubicacionDescripcion: 'Segunda cabaña, frente al jardín y río', vistaEfectiva: 'JARDIN_RIO', estado: 'LIBRE', estadoLimpieza: 'LIMPIA', ultimaLimpiezaAt: hoy(), amenidadesExtra: [], observaciones: '', ...auditSeed, tipoHabitacion: tiposHabitacionSeed.find((t) => t.id === 'TIPO-CABANA-DOBLE') as TipoHabitacion },
-  { id: 'HAB-FAM-03', codigo: 'FAM-03', nombre: 'Familiar 03', tipoHabitacionId: 'TIPO-FAMILIAR-4P', numeroPiso: 1, numeroPuerta: 'F-03', ubicacionDescripcion: 'Zona familiar, cerca área piscina', vistaEfectiva: 'PISCINA_JARDIN', estado: 'OCUPADA', estadoLimpieza: 'LIMPIA', ultimaLimpiezaAt: hoy(), amenidadesExtra: ['CUNA_BEBE'], observaciones: 'Cuna bebé colocada en habitación', ...auditSeed, tipoHabitacion: tiposHabitacionSeed.find((t) => t.id === 'TIPO-FAMILIAR-4P') as TipoHabitacion },
-  { id: 'HAB-CAB-04', codigo: 'CAB-04', nombre: 'Cabaña 04', tipoHabitacionId: 'TIPO-CABANA-TRIPLE', numeroPiso: 1, numeroPuerta: 'C-04', ubicacionDescripcion: 'Zona noreste, terraza con sillones', vistaEfectiva: 'SELVA_MONTANA', estado: 'OCUPADA', estadoLimpieza: 'LIMPIA', ultimaLimpiezaAt: addDaysISO(hoy(), -1), amenidadesExtra: [], observaciones: '', ...auditSeed, tipoHabitacion: tiposHabitacionSeed.find((t) => t.id === 'TIPO-CABANA-TRIPLE') as TipoHabitacion },
-  { id: 'HAB-DOB-05', codigo: 'DOB-05', nombre: 'Doble 05', tipoHabitacionId: 'TIPO-DOBLE-ECONOMICA', numeroPiso: 2, numeroPuerta: '2-05', ubicacionDescripcion: 'Edificio segundo piso pasillo izquierdo', vistaEfectiva: 'JARDIN', estado: 'LIBRE', estadoLimpieza: 'LIMPIA', ultimaLimpiezaAt: hoy(), amenidadesExtra: [], observaciones: '', ...auditSeed, tipoHabitacion: tiposHabitacionSeed.find((t) => t.id === 'TIPO-DOBLE-ECONOMICA') as TipoHabitacion },
-  { id: 'HAB-SUI-06', codigo: 'SUI-06', nombre: 'Suite 06', tipoHabitacionId: 'TIPO-SUITE-VISTA', numeroPiso: 2, numeroPuerta: '2-06', ubicacionDescripcion: 'Esquina noroeste, jacuzzi terraza', vistaEfectiva: 'RIO_PANORAMICA', estado: 'MANTENIMIENTO', estadoLimpieza: 'PENDIENTE', ultimaLimpiezaAt: addDaysISO(hoy(), -2), amenidadesExtra: [], observaciones: 'Mantenimiento jacuzzi programado: 20-21 Sep', ...auditSeed, tipoHabitacion: tiposHabitacionSeed.find((t) => t.id === 'TIPO-SUITE-VISTA') as TipoHabitacion },
-  { id: 'HAB-CAB-07', codigo: 'CAB-07', nombre: 'Cabaña 07', tipoHabitacionId: 'TIPO-CABANA-DOBLE', numeroPiso: 1, numeroPuerta: 'C-07', ubicacionDescripcion: 'Sector bosque, más privada', vistaEfectiva: 'BOSQUE', estado: 'LIBRE', estadoLimpieza: 'LIMPIA', ultimaLimpiezaAt: hoy(), amenidadesExtra: [], observaciones: '', ...auditSeed, tipoHabitacion: tiposHabitacionSeed.find((t) => t.id === 'TIPO-CABANA-DOBLE') as TipoHabitacion },
-  { id: 'HAB-FAM-08', codigo: 'FAM-08', nombre: 'Familiar 08', tipoHabitacionId: 'TIPO-FAMILIAR-5P', numeroPiso: 1, numeroPuerta: 'F-08', ubicacionDescripcion: 'Zona familiar cerca área juegos niños', vistaEfectiva: 'JARDIN', estado: 'LIBRE', estadoLimpieza: 'LIMPIA', ultimaLimpiezaAt: hoy(), amenidadesExtra: ['INFANTIL'], observaciones: '', ...auditSeed, tipoHabitacion: tiposHabitacionSeed.find((t) => t.id === 'TIPO-FAMILIAR-5P') as TipoHabitacion },
-  { id: 'HAB-CAB-09', codigo: 'CAB-09', nombre: 'Cabaña 09', tipoHabitacionId: 'TIPO-CABANA-TRIPLE', numeroPiso: 1, numeroPuerta: 'C-09', ubicacionDescripcion: 'Cerca restaurante', vistaEfectiva: 'JARDIN', estado: 'LIBRE', estadoLimpieza: 'LIMPIA', ultimaLimpiezaAt: hoy(), amenidadesExtra: [], observaciones: '', ...auditSeed, tipoHabitacion: tiposHabitacionSeed.find((t) => t.id === 'TIPO-CABANA-TRIPLE') as TipoHabitacion },
-  { id: 'HAB-SUI-10', codigo: 'SUI-10', nombre: 'Suite 10', tipoHabitacionId: 'TIPO-SUITE-VISTA', numeroPiso: 2, numeroPuerta: '2-10', ubicacionDescripcion: 'Piso superior, jacuzzi y sala', vistaEfectiva: 'RIO_PANORAMICA', estado: 'LIBRE', estadoLimpieza: 'LIMPIA', ultimaLimpiezaAt: hoy(), amenidadesExtra: [], observaciones: '', ...auditSeed, tipoHabitacion: tiposHabitacionSeed.find((t) => t.id === 'TIPO-SUITE-VISTA') as TipoHabitacion },
-  { id: 'HAB-FAM-11', codigo: 'FAM-11', nombre: 'Familiar 11', tipoHabitacionId: 'TIPO-FAMILIAR-4P', numeroPiso: 1, numeroPuerta: 'F-11', ubicacionDescripcion: 'Zona norte tranquila', vistaEfectiva: 'BOSQUE', estado: 'RESERVADA', estadoLimpieza: 'LIMPIA', ultimaLimpiezaAt: hoy(), amenidadesExtra: [], observaciones: '', ...auditSeed, tipoHabitacion: tiposHabitacionSeed.find((t) => t.id === 'TIPO-FAMILIAR-4P') as TipoHabitacion },
-  { id: 'HAB-CAB-12', codigo: 'CAB-12', nombre: 'Cabaña 12', tipoHabitacionId: 'TIPO-CABANA-DOBLE', numeroPiso: 1, numeroPuerta: 'C-12', ubicacionDescripcion: 'Última cabaña, sendero hacia cascadas', vistaEfectiva: 'BOSQUE', estado: 'LIBRE', estadoLimpieza: 'INSPECCIONADA', ultimaLimpiezaAt: hoy(), amenidadesExtra: [], observaciones: 'Inspeccionada 10:30 sin novedad', ...auditSeed, tipoHabitacion: tiposHabitacionSeed.find((t) => t.id === 'TIPO-CABANA-DOBLE') as TipoHabitacion },
+  { id: 'HAB-H201', codigo: 'H201', nombre: 'Habitación 201', tipoHabitacionId: 'TIPO-HAB-DOBLE', numeroPiso: 2, numeroPuerta: '201', ubicacionDescripcion: '2do piso pasillo izquierdo, frente a jardín', vistaEfectiva: 'JARDIN', estado: 'LIBRE', estadoLimpieza: 'LIMPIA', ultimaLimpiezaAt: hoy(), amenidadesExtra: [], observaciones: '', ...auditSeed, tipoHabitacion: tiposHabitacionSeed.find((t) => t.id === 'TIPO-HAB-DOBLE') as TipoHabitacion },
+  { id: 'HAB-H202', codigo: 'H202', nombre: 'Habitación 202', tipoHabitacionId: 'TIPO-HAB-DOBLE', numeroPiso: 2, numeroPuerta: '202', ubicacionDescripcion: '2do piso pasillo central, ventana lateral', vistaEfectiva: 'JARDIN', estado: 'OCUPADA', estadoLimpieza: 'LIMPIA', ultimaLimpiezaAt: hoy(), amenidadesExtra: [], observaciones: '', ...auditSeed, tipoHabitacion: tiposHabitacionSeed.find((t) => t.id === 'TIPO-HAB-DOBLE') as TipoHabitacion },
+  { id: 'HAB-H203', codigo: 'H203', nombre: 'Habitación 203', tipoHabitacionId: 'TIPO-HAB-DOBLE', numeroPiso: 2, numeroPuerta: '203', ubicacionDescripcion: '2do piso pasillo derecho, vista parcial río', vistaEfectiva: 'RIO', estado: 'LIBRE', estadoLimpieza: 'LIMPIA', ultimaLimpiezaAt: hoy(), amenidadesExtra: [], observaciones: '', ...auditSeed, tipoHabitacion: tiposHabitacionSeed.find((t) => t.id === 'TIPO-HAB-DOBLE') as TipoHabitacion },
+  { id: 'HAB-SUITE', codigo: 'SUITE', nombre: 'Suite Principal', tipoHabitacionId: 'TIPO-SUITE', numeroPiso: 3, numeroPuerta: 'SUITE', ubicacionDescripcion: '3er piso exclusivo, jacuzzi terraza', vistaEfectiva: 'RIO_PANORAMICA', estado: 'RESERVADA', estadoLimpieza: 'LIMPIA', ultimaLimpiezaAt: hoy(), amenidadesExtra: [], observaciones: 'Check-in mañana, jacuzzi pétalos rosas programado', ...auditSeed, tipoHabitacion: tiposHabitacionSeed.find((t) => t.id === 'TIPO-SUITE') as TipoHabitacion },
+  { id: 'HAB-CABANA', codigo: 'CABAÑA', nombre: 'Cabaña Independiente', tipoHabitacionId: 'TIPO-CABANA', numeroPiso: 1, numeroPuerta: 'C-01', ubicacionDescripcion: 'Sector bosque, acceso privado', vistaEfectiva: 'BOSQUE', estado: 'MANTENIMIENTO', estadoLimpieza: 'PENDIENTE', ultimaLimpiezaAt: addDaysISO(hoy(), -3), amenidadesExtra: [], observaciones: 'Mantenimiento correctivo calefón: repuesto llegando mañana', ...auditSeed, tipoHabitacion: tiposHabitacionSeed.find((t) => t.id === 'TIPO-CABANA') as TipoHabitacion },
 ];
 
 const tarifasSeed: Tarifa[] = [
   {
-    id: 'TAR-STANDARD-CAB-DOB', tipoHabitacionId: 'TIPO-CABANA-DOBLE', nombre: 'Tarifa Estándar Cabaña Doble',
-    descripcion: 'Tarifa base diaria temporada normal',
+    id: 'TAR-STANDARD-H20X', tipoHabitacionId: 'TIPO-HAB-DOBLE', nombre: 'Tarifa Estándar Hab 20X',
+    descripcion: 'Tarifa base diaria habitación doble 2do piso',
     tipoTarifa: 'DIARIA', moneda: 'PEN',
-    precioPorNoche: 280.00,
-    precioPorPersonaExtra: 70.00, precioPorNinoExtra: 35.00,
+    precioPorNoche: 180.00,
+    precioPorPersonaExtra: 50.00, precioPorNinoExtra: 25.00,
     politicaCancelacionId: 'POL-CANCEL-48H',
     fechaInicioVigencia: addDaysISO(hoy(), -365),
     fechaFinVigencia: addDaysISO(hoy(), 730),
@@ -579,22 +551,10 @@ const tarifasSeed: Tarifa[] = [
     estado: 'ACTIVO', ...auditSeed
   },
   {
-    id: 'TAR-STANDARD-FAM4', tipoHabitacionId: 'TIPO-FAMILIAR-4P', nombre: 'Tarifa Familiar 4P',
-    descripcion: 'Tarifa estándar familiar',
+    id: 'TAR-STANDARD-SUITE', tipoHabitacionId: 'TIPO-SUITE', nombre: 'Tarifa Suite Río',
+    descripcion: 'Tarifa premium suite con jacuzzi terraza',
     tipoTarifa: 'DIARIA', moneda: 'PEN',
-    precioPorNoche: 420.00,
-    precioPorPersonaExtra: 80.00, precioPorNinoExtra: 40.00,
-    politicaCancelacionId: 'POL-CANCEL-72H',
-    fechaInicioVigencia: addDaysISO(hoy(), -365),
-    fechaFinVigencia: addDaysISO(hoy(), 730),
-    impuestosIds: ['IMP-IGV-18'],
-    estado: 'ACTIVO', ...auditSeed
-  },
-  {
-    id: 'TAR-STANDARD-SUI', tipoHabitacionId: 'TIPO-SUITE-VISTA', nombre: 'Tarifa Suite Río',
-    descripcion: 'Tarifa premium suite jacuzzi',
-    tipoTarifa: 'DIARIA', moneda: 'PEN',
-    precioPorNoche: 520.00,
+    precioPorNoche: 380.00,
     precioPorPersonaExtra: 90.00, precioPorNinoExtra: 45.00,
     politicaCancelacionId: 'POL-CANCEL-7D',
     fechaInicioVigencia: addDaysISO(hoy(), -365),
@@ -603,10 +563,22 @@ const tarifasSeed: Tarifa[] = [
     estado: 'ACTIVO', ...auditSeed
   },
   {
-    id: 'TAR-PACK-DESAYUNO', tipoHabitacionId: 'TIPO-CABANA-DOBLE', nombre: 'Pack Alojamiento + Desayuno Buffet 2p',
-    descripcion: 'Promoción incluye alojamiento 1 noche + desayuno buffet para 2 personas',
+    id: 'TAR-STANDARD-CABANA', tipoHabitacionId: 'TIPO-CABANA', nombre: 'Tarifa Cabaña Bosque',
+    descripcion: 'Tarifa cabaña independiente',
+    tipoTarifa: 'DIARIA', moneda: 'PEN',
+    precioPorNoche: 260.00,
+    precioPorPersonaExtra: 70.00, precioPorNinoExtra: 35.00,
+    politicaCancelacionId: 'POL-CANCEL-72H',
+    fechaInicioVigencia: addDaysISO(hoy(), -365),
+    fechaFinVigencia: addDaysISO(hoy(), 730),
+    impuestosIds: ['IMP-IGV-18'],
+    estado: 'ACTIVO', ...auditSeed
+  },
+  {
+    id: 'TAR-PACK-DESAYUNO', tipoHabitacionId: 'TIPO-HAB-DOBLE', nombre: 'Pack Alojamiento + Desayuno 2p',
+    descripcion: 'Promoción incluye alojamiento 1 noche + desayuno para 2 personas',
     tipoTarifa: 'PAQUETE', moneda: 'PEN',
-    precioPorNoche: 350.00,
+    precioPorNoche: 230.00,
     precioPorPersonaExtra: 45.00, precioPorNinoExtra: 22.50,
     politicaCancelacionId: 'POL-CANCEL-48H',
     fechaInicioVigencia: addDaysISO(hoy(), -30),
@@ -1064,10 +1036,10 @@ const usuariosSeed: Usuario[] = [
 
 const puntoVentaPrincipal: PuntoVenta = {
   id: 'PV-RESTAURANTE-01',
-  nombre: 'Restaurante Principal',
+  nombre: 'Room Service y Bar',
   codigoPuntoVenta: 'C-RST',
-  tipo: 'RESTAURANTE_CON_MESAS',
-  descripcion: 'Restaurante principal buffet y a la carta. 5 mesas principales + terraza + room service vinculado.',
+  tipo: 'ROOM_SERVICE',
+  descripcion: 'Atención Room Service a habitaciones y bar. Sin atención en mesas físicas por ahora.',
   ubicacion: 'Planta baja, frente a piscina y jardín principal',
   numeroSerieEquipo: null,
   impuestoPredeterminadoId: 'IMP-IGV-18',
@@ -1081,7 +1053,7 @@ const puntoVentaPrincipal: PuntoVenta = {
     {
       id: 'HR-RST-DESAY',
       puntoVentaId: 'PV-RESTAURANTE-01',
-      nombre: 'Desayuno Buffet',
+      nombre: 'Desayuno Buffet (Room Service)',
       diaInicio: 'LUNES', diaFin: 'DOMINGO',
       horaApertura: '07:00', horaCierre: '10:30',
       estado: 'ACTIVO', ...auditSeed
@@ -1089,7 +1061,7 @@ const puntoVentaPrincipal: PuntoVenta = {
     {
       id: 'HR-RST-ALMU',
       puntoVentaId: 'PV-RESTAURANTE-01',
-      nombre: 'Almuerzo Carta',
+      nombre: 'Almuerzo Carta (Room Service)',
       diaInicio: 'LUNES', diaFin: 'DOMINGO',
       horaApertura: '12:30', horaCierre: '16:00',
       estado: 'ACTIVO', ...auditSeed
@@ -1097,7 +1069,7 @@ const puntoVentaPrincipal: PuntoVenta = {
     {
       id: 'HR-RST-CENA',
       puntoVentaId: 'PV-RESTAURANTE-01',
-      nombre: 'Cena',
+      nombre: 'Cena (Room Service)',
       diaInicio: 'LUNES', diaFin: 'DOMINGO',
       horaApertura: '18:30', horaCierre: '22:30',
       estado: 'ACTIVO', ...auditSeed
@@ -1115,18 +1087,7 @@ const puntoVentaPrincipal: PuntoVenta = {
   estado: 'ACTIVO', ...auditSeed
 };
 
-const mesasSeed: Mesa[] = [
-  { id: 'MESA-M1', puntoVentaId: 'PV-RESTAURANTE-01', codigo: 'M-01', nombreVisible: 'Mesa 1', zona: 'SALON_PRINCIPAL', capacidadMaxPax: 4, capacidadActualUsada: 4, tipo: 'REDONDA', estado: 'OCUPADA', esCombinable: true, mesaCombinadaIds: [], habitacionAsignadaId: null, proximaLimpiezaAt: null, observaciones: '', ...auditSeed },
-  { id: 'MESA-M2', puntoVentaId: 'PV-RESTAURANTE-01', codigo: 'M-02', nombreVisible: 'Mesa 2', zona: 'SALON_PRINCIPAL', capacidadMaxPax: 2, capacidadActualUsada: 2, tipo: 'CUADRADA', estado: 'OCUPADA', esCombinable: true, mesaCombinadaIds: [], habitacionAsignadaId: null, proximaLimpiezaAt: null, observaciones: '', ...auditSeed },
-  { id: 'MESA-M3', puntoVentaId: 'PV-RESTAURANTE-01', codigo: 'M-03', nombreVisible: 'Mesa 3', zona: 'SALON_PRINCIPAL', capacidadMaxPax: 6, capacidadActualUsada: 0, tipo: 'RECTANGULAR', estado: 'LIBRE', esCombinable: true, mesaCombinadaIds: [], habitacionAsignadaId: null, proximaLimpiezaAt: null, observaciones: '', ...auditSeed },
-  { id: 'MESA-M4', puntoVentaId: 'PV-RESTAURANTE-01', codigo: 'M-04', nombreVisible: 'Mesa 4', zona: 'SALON_PRINCIPAL', capacidadMaxPax: 4, capacidadActualUsada: 0, tipo: 'REDONDA', estado: 'SUCIA', esCombinable: true, mesaCombinadaIds: [], habitacionAsignadaId: null, proximaLimpiezaAt: nowISO(), observaciones: 'Se retiró hace 5 min, esperando limpieza', ...auditSeed },
-  { id: 'MESA-M5', puntoVentaId: 'PV-RESTAURANTE-01', codigo: 'M-05', nombreVisible: 'Mesa 5', zona: 'SALON_PRINCIPAL', capacidadMaxPax: 2, capacidadActualUsada: 2, tipo: 'CUADRADA', estado: 'OCUPADA', esCombinable: true, mesaCombinadaIds: [], habitacionAsignadaId: null, proximaLimpiezaAt: null, observaciones: '', ...auditSeed },
-  { id: 'MESA-T1', puntoVentaId: 'PV-RESTAURANTE-01', codigo: 'T-01', nombreVisible: 'Terraza 1', zona: 'TERRAZA_PISCINA', capacidadMaxPax: 4, capacidadActualUsada: 4, tipo: 'REDONDA', estado: 'OCUPADA', esCombinable: true, mesaCombinadaIds: [], habitacionAsignadaId: null, proximaLimpiezaAt: null, observaciones: '', ...auditSeed },
-  { id: 'MESA-H101', puntoVentaId: 'PV-RESTAURANTE-01', codigo: 'H-101', nombreVisible: 'Hab. 101', zona: 'ROOM_SERVICE', capacidadMaxPax: 2, capacidadActualUsada: 2, tipo: 'ROOM_SERVICE', estado: 'OCUPADA', esCombinable: false, mesaCombinadaIds: [], habitacionAsignadaId: 'HAB-CAB-01', proximaLimpiezaAt: null, observaciones: 'Vinculada a habitación CAB-01. Cargo automático al folio', ...auditSeed },
-  { id: 'MESA-H103', puntoVentaId: 'PV-RESTAURANTE-01', codigo: 'H-103', nombreVisible: 'Hab. 103', zona: 'ROOM_SERVICE', capacidadMaxPax: 4, capacidadActualUsada: 4, tipo: 'ROOM_SERVICE', estado: 'OCUPADA', esCombinable: false, mesaCombinadaIds: [], habitacionAsignadaId: 'HAB-FAM-03', proximaLimpiezaAt: null, observaciones: 'Vinculada a habitación FAM-03. Cargo automático al folio. Prioridad ALTA', ...auditSeed },
-  { id: 'MESA-H104', puntoVentaId: 'PV-RESTAURANTE-01', codigo: 'H-104', nombreVisible: 'Hab. 104', zona: 'ROOM_SERVICE', capacidadMaxPax: 3, capacidadActualUsada: 3, tipo: 'ROOM_SERVICE', estado: 'OCUPADA', esCombinable: false, mesaCombinadaIds: [], habitacionAsignadaId: 'HAB-CAB-04', proximaLimpiezaAt: null, observaciones: 'Vinculada a habitación CAB-04. Check-in realizado', ...auditSeed },
-  { id: 'MESA-SUI10', puntoVentaId: 'PV-RESTAURANTE-01', codigo: 'SUI10', nombreVisible: 'Hab. SUI-10', zona: 'ROOM_SERVICE', capacidadMaxPax: 2, capacidadActualUsada: 0, tipo: 'ROOM_SERVICE', estado: 'LIBRE', esCombinable: false, mesaCombinadaIds: [], habitacionAsignadaId: 'HAB-SUI-10', proximaLimpiezaAt: null, observaciones: 'Vinculada a Suite SUI-10 (R-1002). Check-in realizado', ...auditSeed },
-];
+const mesasSeed: Mesa[] = [];
 
 export type Create<T> = Omit<T, 'id' | keyof AuditFields>;
 export type Update<T> = Partial<Omit<T, 'id' | keyof AuditFields>> & Pick<AuditFields, 'updatedBy'>;
@@ -1150,17 +1111,17 @@ const reserva1Habitaciones = [
   {
     id: generateUUID(),
     reservaId: '',
-    habitacionId: 'HAB-CAB-01',
-    habitacion: habitacionesSeed.find((h) => h.id === 'HAB-CAB-01') as Habitacion,
-    tipoHabitacionId: 'TIPO-CABANA-DOBLE',
-    tarifaId: 'TAR-STANDARD-CAB-DOB',
+    habitacionId: 'HAB-H202',
+    habitacion: habitacionesSeed.find((h) => h.id === 'HAB-H202') as Habitacion,
+    tipoHabitacionId: 'TIPO-HAB-DOBLE',
+    tarifaId: 'TAR-STANDARD-H20X',
     fechaCheckinPropuesto: hoy(),
     fechaCheckoutPropuesto: addDaysISO(hoy(), 3),
     totalNoches: 3,
-    precioBaseAcordadoPorNoche: 280.00,
+    precioBaseAcordadoPorNoche: 180.00,
     monedaPrecioAcordado: 'PEN' as const,
     estadoOcupacion: 'CHECKED_IN' as const,
-    observaciones: 'Preferencia cama king size con almohadas de pluma',
+    observaciones: 'Preferencia habitación silenciosa, lado jardín',
     ...auditSeed
   },
 ];
@@ -1200,24 +1161,24 @@ const reserva1: Reserva = {
       nacionalidad: 'PERUANO',
       esMenorEdad: true,
       parentescoConTitular: 'Hija',
-      observaciones: 'Cuna bebé no requerida - usa cama adicional',
+      observaciones: '',
       ...auditSeed
     },
   ],
-  tarifaId: 'TAR-STANDARD-CAB-DOB',
+  tarifaId: 'TAR-STANDARD-H20X',
   politicaCancelacionId: 'POL-CANCEL-48H',
   temporadaId: null,
   codigoPromocionalId: null,
-  subTotalSinImpuestos: 840.00,
-  totalImpuestos: 193.20,
+  subTotalSinImpuestos: 540.00,
+  totalImpuestos: 97.20,
   descuentosTotal: 0,
-  cargoPorPersonasExtra: 35.00,
+  cargoPorPersonasExtra: 25.00,
   cargoPorNinosExtra: 0,
   otrosCargosAlojamiento: 0,
   moneda: 'PEN',
-  montoTotalReserva: 1068.20,
+  montoTotalReserva: 662.20,
   estadoPago: 'PAGO_PARCIAL',
-  saldoPendiente: 768.20,
+  saldoPendiente: 362.20,
   montoPagadoAnticipado: 300.00,
   pagoGarantia: {
     requiereGarantia: true,
@@ -1231,15 +1192,14 @@ const reserva1: Reserva = {
   },
   esGarantiaNoShow: false,
   medioPago: 'TARJETA_CREDITO',
-  notasInternas: 'Huésped VIP. Regalo de bienvenida: botella agua de coco + chocolate artesanal en habitación',
+  notasInternas: 'Huésped habitual. Bienvenida: botella agua + chocolate artesanal',
   requerimientosEspeciales: [
-    { id: generateUUID(), reservaId: 'RES-R1001', categoria: 'HABITACION', descripcion: 'Vista al río', prioridad: 'ALTA', estado: 'CUMPLIDO', ...auditSeed },
-    { id: generateUUID(), reservaId: 'RES-R1001', categoria: 'BIENVENIDA', descripcion: 'Carta manuscrita de bienvenida + flores frescas', prioridad: 'MEDIA', estado: 'PENDIENTE', ...auditSeed },
+    { id: generateUUID(), reservaId: 'RES-R1001', categoria: 'HABITACION', descripcion: '2 botellas agua mineral fría de bienvenida', prioridad: 'MEDIA', estado: 'CUMPLIDO', ...auditSeed },
   ],
   checkInInfo: {
     fechaHoraCheckin: hoy(),
     recepcionistaId: 'USR-RECEP-0002',
-    llaveEntregadaCodigo: 'KEY-CAB-01-MAG',
+    llaveEntregadaCodigo: 'KEY-H202-MAG',
     cantidadLlavesEntregadas: 2,
     depósitoLlavesMonto: 0,
     documentoEntregado: true,
@@ -1247,7 +1207,7 @@ const reserva1: Reserva = {
     aceptaTerminosYCondiciones: true,
     aceptaPoliticaCancelacion: true,
     autorizaCargosExtras: true,
-    observaciones: 'Cliente muy amable, solicita wake up call 06:30 am en habitación',
+    observaciones: 'Check-in 14:15. Solicita wake up call 07:00 am',
     ...auditSeed
   },
   checkOutInfo: null,
@@ -1280,35 +1240,35 @@ const reserva2: Reserva = {
     {
       id: generateUUID(),
       reservaId: 'RES-R1002',
-      habitacionId: 'HAB-SUI-10',
-      habitacion: habitacionesSeed.find((h) => h.id === 'HAB-SUI-10') as Habitacion,
-      tipoHabitacionId: 'TIPO-SUITE-VISTA',
-      tarifaId: 'TAR-STANDARD-SUI',
+      habitacionId: 'HAB-SUITE',
+      habitacion: habitacionesSeed.find((h) => h.id === 'HAB-SUITE') as Habitacion,
+      tipoHabitacionId: 'TIPO-SUITE',
+      tarifaId: 'TAR-STANDARD-SUITE',
       fechaCheckinPropuesto: addDaysISO(hoy(), 1),
       fechaCheckoutPropuesto: addDaysISO(hoy(), 4),
       totalNoches: 3,
-      precioBaseAcordadoPorNoche: 520.00,
+      precioBaseAcordadoPorNoche: 380.00,
       monedaPrecioAcordado: 'PEN',
       estadoOcupacion: 'RESERVADA',
-      observaciones: 'Solicitan jacuzzi con pétalos de rosas para el check-in',
+      observaciones: 'Jacuzzi con pétalos rosas para aniversario',
       ...auditSeed
     },
   ],
   acompanhantes: [],
-  tarifaId: 'TAR-STANDARD-SUI',
+  tarifaId: 'TAR-STANDARD-SUITE',
   politicaCancelacionId: 'POL-CANCEL-7D',
   temporadaId: null,
   codigoPromocionalId: null,
-  subTotalSinImpuestos: 1560.00,
-  totalImpuestos: 358.80,
+  subTotalSinImpuestos: 1140.00,
+  totalImpuestos: 205.20,
   descuentosTotal: 0,
   cargoPorPersonasExtra: 0,
   cargoPorNinosExtra: 0,
   otrosCargosAlojamiento: 0,
   moneda: 'PEN',
-  montoTotalReserva: 1918.80,
+  montoTotalReserva: 1345.20,
   estadoPago: 'PAGO_PARCIAL',
-  saldoPendiente: 1418.80,
+  saldoPendiente: 845.20,
   montoPagadoAnticipado: 500.00,
   pagoGarantia: {
     requiereGarantia: true,
@@ -1322,212 +1282,13 @@ const reserva2: Reserva = {
   },
   esGarantiaNoShow: false,
   medioPago: 'TARJETA_CREDITO',
-  notasInternas: 'Huésped chilena, primera vez en Perú. Habla español y portugués. Solicita tour a las cascadas el segundo día.',
+  notasInternas: 'Aniversario 10 años. Carta + botella vino espumante de bienvenida.',
   requerimientosEspeciales: [
-    { id: generateUUID(), reservaId: 'RES-R1002', categoria: 'HABITACION', descripcion: 'Suite jacuzzi con pétalos rosas rojas', prioridad: 'ALTA', estado: 'PENDIENTE', ...auditSeed },
-    { id: generateUUID(), reservaId: 'RES-R1002', categoria: 'TOURS', descripcion: 'Tour cascadas 2da día de 09:00 a 13:00 con almuerzo incluido', prioridad: 'MEDIA', estado: 'PENDIENTE', ...auditSeed },
-    { id: generateUUID(), reservaId: 'RES-R1002', categoria: 'TRANSPORTE', descripcion: 'Traslado aeropuerto - lodge (llegada 21 Sep 06:30 am - vuelo LA2210)', prioridad: 'ALTA', estado: 'PENDIENTE', ...auditSeed },
+    { id: generateUUID(), reservaId: 'RES-R1002', categoria: 'HABITACION', descripcion: 'Decoración romántica jacuzzi pétalos rosas', prioridad: 'ALTA', estado: 'PENDIENTE', ...auditSeed },
   ],
   checkInInfo: null,
   checkOutInfo: null,
-  historialCambios: auditoriaReserva().map((h) => ({ ...h, reservaId: 'RES-R1002', valorNuevo: 'Reserva confirmada desde Booking con garantía.' })),
-  ...auditSeed
-};
-
-const reserva3: Reserva = {
-  id: 'RES-R1003',
-  codigoReserva: 'R-1003',
-  huespedId: 'HUE-LQUISPE-003',
-  huesped: huespedesSeed.find((h) => h.id === 'HUE-LQUISPE-003') as Huesped,
-  estado: 'CHECKED_IN',
-  origen: 'WHATSAPP',
-  canalReservaId: 'CANAL-WHATSAPP',
-  agenteOtaId: null,
-  codigoOtaConirmacion: null,
-  fechaCreacion: addDaysISO(hoy(), -7),
-  fechaModificacion: hoy(),
-  fechaCheckin: hoy(),
-  fechaCheckout: addDaysISO(hoy(), 2),
-  fechaCheckinReal: hoy(),
-  fechaCheckoutReal: null,
-  totalNoches: 2,
-  totalAdultos: 3,
-  totalNinos: 1,
-  totalPersonas: 4,
-  tipoReserva: 'ALOJAMIENTO',
-  habitaciones: [
-    {
-      id: generateUUID(),
-      reservaId: 'RES-R1003',
-      habitacionId: 'HAB-FAM-03',
-      habitacion: habitacionesSeed.find((h) => h.id === 'HAB-FAM-03') as Habitacion,
-      tipoHabitacionId: 'TIPO-FAMILIAR-4P',
-      tarifaId: 'TAR-STANDARD-FAM4',
-      fechaCheckinPropuesto: hoy(),
-      fechaCheckoutPropuesto: addDaysISO(hoy(), 2),
-      totalNoches: 2,
-      precioBaseAcordadoPorNoche: 420.00,
-      monedaPrecioAcordado: 'PEN',
-      estadoOcupacion: 'CHECKED_IN',
-      observaciones: 'Familia: 2 adultos + 1 adolescente + 1 niño. Cuna bebé necesaria.',
-      ...auditSeed
-    },
-  ],
-  acompanhantes: [
-    {
-      id: generateUUID(), reservaId: 'RES-R1003', tipoDocumento: 'DNI', numeroDocumento: '45321001',
-      nombres: 'Fiorella', apellidos: 'Apaza Quispe', fechaNacimiento: '2009-11-11', genero: 'FEMENINO',
-      nacionalidad: 'PERUANO', esMenorEdad: true, parentescoConTitular: 'Hija mayor', observaciones: '', ...auditSeed
-    },
-    {
-      id: generateUUID(), reservaId: 'RES-R1003', tipoDocumento: 'DNI', numeroDocumento: '45321002',
-      nombres: 'Luis', apellidos: 'Quispe Apaza Jr.', fechaNacimiento: '2019-04-02', genero: 'MASCULINO',
-      nacionalidad: 'PERUANO', esMenorEdad: true, parentescoConTitular: 'Hijo menor - necesita cuna bebé', observaciones: 'Cuna bebé', ...auditSeed
-    },
-  ],
-  tarifaId: 'TAR-STANDARD-FAM4',
-  politicaCancelacionId: 'POL-CANCEL-72H',
-  temporadaId: null,
-  codigoPromocionalId: 'PROMO-3N-50OFF',
-  subTotalSinImpuestos: 840.00,
-  totalImpuestos: 193.20,
-  descuentosTotal: 50.00,
-  cargoPorPersonasExtra: 40.00,
-  cargoPorNinosExtra: 40.00,
-  otrosCargosAlojamiento: 0,
-  moneda: 'PEN',
-  montoTotalReserva: 1063.20,
-  estadoPago: 'PAGO_PARCIAL',
-  saldoPendiente: 563.20,
-  montoPagadoAnticipado: 500.00,
-  pagoGarantia: {
-    requiereGarantia: true,
-    tipoGarantia: 'TRANSFERENCIA_DEPOSITO',
-    tarjetaUltimos4: null,
-    autorizacionCodigo: 'OP-0456-7890-TR',
-    montoBloqueado: 500.00,
-    fechaHoraVencimientoBloqueo: addDaysISO(hoy(), 3),
-    monedaGarantia: 'PEN',
-    ...auditSeed
-  },
-  esGarantiaNoShow: false,
-  medioPago: 'TRANSFERENCIA',
-  notasInternas: 'Factura electrónica a RUC 20453217650 - Transportes Quispe SAC. Subir factura a carpeta compartida luego del Check-out.',
-  requerimientosEspeciales: [
-    { id: generateUUID(), reservaId: 'RES-R1003', categoria: 'HABITACION', descripcion: 'Cuna bebé colocada + silla alta para comer', prioridad: 'ALTA', estado: 'CUMPLIDO', ...auditSeed },
-    { id: generateUUID(), reservaId: 'RES-R1003', categoria: 'MISC', descripcion: 'Cumpleaños 18 años de Fiorella el 21 Sep. Pastel sorpresa post-cena 20:30.', prioridad: 'ALTA', estado: 'PENDIENTE', ...auditSeed },
-  ],
-  checkInInfo: {
-    fechaHoraCheckin: hoy(),
-    recepcionistaId: 'USR-RECEP-0002',
-    llaveEntregadaCodigo: 'KEY-FAM-03-RFID',
-    cantidadLlavesEntregadas: 4,
-    depósitoLlavesMonto: 0,
-    documentoEntregado: true,
-    firmaRegistroFisico: true,
-    aceptaTerminosYCondiciones: true,
-    aceptaPoliticaCancelacion: true,
-    autorizaCargosExtras: true,
-    observaciones: 'Pagaron transferencia la semana pasada. Saldo se cancela en Check-out efectivo o tarjeta.',
-    ...auditSeed
-  },
-  checkOutInfo: null,
-  historialCambios: auditoriaReserva().map((h) => ({ ...h, reservaId: 'RES-R1003', valorNuevo: 'Reserva creada desde Whatsapp recepción. Pago 50% adelantado transferencia.' })),
-  ...auditSeed
-};
-
-const reserva4: Reserva = {
-  id: 'RES-R1004',
-  codigoReserva: 'R-1004',
-  huespedId: 'HUE-ARAMOS-004',
-  huesped: huespedesSeed.find((h) => h.id === 'HUE-ARAMOS-004') as Huesped,
-  estado: 'CHECKED_IN',
-  origen: 'WEB_OFICIAL',
-  canalReservaId: 'CANAL-WEB',
-  agenteOtaId: null,
-  codigoOtaConirmacion: null,
-  fechaCreacion: addDaysISO(hoy(), -20),
-  fechaModificacion: addDaysISO(hoy(), -1),
-  fechaCheckin: addDaysISO(hoy(), -1),
-  fechaCheckout: addDaysISO(hoy(), 2),
-  fechaCheckinReal: addDaysISO(hoy(), -1) + 'T15:12:00-05:00',
-  fechaCheckoutReal: null,
-  totalNoches: 3,
-  totalAdultos: 3,
-  totalNinos: 0,
-  totalPersonas: 3,
-  tipoReserva: 'ALOJAMIENTO',
-  habitaciones: [
-    {
-      id: generateUUID(),
-      reservaId: 'RES-R1004',
-      habitacionId: 'HAB-CAB-04',
-      habitacion: habitacionesSeed.find((h) => h.id === 'HAB-CAB-04') as Habitacion,
-      tipoHabitacionId: 'TIPO-CABANA-TRIPLE',
-      tarifaId: 'TAR-STANDARD-CAB-DOB',
-      fechaCheckinPropuesto: addDaysISO(hoy(), -1),
-      fechaCheckoutPropuesto: addDaysISO(hoy(), 2),
-      totalNoches: 3,
-      precioBaseAcordadoPorNoche: 360.00,
-      monedaPrecioAcordado: 'PEN',
-      estadoOcupacion: 'CHECKED_IN',
-      llaveCodigo: 'CAB-04',
-      observaciones: '3 amigas brasileñas. Cabaña triple con baño privado y balcón.',
-      ...auditSeed
-    },
-  ],
-  acompanhantes: [],
-  tarifaId: 'TAR-STANDARD-CAB-DOB',
-  politicaCancelacionId: 'POL-CANCEL-48H',
-  temporadaId: null,
-  codigoPromocionalId: 'PROMO-WELCOME-10',
-  subTotalSinImpuestos: 1080.00,
-  totalImpuestos: 248.40,
-  descuentosTotal: 132.84,
-  cargoPorPersonasExtra: 0,
-  cargoPorNinosExtra: 0,
-  otrosCargosAlojamiento: 0,
-  moneda: 'PEN',
-  montoTotalReserva: 1195.56,
-  estadoPago: 'PAGO_PARCIAL',
-  saldoPendiente: 995.56,
-  montoPagadoAnticipado: 200.00,
-  pagoGarantia: {
-    requiereGarantia: true,
-    tipoGarantia: 'YAPE',
-    tarjetaUltimos4: null,
-    autorizacionCodigo: 'YAPE-R1004-7788',
-    montoBloqueado: 398.52,
-    fechaHoraVencimientoBloqueo: addDaysISO(hoy(), 3),
-    monedaGarantia: 'PEN',
-    ...auditSeed
-  },
-  esGarantiaNoShow: true,
-  medioPago: 'YAPE',
-  notasInternas: '3 amigas brasileñas. Check-in realizado 15:12 20 sep. Llave CAB-04 entregada. Pago adelanto S/200.00 en YAPE.',
-  requerimientosEspeciales: [
-    { id: generateUUID(), reservaId: 'RES-R1004', categoria: 'HABITACION', descripcion: 'Asignar CAB-04 (cabaña triple con balcón y vista parcial al jardín).', prioridad: 'ALTA', estado: 'CUMPLIDO', ...auditSeed },
-    { id: generateUUID(), reservaId: 'RES-R1004', categoria: 'TOURS', descripcion: 'Interesadas en tour observación de aves amanecer. Consultar disponibilidad y precio actual.', prioridad: 'BAJA', estado: 'PENDIENTE', ...auditSeed },
-  ],
-  checkInInfo: {
-    usuarioCheckInId: 'USR-MOISES-0001',
-    fechaHoraCheckIn: addDaysISO(hoy(), -1) + 'T15:12:00-05:00',
-    llaveEntregada: true,
-    llaveCodigo: 'CAB-04',
-    documentoEntregado: true,
-    documentoTipo: 'PASAPORTE',
-    documentoNumero: 'BR-11223344',
-    documentoFotoUrl: null,
-    medioPagoUsado: 'YAPE',
-    montoPagoAdelanto: 200.00,
-    observaciones: '3 amigas brasileñas. Check-in exitoso. Llave entregada. Pago adelanto S/200.00 YAPE.',
-    ...auditSeed
-  },
-  checkOutInfo: null,
-  historialCambios: [
-    ...auditoriaReserva().slice(0, 1).map((h) => ({ ...h, reservaId: 'RES-R1004', valorNuevo: 'Reserva web oficial (3 pax, 3 noches cabaña triple) creada.' })),
-    { id: generateUUID(), reservaId: 'RES-R1004', campoModificado: 'estado', valorAnterior: 'PENDIENTE', valorNuevo: 'CHECKED_IN', fechaHoraCambio: addDaysISO(hoy(), -1) + 'T15:12:00-05:00', usuarioId: 'USR-MOISES-0001', observacion: 'Check-in realizado. Entrega llave CAB-04. Pago adelanto S/200.00.', ...auditSeed },
-  ],
+  historialCambios: auditoriaReserva().map((h) => ({ ...h, reservaId: 'RES-R1002', valorNuevo: 'Reserva confirmada desde Booking.' })),
   ...auditSeed
 };
 
@@ -1546,7 +1307,7 @@ const reserva5: Reserva = {
   fechaCheckin: addDaysISO(hoy(), -5),
   fechaCheckout: addDaysISO(hoy(), -2),
   fechaCheckinReal: addDaysISO(hoy(), -5),
-  fechaCheckoutReal: addDaysISO(hoy(), -2),
+  fechaCheckoutReal: addDaysISO(hoy(), -2) + 'T11:12:00-05:00',
   totalNoches: 3,
   totalAdultos: 2,
   totalNinos: 0,
@@ -1556,101 +1317,65 @@ const reserva5: Reserva = {
     {
       id: generateUUID(),
       reservaId: 'RES-R1005',
-      habitacionId: 'HAB-DOB-05',
-      habitacion: habitacionesSeed.find((h) => h.id === 'HAB-DOB-05') as Habitacion,
-      tipoHabitacionId: 'TIPO-DOBLE-ECONOMICA',
-      tarifaId: 'TAR-STANDARD-CAB-DOB',
+      habitacionId: 'HAB-H201',
+      habitacion: habitacionesSeed.find((h) => h.id === 'HAB-H201') as Habitacion,
+      tipoHabitacionId: 'TIPO-HAB-DOBLE',
+      tarifaId: 'TAR-STANDARD-H20X',
       fechaCheckinPropuesto: addDaysISO(hoy(), -5),
       fechaCheckoutPropuesto: addDaysISO(hoy(), -2),
       totalNoches: 3,
-      precioBaseAcordadoPorNoche: 220.00,
+      precioBaseAcordadoPorNoche: 180.00,
       monedaPrecioAcordado: 'PEN',
-      estadoOcupacion: 'CHECKED_OUT',
-      observaciones: 'Check-out normal, todo OK. Dejó buena reseña.',
+      estadoOcupacion: 'LIBERADA_CHECKOUT',
+      observaciones: 'Checkout 11:12 sin novedades',
       ...auditSeed
     },
   ],
   acompanhantes: [],
-  tarifaId: 'TAR-STANDARD-CAB-DOB',
+  tarifaId: 'TAR-STANDARD-H20X',
   politicaCancelacionId: 'POL-CANCEL-48H',
   temporadaId: null,
   codigoPromocionalId: null,
-  subTotalSinImpuestos: 660.00,
-  totalImpuestos: 151.80,
-  descuentosTotal: 0.00,
-  cargoPorPersonasExtra: 0.00,
-  cargoPorNinosExtra: 0.00,
-  otrosCargosAlojamiento: 0.00,
+  subTotalSinImpuestos: 540.00,
+  totalImpuestos: 97.20,
+  descuentosTotal: 0,
+  cargoPorPersonasExtra: 0,
+  cargoPorNinosExtra: 0,
+  otrosCargosAlojamiento: 0,
   moneda: 'PEN',
-  montoTotalReserva: 811.80,
+  montoTotalReserva: 637.20,
   estadoPago: 'PAGADO_TOTAL',
-  saldoPendiente: 0.00,
-  montoPagadoAnticipado: 811.80,
-  pagoGarantia: {
-    requiereGarantia: true,
-    tipoGarantia: 'TARJETA_PREAUTORIZADA',
-    tarjetaUltimos4: '1234',
-    autorizacionCodigo: 'AUTH-PREV-OK-555',
-    montoBloqueado: 811.80,
-    fechaHoraVencimientoBloqueo: addDaysISO(hoy(), -2),
-    monedaGarantia: 'PEN',
-    ...auditSeed
-  },
+  saldoPendiente: 0,
+  montoPagadoAnticipado: 637.20,
+  pagoGarantia: { requiereGarantia: false, tipoGarantia: 'NINGUNA', tarjetaUltimos4: null, autorizacionCodigo: null, montoBloqueado: 0, fechaHoraVencimientoBloqueo: null, monedaGarantia: 'PEN', ...auditSeed },
   esGarantiaNoShow: false,
-  medioPago: 'TARJETA_CREDITO',
-  notasInternas: 'Cliente feliz. Reservará de nuevo en Diciembre para vacaciones fin de año con toda la familia (6 personas).',
-  requerimientosEspeciales: [
-    { id: generateUUID(), reservaId: 'RES-R1005', categoria: 'BIENVENIDA', descripcion: 'Fruta de bienvenida por ser cliente frecuente', prioridad: 'MEDIA', estado: 'CUMPLIDO', ...auditSeed },
-  ],
-  checkInInfo: {
-    fechaHoraCheckin: addDaysISO(hoy(), -5),
-    recepcionistaId: 'USR-RECEP-0002',
-    llaveEntregadaCodigo: 'KEY-DOB-05',
-    cantidadLlavesEntregadas: 2,
-    depósitoLlavesMonto: 0,
-    documentoEntregado: true,
-    firmaRegistroFisico: true,
-    aceptaTerminosYCondiciones: true,
-    aceptaPoliticaCancelacion: true,
-    autorizaCargosExtras: true,
-    observaciones: 'Check-in rápido en 5 min',
-    ...auditSeed
-  },
+  medioPago: 'EFECTIVO',
+  notasInternas: 'Estadía sin novedades. Cliente repite visita.',
+  requerimientosEspeciales: [],
+  checkInInfo: { fechaHoraCheckin: addDaysISO(hoy(), -5), recepcionistaId: 'USR-RECEP-0002', llaveEntregadaCodigo: 'KEY-H201-OLD', cantidadLlavesEntregadas: 2, depósitoLlavesMonto: 0, documentoEntregado: true, firmaRegistroFisico: true, aceptaTerminosYCondiciones: true, aceptaPoliticaCancelacion: true, autorizaCargosExtras: true, observaciones: 'Check-in rápido 14:40', ...auditSeed },
   checkOutInfo: {
-    fechaHoraCheckout: addDaysISO(hoy(), -2),
+    fechaHoraCheckout: addDaysISO(hoy(), -2) + 'T11:12:00-05:00',
     recepcionistaId: 'USR-RECEP-0002',
-    llavesDevueltas: true,
-    cantidadLlavesDevueltas: 2,
-    estadoHabitacionEntregaFinal: 'SUCIA',
-    folioIdCerrado: 'FOL-R1005',
-    folio: null,
-    totalCargosFolio: 965.80,
-    totalImpuestosFolio: 177.40,
-    descuentosAplicados: 0.00,
-    totalPagadoCheckout: 965.80,
-    metodoPagoCheckout: 'TARJETA_CREDITO',
-    transaccionId: 'TXN-VISA-77889900-OK',
-    comprobanteEmitidoId: 'CPE-BOLETA-00123',
+    habitacionRevisada: true,
+    danosHabitacion: false,
+    observacionesDanos: '',
+    objetosPerdidos: [],
+    llavesRecibidasCantidad: 2,
+    depósitoDevueltoMonto: 0,
+    motivoNoDevolucionDeposito: '',
+    documentoEntregado: true,
     comprobanteNumero: 'B001-000123',
-    comprobanteEnviadoCorreo: true,
-    observacionesEntrega: 'Entregado boleta electrónica por correo. Cliente muy contento. Dejó 5 soles de propina recepción.',
-    firmaRecepcionCliente: true,
+    observaciones: 'Checkout sin novedades. Calificación 5/5.',
     ...auditSeed
   },
   historialCambios: [
-    ...auditoriaReserva().map((h) => ({ ...h, reservaId: 'RES-R1005', valorNuevo: 'Reserva Directa Trujillo.' })),
-    {
-      id: generateUUID(), reservaId: 'RES-R1005',
-      timestamp: addDaysISO(hoy(), -2), usuarioId: 'USR-RECEP-0002', tipoCambio: 'CHECKOUT',
-      valorAnterior: 'CHECKED_IN', valorNuevo: 'CHECKED_OUT',
-      comentario: 'Check-out exitoso. Total pago: S/ 965.80. Cliente muy contento.',
-      ...auditSeed
-    },
+    ...auditoriaReserva().slice(0, 1).map((h) => ({ ...h, reservaId: 'RES-R1005', valorNuevo: 'Reserva directa creada.' })),
+    { id: generateUUID(), reservaId: 'RES-R1005', campoModificado: 'estado', valorAnterior: 'CHECKED_IN', valorNuevo: 'CHECKED_OUT', fechaHoraCambio: addDaysISO(hoy(), -2) + 'T11:12:00-05:00', usuarioId: 'USR-RECEP-0002', observacion: 'Checkout exitoso, todo pagado.', ...auditSeed }
   ],
   ...auditSeed
 };
 
-const reservasSeed: Reserva[] = [reserva1, reserva2, reserva3, reserva4, reserva5];
+const reservasSeed: Reserva[] = [reserva1, reserva2, reserva5];
 
 // ===== FOLIOS =====
 const buildCargoAlojamiento = (folioId: string, rh: Reserva['habitaciones'][number], folioNum: string): CargoFolio => {
@@ -1777,36 +1502,71 @@ const folioCheckIn = (r: Reserva, folioNum: string, num = 'F-2026-0920'): Folio 
   };
 };
 
+const folioCerradoCheckOut = (r: Reserva, folioNum: string, num = 'F-2026-0920', montoPago?: number): Folio => {
+  const base = folioCheckIn(r, folioNum, num);
+  const totalPago = Number(montoPago ?? base.totalFolio);
+  return {
+    ...base,
+    fechaCierre: r.fechaCheckoutReal || r.fechaCheckout,
+    fechaCheckoutReal: r.fechaCheckoutReal || r.fechaCheckout,
+    estado: 'CERRADO' as any,
+    usuarioIdCierre: r.checkOutInfo?.recepcionistaId || 'USR-RECEP-0002',
+    totalPagado: totalPago,
+    saldoPendiente: 0,
+    comprobanteFinalId: r.checkOutInfo?.comprobanteEmitidoId || 'CPE-BOLETA-00123',
+    pagos: [{
+      id: generateUUID(),
+      folioId: base.id,
+      cajaSesionId: null,
+      usuarioId: r.checkOutInfo?.recepcionistaId || 'USR-RECEP-0002',
+      metodoPago: (r.medioPago as any) || 'TARJETA_CREDITO',
+      subMetodoPago: (r.medioPago as any) === 'EFECTIVO' ? 'SOLES_EFECTIVO' : 'VISA',
+      monto: totalPago,
+      moneda: 'PEN',
+      tipoCambioMonedaReferencia: 1.0,
+      montoMonedaOriginal: totalPago,
+      fechaHoraPago: r.fechaCheckoutReal || r.fechaCheckout,
+      referenciaBancaria: r.checkOutInfo?.transaccionId || null,
+      comprobanteAsociadoId: r.checkOutInfo?.comprobanteEmitidoId || null,
+      comprobanteNumero: r.checkOutInfo?.comprobanteNumero || null,
+      estado: 'COMPLETADO' as any,
+      esPropina: false,
+      esParcial: false,
+      esDevolucion: false,
+      pagoOriginalId: null,
+      comprobanteEnvioCorreo: true,
+      comprobanteEnvioWhatsApp: true,
+      comprobantePDFUrl: null,
+      cajeroNombre: null,
+      aprobacionCodigo: r.checkOutInfo?.transaccionId || null,
+      observaciones: `Pago checkout ${r.id}.`,
+      ...auditSeed
+    }] as any,
+    notasInternas: `Folio cerrado en Check-out. Hab ${base.habitacion?.codigo || ''}. ${base.notasInternas || ''}`.trim(),
+  };
+};
+
 const foliosSeed: Folio[] = [
   folioCheckIn(reserva1, 'F-2026-0920-001', 'F-2026-0920-001'),
-  folioCheckIn(reserva3, 'F-2026-0920-002', 'F-2026-0920-002'),
-  (() => {
-    // R-1004 CAB-04 check-in (user captura A3 folio F-2E88)
-    try {
-      return folioCheckIn(reserva4, 'F-2E88', 'F-2E88');
-    } catch {
-      return folioCheckIn(reserva3, 'F-2E88', 'F-2E88');
-    }
-  })(),
+  folioCerradoCheckOut(reserva5, 'F-2026-0917-005', 'F-2026-0917-005', 637.20),
 ];
 
-// Pagos del folio cerrado de la reserva 5
 const pagoFolioCerrado: PagoFolio = {
   id: generateUUID(),
   folioId: 'FOL-RES-R1005',
   cajaSesionId: null,
   usuarioId: 'USR-RECEP-0002',
-  metodoPago: 'TARJETA_CREDITO',
-  subMetodoPago: 'VISA',
-  monto: 965.80,
+  metodoPago: 'EFECTIVO',
+  subMetodoPago: 'SOLES_EFECTIVO',
+  monto: 637.20,
   moneda: 'PEN',
   tipoCambioMonedaReferencia: 1.0,
-  montoMonedaOriginal: 965.80,
+  montoMonedaOriginal: 637.20,
   fechaHoraPago: addDaysISO(hoy(), -2),
-  referenciaBancaria: 'TXN-VISA-77889900',
-  comprobanteAsociadoId: 'CPE-BOLETA-00123',
+  referenciaBancaria: null,
+  comprobanteAsociadoId: 'CPE-BOLETA-000123',
   comprobanteNumero: 'B001-000123',
-  estado: 'COMPLETADO',
+  estado: 'COMPLETADO' as any,
   esPropina: false,
   esParcial: false,
   esDevolucion: false,
@@ -1815,8 +1575,8 @@ const pagoFolioCerrado: PagoFolio = {
   comprobanteEnvioWhatsApp: true,
   comprobantePDFUrl: null,
   cajeroNombre: null,
-  aprobacionCodigo: 'APP-77889900-VISA',
-  observaciones: 'Pago exitoso sin novedades. Check-out R-1005.',
+  aprobacionCodigo: null,
+  observaciones: 'Pago exitoso sin novedades. Check-out R-1005. Estadía 3 noches H201.',
   ...auditSeed
 };
 
@@ -1869,14 +1629,13 @@ const buildComandaDetalle = (comandaId: string, prod: ProductoFB, cant: number, 
 };
 
 const buildComanda = (
-  c: Mesa,
+  c: Mesa | null,
   r: Reserva | null,
   num: string,
   detalles: ComandaDetalle[],
-  opts: Partial<Comanda> = {}
+  opts: Partial<Comanda> & { habitacionId?: string; tipoComandaOverride?: 'ROOM_SERVICE' | 'MESA_RESTAURANTE' } = {}
 ): Comanda => {
   const total = detalles.reduce((sum, d) => sum + d.montoLinea, 0);
-  // IMP: cabecera calculada desde los items (no /1.23 siempre) porque no todos productos tienen SELVA5
   const totalSubtotal = detalles.reduce((s, d) => s + Number(d.subtotal || 0), 0);
   const totalIGV18 = detalles.reduce((s, d) => {
     const arr = d.impuestosMontoDesglosado || [];
@@ -1891,27 +1650,34 @@ const buildComanda = (
   const impuestosDetalle: any[] = [];
   if (totalIGV18 > 0) impuestosDetalle.push({ impuestoId: 'IMP-IGV-18', impuestoNombre: 'IGV 18%', montoImpuesto: Number(totalIGV18.toFixed(2)) });
   if (totalSelva5 > 0) impuestosDetalle.push({ impuestoId: 'IMP-SELVA-5', impuestoNombre: 'IGV Selva 5%', montoImpuesto: Number(totalSelva5.toFixed(2)) });
+
+  const habitacionId = (opts.habitacionId ?? (c?.habitacionAsignadaId || null)) as string | null;
+  const habitacion = habitacionId ? (habitacionesSeed.find((h) => h.id === habitacionId) as Habitacion) ?? null : null;
+  const esRoomService =
+    (opts.tipoComandaOverride === 'ROOM_SERVICE') ||
+    (!!habitacionId && (!c || (c as any).zona === 'ROOM_SERVICE'));
+
   return {
     id: generateUUID(),
-    puntoVentaId: c.puntoVentaId,
+    puntoVentaId: c?.puntoVentaId ?? puntoVentaPrincipal.id,
     puntoVenta: puntoVentaPrincipal,
     cajaSesionId: null,
     numeroCorrelativo: `C-${num}`,
-    mesaId: c.id,
-    mesa: c,
-    habitacionId: c.habitacionAsignadaId || null,
-    habitacion: c.habitacionAsignadaId ? (habitacionesSeed.find((h) => h.id === c.habitacionAsignadaId) as Habitacion) : null,
-    folioId: c.habitacionAsignadaId && r ? `FOL-${r.id}` : null,
+    mesaId: c?.id ?? null,
+    mesa: c ?? (null as any),
+    habitacionId,
+    habitacion,
+    folioId: (habitacionId && r) ? `FOL-${r.id}` : null,
     reservaId: r?.id || null,
     reserva: r || null,
     huespedTitularId: r?.huespedId || null,
     huespedTitular: r?.huesped || null,
-    tipoComanda: c.zona === 'ROOM_SERVICE' ? 'ROOM_SERVICE' : 'MESA_RESTAURANTE',
-    tipoConsumo: c.zona === 'ROOM_SERVICE' ? 'CARGO_A_HABITACION' : 'COBRO_DIRECTO',
-    prioridad: c.habitacionAsignadaId === 'HAB-FAM-03' ? 'ROOM_SERVICE_RAPIDO' : 'NORMAL',
-    estado: opts.estado || 'ABIERTA',
-    estadoEntrega: opts.estadoEntrega || 'EN_PROCESO',
-    modoAtencion: c.zona === 'ROOM_SERVICE' ? 'ROOM_SERVICE' : 'EN_SALON',
+    tipoComanda: (esRoomService ? 'ROOM_SERVICE' : 'MESA_RESTAURANTE') as any,
+    tipoConsumo: (esRoomService ? 'CARGO_A_HABITACION' : 'COBRO_DIRECTO') as any,
+    prioridad: esRoomService ? 'ROOM_SERVICE_RAPIDO' : 'NORMAL',
+    estado: (opts.estado as any) || 'ABIERTA',
+    estadoEntrega: (opts.estadoEntrega as any) || 'EN_PROCESO',
+    modoAtencion: (esRoomService ? 'ROOM_SERVICE' : 'EN_SALON') as any,
     usuarioIdMozoApertura: opts.usuarioIdMozoApertura || 'USR-MOZO-0003',
     mozoAsignado: opts.mozoAsignado || null,
     turnoServicioId: null,
@@ -1919,8 +1685,8 @@ const buildComanda = (
     horaApertura: nowISO(),
     fechaCierre: null,
     horaCierre: null,
-    paxAdultos: c.capacidadActualUsada,
-    paxNinos: 0,
+    paxAdultos: Number((c as any)?.capacidadActualUsada ?? (r?.totalAdultos || 2)),
+    paxNinos: Number(r?.totalNinos || 0),
     moneda: 'PEN',
     detalles,
     totalNetoSinImpuestos: Number(totalSubtotal.toFixed(2)),
@@ -1936,8 +1702,8 @@ const buildComanda = (
     totalFinalConPropina: total,
     saldoPendiente: total,
     totalCobrado: 0,
-    cobros: [],
-    cierre: null,
+    cobros: (opts.cobros as any) || [],
+    cierre: (opts.cierre as any) || null,
     observacionesInternas: opts.observacionesInternas || '',
     horaEnvioKds: nowISO(),
     horaPrimeraEntrega: null,
@@ -1948,114 +1714,37 @@ const buildComanda = (
   };
 };
 
+const buildComandaRoomService = (
+  habitacionId: string,
+  r: Reserva,
+  num: string,
+  detalles: ComandaDetalle[],
+  opts: Partial<Comanda> = {}
+): Comanda => {
+  return buildComanda(null, r, num, detalles, {
+    habitacionId,
+    tipoComandaOverride: 'ROOM_SERVICE',
+    ...opts,
+  });
+};
+
 const prod = (id: string): ProductoFB => {
   const encontrado = productosFBSeed.find((p) => p.id === id);
   if (encontrado) return encontrado;
-  // Fallback 100% seguro anti "prod2 undefined": devuelve Agua Mineral (existe siempre). Evita crash si queda algún ID antiguo olvidado.
   return productosFBSeed.find((p) => p.id === 'PROD-AGUA-MINERAL') || productosFBSeed[productosFBSeed.length - 1] || productosFBSeed[0];
 };
 
 const comandasSeed: Comanda[] = [
-  buildComanda(mesasSeed[0], null, '901', [
-    buildComandaDetalle('', prod('PROD-ENT-ENSALADA-ATUN'), 1, 'Sin cebolla + queso extra'),
-    buildComandaDetalle('', prod('PROD-PLATO-LOMO-SALTADO'), 2, '1 bien cocido, 1 jugoso'),
-    buildComandaDetalle('', prod('PROD-PLATO-ESTOFADO-POLLO'), 1),
-    buildComandaDetalle('', prod('PROD-JUGO-NARANJA'), 2),
-    buildComandaDetalle('', prod('PROD-CERVEZA-ARTESANAL'), 2),
-    buildComandaDetalle('', prod('PROD-POSTRE-WAFFLES'), 1),
-  ], {
-    estado: 'EN_COCINA_BAR',
-    estadoEntrega: 'EN_PROCESO',
-    usuarioIdMozoApertura: 'USR-MOZO-0003',
-  }),
-  buildComanda(mesasSeed[1], null, '902', [
-    buildComandaDetalle('', prod('PROD-ENT-ENSALADA-FRESCA'), 1),
-    buildComandaDetalle('', prod('PROD-PLATO-TRUCHA-PLANCHA'), 1, 'Salsa 3 ajíes por favor'),
-    buildComandaDetalle('', prod('PROD-AGUA-MINERAL'), 1),
-  ], {
-    estado: 'LISTA_PARA_ENTREGAR',
-    estadoEntrega: 'PENDIENTE_ENTREGA_MOZO',
-    usuarioIdMozoApertura: 'USR-MOZO-0004',
-  }),
-  buildComanda(mesasSeed[4], null, '903', [
-    buildComandaDetalle('', prod('PROD-PLATO-PICANTE-CUY'), 1),
-    buildComandaDetalle('', prod('PROD-GASEOSA'), 1, 'Inca Kola'),
-  ], {
-    estado: 'ABIERTA',
-    estadoEntrega: 'TOMANDO_ORDEN',
-    usuarioIdMozoApertura: 'USR-MOZO-0003',
-  }),
-  buildComanda(mesasSeed[5], null, '904', [
-    buildComandaDetalle('', prod('PROD-DESAY-LOMOALJUGO'), 3, ''),
-    buildComandaDetalle('', prod('PROD-CAFE'), 2),
-    buildComandaDetalle('', prod('PROD-INFUSIONES'), 1),
-    buildComandaDetalle('', prod('PROD-JUGO-NARANJA'), 2),
-  ], {
-    estado: 'CERRADA_COBRADA',
-    estadoEntrega: 'TODOS_ENTREGADOS',
-    usuarioIdMozoApertura: 'USR-MOZO-0004',
-    cobros: [{
-      id: generateUUID(),
-      comandaId: '',
-      folioId: null,
-      cajaSesionId: null,
-      usuarioIdCobro: 'USR-MOZO-0004',
-      metodoPago: 'EFECTIVO',
-      subMetodoPago: 'SOLES_EFECTIVO',
-      monto: 98.0,
-      moneda: 'PEN',
-      montoPagadoCon: 100.00,
-      montoVuelto: 2.00,
-      fechaHoraCobro: nowISO(),
-      comprobanteId: null,
-      comprobanteNumero: null,
-      referenciaBancaria: null,
-      comprobanteEnvioCorreo: false,
-      comprobanteEnvioWhatsApp: false,
-      comprobantePDFUrl: null,
-      estado: 'COMPLETADO',
-      cierreCajaId: null,
-      observaciones: 'Cliente pagó en efectivo S/ 100, vuelto S/ 2 soles',
-      ...auditSeed
-    }],
-    cierre: {
-      id: generateUUID(),
-      comandaId: '',
-      tipo: 'COBRO_DIRECTO',
-      folioIdCargado: null,
-      cajaSesionId: null,
-      usuarioIdCierre: 'USR-MOZO-0004',
-      fechaHoraCierre: nowISO(),
-      observaciones: 'Cobro completo',
-      ...auditSeed
-    } as CierreComanda,
-  }),
-  buildComanda(mesasSeed[6], reserva1, '910', [
+  buildComandaRoomService('HAB-H202', reserva1, '801', [
     buildComandaDetalle('', prod('PROD-DESAY-CONTINENTAL'), 2),
     buildComandaDetalle('', prod('PROD-CAFE'), 2, 'Café poco azúcar'),
     buildComandaDetalle('', prod('PROD-JUGO-NARANJA'), 1),
-    buildComandaDetalle('', prod('PROD-ENT-ENSALADA-FRESCA'), 1, 'Sin gluten, pide opción sin croutons'),
     buildComandaDetalle('', prod('PROD-AGUA-MINERAL'), 1, 'Sin gas, bien fría'),
   ], {
-    estado: 'EN_COCINA_BAR',
-    estadoEntrega: 'EN_PROCESO',
+    estado: 'EN_COCINA_BAR' as any,
+    estadoEntrega: 'EN_PROCESO' as any,
     usuarioIdMozoApertura: 'USR-RS-0005',
-    observacionesInternas: 'Room Service Hab 101 / CAB-01. Entregar con cubertería de 2 + servilletas tela. Aplicar cargo automático al folio #F-2026-0920-001.',
-  }),
-  buildComanda(mesasSeed[7], reserva3, '915', [
-    buildComandaDetalle('', prod('PROD-DESAY-LOMOALJUGO'), 4),
-    buildComandaDetalle('', prod('PROD-CAFE'), 2),
-    buildComandaDetalle('', prod('PROD-INFUSIONES'), 1),
-    buildComandaDetalle('', prod('PROD-JUGO-NARANJA'), 2),
-    buildComandaDetalle('', prod('PROD-CERVEZA-ARTESANAL'), 4),
-    buildComandaDetalle('', prod('PROD-VINO-SANTIAGO-QUEIROLO'), 2),
-    buildComandaDetalle('', prod('PROD-PLATO-LOMO-SALTADO'), 2),
-    buildComandaDetalle('', prod('PROD-POSTRE-WAFFLES'), 2, 'Pastel sorpresa incluido (cumpleaños 21 Sep Fiorella 18 años)'),
-  ], {
-    estado: 'ABIERTA',
-    estadoEntrega: 'TOMANDO_ORDEN',
-    usuarioIdMozoApertura: 'USR-RS-0005',
-    observacionesInternas: 'Room Service Hab 103 / FAM-03. Carga automática a folio #F-2026-0920-002. Incluye pastel sorpresa cumpleaños 20:30 hrs (contactar pastelería). Prioridad ALTA.',
+    observacionesInternas: 'Room Service Hab H202. Entregar con cubertería de 2 + servilletas de tela. Cargo automático al folio #F-2026-0920-001 (huésped R1001).',
   }),
 ];
 

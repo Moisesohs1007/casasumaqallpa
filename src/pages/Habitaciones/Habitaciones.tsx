@@ -187,12 +187,10 @@ const HabitacionesPage: React.FC = () => {
     }
 
     if (est === 'LIMPIEZA' || est === 'MANTENIMIENTO' || est === 'BLOQUEADA') {
-      if (est !== 'LIBRE') {
-        opciones.push({
-          text: '✅ Marcar como LIBRE',
-          handler: () => marcarEstado(h, 'LIBRE'),
-        });
-      }
+      opciones.push({
+        text: '✅ Marcar como LIBRE',
+        handler: () => marcarEstado(h, 'LIBRE'),
+      });
     }
 
     opciones.push({

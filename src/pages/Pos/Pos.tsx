@@ -203,8 +203,22 @@ const PosPage: React.FC = () => {
             {!loading && vistaMesas.length === 0 && (
               <IonCol size="12">
                 <IonCard>
-                  <IonCardContent style={{ textAlign: 'center', padding: '24px 0' }}>
-                    No hay mesas/puntos de venta registrados. Abre el SQL Editor en Supabase y carga el seed demo.
+                  <IonCardContent style={{ textAlign: 'center', padding: '32px 16px' }}>
+                    <div style={{ fontSize: 48, marginBottom: 12 }}>🍽️</div>
+                    <strong style={{ fontSize: 16, display: 'block', marginBottom: 8 }}>
+                      Restaurante operando solo en modo Room Service
+                    </strong>
+                    <p style={{ margin: '4px 0', color: 'var(--ion-color-medium)' }}>
+                      No hay mesas físicas de salón habilitadas.
+                    </p>
+                    <p style={{ margin: '8px 0 0', fontWeight: 500 }}>
+                      Para agregar un consumo:
+                    </p>
+                    <ol style={{ textAlign: 'left', display: 'inline-block', margin: '8px auto 0', paddingLeft: 22, color: 'var(--ion-color-medium-shade)' }}>
+                      <li>Ir a la pantalla <strong>Habitaciones</strong></li>
+                      <li>Hacer clic en una habitación <strong>OCUPADA</strong></li>
+                      <li>Elegir la opción <strong>Agregar Consumo / Room Service</strong></li>
+                    </ol>
                   </IonCardContent>
                 </IonCard>
               </IonCol>
