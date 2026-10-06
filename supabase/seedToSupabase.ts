@@ -231,8 +231,61 @@ async function runSql(sql: string) {
 
 async function main() {
   console.log('🚀 Subiendo seed a Supabase →', URL);
-  // 1) Warm up + set loose config (no requiere superuser). FK constraint: limpiamos referencias huérfanas a NULL.
   await runSql('--');
+
+  // ---------- CLEANUP ANTES DE UPSERT: borra filas antiguas que NO estén en el seed nuevo ----------
+  // (evita merge con IDs antiguos que ya no existen, ej: 12 hab CAB/FAM/DOB → 5 hab H201/H202/H203/SUITE/CABAÑA)
+  const CLEANUP_TABLES_ORDER = [
+    'comandas_detalles','cargos_folio','pagos_folio','comandas','folios','reservas','mesas',
+    'habitaciones','tarifas','codigos_promo','politicas_cancelacion','temporadas','tipos_habitacion',
+    'puntos_venta','huespedes','usuarios','roles',
+    'modificadores_fb','presentaciones_fb','productos_fb','categorias_fb','alergenos','impuestos',
+  ];
+  for (const t of TABLES) {
+    if (!CLEANUP_TABLES_ORDER.includes(t.table)) continue;
+    let rows: any[] = [];
+    try { rows = t.rowsFn() || []; } catch { rows = []; }
+    const okIds = new Set<string>(rows.map((r: any) => String(r.id)).filter(Boolean));
+    if (!okIds.size) {
+      // Vacío en seed → borra TODO
+      try {
+        const { error } = await sb.from(t.table).delete().neq('id', '00000000-0000-0000-0000-000000000000');
+        if (error) console.warn(`⚠  ${t.table} cleanup empty failed → ${error.message}`);
+        else console.log(`🗑️  ${t.table}: seed vacío, tabla limpiada (DELETE all)`);
+      } catch (e: any) { console.warn(`⚠  ${t.table} cleanup empty EXC → ${e?.message}`); }
+      continue;
+    }
+    // Batch: págino de a 100 ids por DELETE NOT IN (avoid largo query)
+    const idsArr = Array.from(okIds);
+    try {
+      let deletedCount = 0;
+      for (let i = 0; i < idsArr.length; i += 100) {
+        const slice = idsArr.slice(i, i + 100);
+        // 1) Seleccionar todos IDs que NO estén en slice paginado — lo hacemos por not ilike + global:
+        //    alternativa: SELECT id FROM tabla WHERE id NOT IN (slice) → delete
+        const { data: idsToDelete, error: selErr } = await sb
+          .from(t.table)
+          .select<string, { id: string }>('id')
+          .not('id', 'in', `(${slice.map(id => "'" + id.replace(/'/g, "''") + "'").join(',')})`);
+        if (selErr) { console.warn(`⚠  ${t.table} select ids to delete → ${selErr.message}`); break; }
+        if (!idsToDelete || !idsToDelete.length) break;
+        const delIds = idsToDelete.map(x => x.id);
+        if (!delIds.length) break;
+        // delete paginado
+        for (let j = 0; j < delIds.length; j += 100) {
+          const delChunk = delIds.slice(j, j + 100);
+          const { error: delErr } = await sb
+            .from(t.table)
+            .delete()
+            .in('id', delChunk);
+          if (delErr) { console.warn(`⚠  ${t.table} delete chunk ${j} → ${delErr.message}`); break; }
+          deletedCount += delChunk.length;
+        }
+      }
+      if (deletedCount) console.log(`🗑️  ${t.table}: ${deletedCount} filas antiguas eliminadas (no en seed nuevo)`);
+    } catch (e: any) { console.warn(`⚠  ${t.table} cleanup EXC → ${e?.message}`); }
+  }
+  // ---------- FIN CLEANUP ----------
 
   for (const t of TABLES) {
     let rows: any[] = [];

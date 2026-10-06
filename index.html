@@ -14,25 +14,38 @@
     <link rel="manifest" href="./manifest.webmanifest" />
     <title>Casa Sumaq Allpa - Sistema de Gestión</title>
     <script>
-      if ('serviceWorker' in navigator) {
-        window.addEventListener('load', function () {
-          navigator.serviceWorker.getRegistrations().then(function (registrations) {
-            var pending = registrations.map(function (reg) { return reg.unregister(); });
-            if ('caches' in window) {
-              pending.push(window.caches.keys().then(function (keys) {
-                return Promise.all(keys.map(function (k) { return window.caches.delete(k); }));
-              }));
-            }
-            Promise.all(pending).then(function () {
-              if (location.pathname !== '/casasumaqallpa/') {
-                location.replace('/casasumaqallpa/');
-              } else {
-                location.reload();
-              }
-            });
+      (function () {
+        function cleanupThenContinue() {
+            if (!('serviceWorker' in navigator)) return Promise.resolve(false);
+            return navigator.serviceWorker.getRegistrations()
+              .then(function (registrations) {
+                var pending = registrations.map(function (reg) { return reg.unregister(); });
+                if ('caches' in window) {
+                  pending.push(window.caches.keys().then(function (keys) {
+                    return Promise.all(keys.map(function (k) { return window.caches.delete(k); }));
+                  }));
+                }
+                return Promise.all(pending).then(function () { return registrations.length > 0 || ('caches' in window); });
+              });
+        }
+        var needsRedirect = location.pathname.indexOf('/casasumaqallpa') !== 0;
+        if (needsRedirect) {
+          cleanupThenContinue().finally(function () {
+            var newPath = '/casasumaqallpa/' + (location.hash || '');
+            location.replace(newPath);
           });
-        });
-      }
+        } else {
+          // Ruta ya correcta: limpia SW/caches y reload SOLO 1 vez al iniciar (flag #limpio para no loop)
+          try {
+            if (sessionStorage.getItem('csq_sw_cleaned') !== '1') {
+              cleanupThenContinue().then(function (didClean) {
+                sessionStorage.setItem('csq_sw_cleaned', '1');
+                if (didClean) location.reload();
+              });
+            }
+          } catch (e) {}
+        }
+      })();
     </script>
   </head>
   <body>
