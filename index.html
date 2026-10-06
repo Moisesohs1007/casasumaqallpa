@@ -15,6 +15,18 @@
     <title>Casa Sumaq Allpa - Sistema de Gestión</title>
     <script>
       (function () {
+        // GitHub Pages SPA Fallback: lee ?p=/ruta (generado por 404.html) y restaura pathname real ANTES que Ionic Router arranque
+        try {
+          var q = new URLSearchParams(window.location.search);
+          var p = q.get('p');
+          if (p) {
+            q.delete('p');
+            var qs = q.toString();
+            var restoredPath = p + (qs ? '?' + qs : '') + (window.location.hash || '');
+            window.history.replaceState(null, '', '/casasumaqallpa' + restoredPath);
+          }
+        } catch (e) {}
+
         function cleanupThenContinue() {
             if (!('serviceWorker' in navigator)) return Promise.resolve(false);
             return navigator.serviceWorker.getRegistrations()
@@ -35,7 +47,6 @@
             location.replace(newPath);
           });
         } else {
-          // Ruta ya correcta: limpia SW/caches y reload SOLO 1 vez al iniciar (flag #limpio para no loop)
           try {
             if (sessionStorage.getItem('csq_sw_cleaned') !== '1') {
               cleanupThenContinue().then(function (didClean) {
