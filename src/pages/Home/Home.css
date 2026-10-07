@@ -1,61 +1,32 @@
-.dashboard-card {
-  min-height: 140px;
-  border-radius: 12px;
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.08);
-}
-
-.card-header-row {
+/* ============= LAYOUT HOME 100dvh SIN SCROLL ============= */
+.home-page {
+  height: 100dvh;
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.badge-value {
-  font-size: 1.4rem;
-  padding: 8px 14px;
-  border-radius: 999px;
-}
-
-.badge-sub {
-  margin-left: 4px;
-  opacity: 0.8;
-  font-size: 0.85rem;
-}
-
-.card-title {
-  font-size: 1rem;
-  font-weight: 500;
-}
-
-.home-ul {
-  padding-left: 1.25rem;
-}
-
-.home-ul li {
-  margin-bottom: 8px;
-  line-height: 1.45;
-}
-
-.home-ul code {
-  background: rgba(0, 0, 0, 0.07);
-  padding: 1px 6px;
-  border-radius: 4px;
-  font-size: 0.82rem;
-}
-
-.portada-card {
+  flex-direction: column;
   overflow: hidden;
-  border-radius: 14px;
-  padding: 0;
-  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.12);
 }
 
+.home-content {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px 10px 6px !important;
+  overflow: hidden;
+}
+
+/* ------------- PORTADA ------------- */
 .portada-wrap {
   position: relative;
   width: 100%;
-  aspect-ratio: 16 / 9;
+  max-height: 22svh;
+  min-height: 100px;
+  flex: 0 0 auto;
   background: #1a1a1a;
+  border-radius: 10px;
   overflow: hidden;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
 }
 
 .portada-img {
@@ -70,20 +41,160 @@
   left: 0;
   right: 0;
   bottom: 0;
-  padding: 20px 18px 16px;
-  background: linear-gradient(to top, rgba(0, 0, 0, 0.72) 0%, rgba(0, 0, 0, 0.25) 65%, transparent 100%);
+  padding: 10px 12px 8px;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.7) 0%, rgba(0, 0, 0, 0.18) 70%, transparent 100%);
   color: #fff;
 }
 
 .portada-titulo {
-  font-size: 1.55rem;
+  font-size: 1.05rem;
   font-weight: 700;
   letter-spacing: 0.2px;
-  text-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
 }
 
 .portada-sub {
+  font-size: 0.7rem;
+  opacity: 0.92;
+  margin-top: 1px;
+}
+
+/* ------------- TODAY + BOTÓN VER CARTA ------------- */
+.today-row {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 8px;
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 1px 5px rgba(0, 0, 0, 0.05);
+}
+
+.today-text { min-width: 0; }
+.today-date {
   font-size: 0.9rem;
-  opacity: 0.9;
+  font-weight: 600;
+  line-height: 1.2;
+  color: #1a1a1a;
+}
+.today-sub {
+  font-size: 0.72rem;
+  color: #666;
+  margin-top: 2px;
+}
+
+/* ------------- KPIs ------------- */
+.kpis-row {
+  flex: 0 0 auto;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+}
+
+.kpi-card {
+  border-radius: 10px;
+  padding: 7px 8px;
+  min-height: 74px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  color: #fff;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+.kpi-primary   { background: var(--ion-color-primary, #3880ff); }
+.kpi-warning   { background: var(--ion-color-warning, #ffc409); color: #1a1a1a; }
+.kpi-tertiary  { background: var(--ion-color-tertiary, #7044ff); }
+.kpi-success   { background: var(--ion-color-success, #10dc60); }
+
+.kpi-warning .kpi-icon, .kpi-success .kpi-icon { filter: drop-shadow(0 1px 1px rgba(0,0,0,0.15)); }
+.kpi-warning { color: #111; }
+.kpi-success { color: #fff; }
+
+.kpi-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px;
+}
+
+.kpi-icon { font-size: 1.25rem; opacity: 0.98; }
+.kpi-icon.sc-ion-icon-md-h, .kpi-icon.sc-ion-icon-ios-h { font-size: 1.25rem !important; }
+
+.kpi-value {
+  font-size: 1.2rem;
+  font-weight: 800;
+  line-height: 1;
+  background: rgba(255,255,255,0.92);
+  color: #1a1a1a;
+  padding: 2px 8px;
+  border-radius: 999px;
+}
+.kpi-badgesub {
+  margin-left: 2px;
+  font-size: 0.72rem;
+  opacity: 0.8;
+  font-weight: 600;
+}
+.kpi-label {
+  font-size: 0.66rem;
+  font-weight: 600;
+  line-height: 1.15;
+  opacity: 0.96;
   margin-top: 3px;
+}
+
+/* ------------- TIPS / INSTRUCCIONES ------------- */
+.tips-box {
+  flex: 1 1 auto;
+  min-height: 0;
+  padding: 7px 10px;
+  background: #f7f7fb;
+  border: 1px solid #e7e7f0;
+  border-radius: 8px;
+  overflow: hidden;
+}
+.tips-title {
+  font-size: 0.76rem;
+  font-weight: 700;
+  color: #4a4a68;
+  margin-bottom: 4px;
+}
+.tips-list {
+  margin: 0;
+  padding-left: 18px;
+  line-height: 1.38;
+}
+.tips-list li {
+  font-size: 0.7rem;
+  color: #555;
+  margin-bottom: 2px;
+}
+.tips-list code {
+  background: rgba(0, 0, 0, 0.06);
+  padding: 0 4px;
+  border-radius: 3px;
+  font-size: 0.68rem;
+}
+
+/* Anulamos márgenes Ionic por defecto de ion-card/ion-grid si quedaran */
+ion-card { margin: 0 !important; }
+ion-grid { padding: 0 !important; }
+ion-row { margin: 0 !important; }
+ion-col { padding: 4px !important; }
+ion-item {
+  --inner-padding-end: 4px;
+  --padding-start: 6px;
+  --padding-end: 6px;
+  --min-height: auto;
+}
+ion-card-header { padding: 8px 10px !important; }
+ion-card-content { padding: 8px 10px 10px !important; }
+ion-label h2 { margin: 0 !important; font-size: 0.9rem; font-weight: 600; }
+ion-label p { margin: 0 !important; font-size: 0.75rem; color: #666; }
+
+/* ---- Ajustes viewport móvil: ocultar barras iOS ---- */
+@supports (height: 100dvh) {
+  .home-page { height: 100dvh; }
 }

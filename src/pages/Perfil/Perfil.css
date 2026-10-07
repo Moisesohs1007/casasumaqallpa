@@ -30,3 +30,205 @@
   border-radius: 50%;
   letter-spacing: 0.5px;
 }
+
+/* =============== PANEL ADMIN =============== */
+.admin-card {
+  border-radius: 14px;
+  border-top: 3px solid var(--ion-color-primary, #2dd36f);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.07);
+  margin-top: 14px;
+}
+.admin-header {
+  padding-bottom: 6px !important;
+}
+.admin-title-icon {
+  margin-right: 8px;
+  vertical-align: -3px;
+  color: var(--ion-color-primary, #2dd36f);
+}
+.admin-content {
+  padding-top: 4px !important;
+}
+
+.subcard {
+  border-radius: 12px;
+  background: #fafafe;
+  border: 1px solid #ececf5;
+  margin-top: 6px;
+  box-shadow: none;
+}
+.subcard-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 12px !important;
+}
+.subcard-title {
+  font-size: 1rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  flex: 1;
+}
+.subcard-title ion-icon {
+  color: var(--ion-color-primary, #2dd36f);
+}
+.admin-count {
+  font-size: 0.75rem;
+  margin-left: 6px;
+}
+
+.admin-habs-list {
+  padding: 0 8px 10px !important;
+}
+.admin-empty {
+  text-align: center;
+  padding: 16px 0 4px;
+}
+.admin-hab-item {
+  --inner-padding-end: 0;
+  --padding-start: 0;
+  --padding-end: 0;
+  --min-height: auto;
+  padding: 4px 0 !important;
+}
+.hab-grid {
+  padding: 0 !important;
+  width: 100%;
+}
+.hab-col {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 2px 6px !important;
+  min-width: 0;
+}
+.hab-codigo {
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: #1a1a1a;
+  letter-spacing: 0.3px;
+}
+.hab-nombre {
+  font-size: 0.7rem;
+  color: #666;
+  margin-top: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.hab-badge {
+  font-size: 0.7rem !important;
+  padding: 2px 8px;
+  align-self: flex-start;
+  margin-bottom: 3px;
+  border-radius: 999px !important;
+}
+.hab-tipo {
+  font-size: 0.7rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+.hab-precio-col { align-items: flex-end; }
+.hab-precio {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-weight: 700;
+  color: #222;
+  font-size: 0.8rem;
+  background: #fff;
+  padding: 3px 8px;
+  border-radius: 999px;
+  border: 1px solid #e8e8ef;
+}
+.hab-precio ion-icon {
+  font-size: 0.82rem;
+  color: var(--ion-color-warning, #ffc409);
+}
+.hab-actions-col {
+  align-items: flex-end;
+  flex-direction: row !important;
+  justify-content: flex-end;
+  gap: 0;
+}
+.hab-actions-col ion-button {
+  --padding-start: 4px;
+  --padding-end: 4px;
+  margin: 0 2px;
+}
+
+/* ---- Alert body custom ---- */
+.hab-alert-body {
+  padding: 0 18px 6px;
+  max-height: 62vh;
+  overflow-y: auto;
+}
+.hab-alert-row {
+  margin: 8px 0;
+}
+.hab-alert-row-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.hab-alert-actions-inline {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin: 12px 0 4px;
+}
+
+/* Toast inline admin */
+.admin-toast {
+  position: fixed;
+  left: 50%;
+  bottom: calc(56px + 18px);
+  transform: translateX(-50%);
+  background: #111;
+  color: #fff;
+  padding: 9px 16px;
+  border-radius: 999px;
+  font-size: 0.82rem;
+  font-weight: 500;
+  z-index: 1000;
+  box-shadow: 0 4px 14px rgba(0,0,0,0.22);
+  max-width: 85vw;
+  text-align: center;
+  pointer-events: none;
+}
+
+/* Grid en formulario Hab modal */
+.hab-form-grid { padding: 0 !important; }
+.hab-form-grid ion-row { margin: 0; }
+.hab-form-grid ion-col { padding: 0 4px !important; }
+.hab-form-grid ion-item {
+  --inner-padding-end: 8px;
+  --min-height: 0;
+}
+.hab-alert-actions-inline {
+  display: grid !important;
+  grid-template-columns: 1fr 1fr !important;
+  gap: 10px;
+  margin: 6px 2px 14px !important;
+}
+.hab-alert-actions-inline ion-button {
+  margin: 0;
+  width: 100%;
+}
+
+ion-card-subtitle {
+  margin-top: 3px;
+  font-size: 0.76rem;
+  color: #666;
+}
+ion-card-content p {
+  margin: 4px 0;
+  font-size: 0.85rem;
+  line-height: 1.45;
+}

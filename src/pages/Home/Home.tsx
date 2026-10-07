@@ -162,41 +162,32 @@ const HomePage: React.FC<HomePageProps> = () => {
   void sessionUsuario;
 
   return (
-    <IonPage>
+    <IonPage className="home-page">
       <IonHeader>
         <IonToolbar color="primary">
           <IonTitle>Casa Sumaq Allpa</IonTitle>
         </IonToolbar>
       </IonHeader>
 
-      <IonContent fullscreen className="ion-padding">
-        <IonHeader collapse="condense">
-          <IonToolbar>
-            <IonTitle size="large">Inicio</IonTitle>
-          </IonToolbar>
-        </IonHeader>
-
+      <IonContent fullscreen scrollY={false} className="home-content">
         {portadaSrc && (
-          <IonCard className="portada-card">
-            <div className="portada-wrap">
-              <IonImg src={portadaSrc} alt="Portada Casa Sumaq Allpa" className="portada-img" />
-              <div className="portada-overlay">
-                <div className="portada-titulo">Casa Sumaq Allpa</div>
-                <div className="portada-sub">Sistema de Gestión Hotelera</div>
-              </div>
+          <div className="portada-wrap">
+            <IonImg src={portadaSrc} alt="Portada Casa Sumaq Allpa" className="portada-img" />
+            <div className="portada-overlay">
+              <div className="portada-titulo">Casa Sumaq Allpa</div>
+              <div className="portada-sub">Sistema de Gestión Hotelera</div>
             </div>
-          </IonCard>
+          </div>
         )}
 
-        <IonItem lines="none" className="ion-margin-bottom">
-          <IonLabel>
-            <h2 className="ion-text-capitalize">{today}</h2>
-            <p>Bienvenido(a) al panel de gestión.</p>
-          </IonLabel>
+        <div className="today-row">
+          <div className="today-text">
+            <div className="today-date ion-text-capitalize">{today}</div>
+            <div className="today-sub">Bienvenido(a) al panel de gestión.</div>
+          </div>
           {cartaHref && (
             <IonButton
-              slot="end"
-              size="default"
+              size="small"
               color="secondary"
               onClick={() => window.open(cartaHref, '_blank', 'noopener,noreferrer')}
             >
@@ -204,42 +195,30 @@ const HomePage: React.FC<HomePageProps> = () => {
               Ver carta
             </IonButton>
           )}
-        </IonItem>
+        </div>
 
-        <IonGrid>
-          <IonRow>
-            {dashboardItems.map((item) => (
-              <IonCol key={item.id} size="12" size-sm="6" size-md="6" size-lg="4" size-xl="3">
-                <IonCard color={`${item.color}`} className="dashboard-card">
-                  <IonCardHeader>
-                    <div className="card-header-row">
-                      <IonIcon icon={item.icon} size="large" color="light" />
-                      <IonBadge color="light" className="badge-value">
-                        {item.value}
-                        {item.badge ? <span className="badge-sub">{item.badge}</span> : null}
-                      </IonBadge>
-                    </div>
-                    <IonCardTitle className="ion-padding-top card-title">{item.label}</IonCardTitle>
-                  </IonCardHeader>
-                </IonCard>
-              </IonCol>
-            ))}
-          </IonRow>
-        </IonGrid>
+        <div className="kpis-row">
+          {dashboardItems.map((item) => (
+            <div key={item.id} className={`kpi-card kpi-${item.color}`}>
+              <div className="kpi-top">
+                <IonIcon icon={item.icon} color="light" className="kpi-icon" />
+                <div className="kpi-value">
+                  {item.value}
+                  {item.badge ? <span className="kpi-badgesub">{item.badge}</span> : null}
+                </div>
+              </div>
+              <div className="kpi-label">{item.label}</div>
+            </div>
+          ))}
+        </div>
 
-        <IonCard className="ion-margin-top">
-          <IonCardHeader>
-            <IonCardTitle>Instrucciones rápidas</IonCardTitle>
-          </IonCardHeader>
-          <IonCardContent>
-            <ul className="home-ul">
-              <li><strong>📸 Portada/Logo:</strong> Guarda la imagen en <code>public/portada.jpg</code> (o .png / .webp) y aparecerá automáticamente arriba. No usar carpeta <code>dist/</code>, se borra en cada build.</li>
-              <li><strong>📄 Carta del lodge:</strong> Guarda el PDF en <code>public/carta.pdf</code> para que aparezca el botón "Ver carta" arriba.</li>
-              <li><strong>🛏️ Operación diaria:</strong> Todo desde la pestaña <strong>Habitaciones</strong>. POS para clientes eventuales walk-in.</li>
-              <li><strong>💾 Base de datos SQL:</strong> Usa <code>npm run db:migrate -- --file tu_migracion.sql</code> (sin popup Run/Skip).</li>
-            </ul>
-          </IonCardContent>
-        </IonCard>
+        <div className="tips-box">
+          <div className="tips-title">Instrucciones rápidas</div>
+          <ol className="tips-list">
+            <li>📸 Portada: <code>public/portada.jpg</code> · 📄 Carta: <code>public/carta.pdf</code></li>
+            <li>🛏️ Operación diaria: pestaña <strong>Habitaciones</strong> · 💳 Walk-in: pestaña POS</li>
+          </ol>
+        </div>
       </IonContent>
     </IonPage>
   );
