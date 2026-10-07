@@ -6,7 +6,10 @@ import {
   IonTitle,
   IonToolbar,
   IonImg,
+  IonIcon,
 } from '@ionic/react';
+import type { Color } from '@ionic/core';
+import { people, bed, restaurant, trendingUp } from 'ionicons/icons';
 import type { Usuario } from '../../types';
 import './Home.css';
 
@@ -77,6 +80,15 @@ async function findFirstAsset(candidatos: string[], checkType: 'image' | 'any'):
   return null;
 }
 
+interface DashboardKpiItem {
+  id: string;
+  label: string;
+  value: number;
+  badge?: string;
+  icon: string;
+  color: Color;
+}
+
 interface HomePageProps {}
 
 const HomePage: React.FC<HomePageProps> = () => {
@@ -93,6 +105,13 @@ const HomePage: React.FC<HomePageProps> = () => {
     findFirstAsset(PORTADA_CANDIDATOS, 'image').then((url) => alive && setPortadaSrc(url));
     return () => { alive = false; };
   }, []);
+
+  const dashboardItems: DashboardKpiItem[] = [
+    { id: 'kpi-llegadas', label: 'Llegadas hoy',    value: 0,           icon: people,      color: 'primary' },
+    { id: 'kpi-salidas',  label: 'Salidas hoy',     value: 0,           icon: trendingUp,  color: 'warning' },
+    { id: 'kpi-hab',      label: 'Hab. ocupadas',   value: 0, badge:'/5', icon: bed,         color: 'tertiary' },
+    { id: 'kpi-com',      label: 'Comandas activas',value: 0,           icon: restaurant,  color: 'success' },
+  ];
 
   const sessionUsuario: Usuario = {
     id: 'usr-actual',
@@ -124,6 +143,22 @@ const HomePage: React.FC<HomePageProps> = () => {
             <div className="portada-overlay">
               <div className="portada-titulo">Casa Sumaq Allpa</div>
               <div className="portada-sub">Sistema de Gestión Hotelera</div>
+            </div>
+
+            {/* ============ KPIS DENTRO DE LA PORTADA, EN LA FRANJA BLANCA DERECHA (RECTANGULO AZUL) ============ */}
+            <div className="portada-kpis-col">
+              {dashboardItems.map((item) => (
+                <div key={item.id} className={`pkpi-card pkpi-${item.color}`}>
+                  <div className="pkpi-top">
+                    <IonIcon icon={item.icon} color="light" className="pkpi-icon" />
+                    <div className="pkpi-value">
+                      {item.value}
+                      {item.badge ? <span className="pkpi-badgesub">{item.badge}</span> : null}
+                    </div>
+                  </div>
+                  <div className="pkpi-label">{item.label}</div>
+                </div>
+              ))}
             </div>
           </div>
         )}
