@@ -104,6 +104,41 @@ class InMemoryDB {
     return true;
   }
 
+  /** Insertar item raw con ID PRE-DEFINIDO; SOLO si no existe uno con mismo id. Retorna lo insertado o undefined si ya existía. */
+  addRawIfMissingById<T extends { id: string }>(key: CollectionKey, id: string, rawItem: T): T | undefined {
+    const arr = this.data[key] as T[];
+    if (arr.some((x) => x.id === id)) return undefined;
+    arr.push(rawItem);
+    return CLONE(rawItem);
+  }
+
+  /** Deduplicar array por clave business key. Retorna cantidad de duplicados removidos. */
+  deduplicateBy<T extends { [k: string]: any }>(
+    key: CollectionKey,
+    getUniqueKey: (item: T) => string,
+    keepStrategy: 'FIRST' | 'LAST' = 'FIRST'
+  ): number {
+    const arr = this.data[key] as T[];
+    if (!arr || arr.length === 0) return 0;
+    const seen = new Map<string, T>();
+    for (const item of arr) {
+      const uk = getUniqueKey(item);
+      if (!uk) continue;
+      if (keepStrategy === 'FIRST') {
+        if (!seen.has(uk)) seen.set(uk, item);
+      } else {
+        seen.set(uk, item);
+      }
+    }
+    const originalLen = arr.length;
+    const deduped = Array.from(seen.values());
+    if (deduped.length < originalLen) {
+      (this.data[key] as unknown[]) = deduped;
+      return originalLen - deduped.length;
+    }
+    return 0;
+  }
+
   findOne<T extends { [k: string]: any }>(
     key: CollectionKey,
     predicate: (x: T) => boolean

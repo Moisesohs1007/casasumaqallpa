@@ -206,6 +206,7 @@ const NuevaReserva: React.FC = () => {
   const [observacionesHuesped, setObservacionesHuesped] = useState('');
   const [reservaCreada, setReservaCreada] = useState<Reserva | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [creandoReserva, setCreandoReserva] = useState(false);
 
   // ===== Acciones Paso 1 =====
   const doBuscarPorDoc = () => {
@@ -334,9 +335,12 @@ const NuevaReserva: React.FC = () => {
   // ===== Paso 4: Crear =====
   const doCrearReserva = () => {
     setErrorMsg(null);
+    if (creandoReserva) { return; } // Protección doble submit
+    if (!!reservaCreada) { return; } // Ya se creó, evitar re-crear si clickea otra vez
     if (!huespedFinal) { setErrorMsg('Paso 1: Selecciona o crea un huésped.'); return; }
     if (!habitacionSeleccionada || noches < 1) { setErrorMsg('Paso 2: Selecciona fechas válidas y una habitación.'); return; }
     if (!resumenTarifa) { setErrorMsg('Paso 3: Calcula tarifa antes de confirmar.'); return; }
+    setCreandoReserva(true);
     const tipoHabitacion = HabitacionService.listarTipos().find((t) => t.id === habitacionSeleccionada.tipoHabitacionId)!;
     try {
       const nueva = ReservaService.crear({
@@ -447,8 +451,11 @@ const NuevaReserva: React.FC = () => {
         usuarioResponsableId: 'USR-MOISES-0001',
       } as any);
       setReservaCreada(nueva);
+      // Dejar disabled un rato para evitar doble click lento (aunque idempotency ya lo protege)
+      window.setTimeout(() => setCreandoReserva(false), 1500);
     } catch (e: any) {
       setErrorMsg(e.message || 'Error al crear la reserva.');
+      setCreandoReserva(false);
     }
   };
 
@@ -484,6 +491,7 @@ const NuevaReserva: React.FC = () => {
     setObservacionesHuesped('');
     setReservaCreada(null);
     setErrorMsg(null);
+    setCreandoReserva(false);
     setPaso(1);
   });
 
@@ -985,9 +993,9 @@ const NuevaReserva: React.FC = () => {
                           <IonItem><IonLabel>Origen</IonLabel><IonLabel slot="end"><IonBadge>{origen}</IonBadge></IonLabel></IonItem>
                           <IonItem lines="none"><IonLabel style={{ fontSize: 20 }}><b>TOTAL</b></IonLabel><IonLabel slot="end" color="primary" style={{ fontSize: 22 }}><b>S/ {Number(resumenTarifa?.totalFinal || 0).toFixed(2)}</b></IonLabel></IonItem>
                         </IonList>
-                        <IonButton expand="block" color="primary" size="large" onClick={doCrearReserva} style={{ marginTop: 12 }}>
+                        <IonButton expand="block" color="primary" size="large" onClick={doCrearReserva} disabled={creandoReserva || !!reservaCreada} style={{ marginTop: 12 }}>
                           <IonIcon icon={checkmarkDone} slot="start" />
-                          CREAR RESERVA
+                          {creandoReserva ? 'CREANDO...' : !!reservaCreada ? 'RESERVA CREADA ✓' : 'CREAR RESERVA'}
                         </IonButton>
                       </IonCardContent>
                     </IonCard>

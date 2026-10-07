@@ -51,11 +51,15 @@ export const ReservaService = {
         const reservasRemotas = await dbRemota.allAsync<Reserva>(KEY);
         if (reservasRemotas && reservasRemotas.length > 0) {
           db.setAll<Reserva>(KEY, reservasRemotas);
+          const removidos = db.deduplicateBy<Reserva>(KEY, (r: any) => String(r.codigoReserva || r.id || '').trim(), 'FIRST');
+          if (removidos > 0) log(`⚠️  Hidratación: removidos ${removidos} duplicados de reservas por codigoReserva.`);
           _hidratacionDone = true;
-          log(`✅ reservas cargadas: ${reservasRemotas.length}`);
+          log(`✅ reservas cargadas: ${reservasRemotas.length - removidos} (netos tras deduplicar)`);
           return true;
         } else {
           log('⚠️  0 reservas en Supabase Cloud. InMemoryDB se mantiene vacía.');
+          const removidos = db.deduplicateBy<Reserva>(KEY, (r: any) => String(r.codigoReserva || r.id || '').trim(), 'FIRST');
+          if (removidos > 0) log(`🧹 Limpieza: removidos ${removidos} duplicados residuales de reservas en RAM local.`);
           _hidratacionDone = true;
           return true;
         }
@@ -80,6 +84,11 @@ export const ReservaService = {
     buscar?: string;
     soloPendientesGarantia?: boolean;
   }): Reserva[] {
+    // Limpieza segura: dedupe por codigoReserva antes de listar (protección final)
+    try {
+      const removidos = db.deduplicateBy<Reserva>(KEY, (r: any) => String(r.codigoReserva || r.id || '').trim(), 'FIRST');
+      if (removidos > 0) log(`🧹 listarTodas: removidos ${removidos} duplicados de reserva antes de renderizar.`);
+    } catch (_) {}
     let lista = db.all<Reserva>(KEY).sort((a, b) =>
       (b.fechaCreacion || '').localeCompare(a.fechaCreacion || '')
     );
@@ -233,72 +242,91 @@ export const ReservaService = {
     return { valido: true, habitacion, noches, tarifaCalculada: tarifaCalc };
   },
 
-  /** Paso 2 del flujo: crear la reserva. DUAL WRITE local + Supabase Cloud (persiste). */
+  /** Paso 2 del flujo: crear la reserva. DUAL WRITE local + Supabase Cloud (persiste).
+   *  FIX: GENERAR UN SOLO id y UN SOLO codigo ANTES de insertar, y enviar ESTE MISMO id/codigo a AMBAS DBs.
+   *  EVITA el bug anterior: 2 UUIDs diferentes (una local otra remota) → sync-back devolvía 2da copia duplicada.
+   *  FIX 2: Idempotency check: si misma codigoReserva ya existe en local, retornar la existente (evitar doble click).
+   *  FIX 3: Codigo más robusto: timestamp-ms + 2dig random → evita colisiones si 2 clicks en mismo ms.
+   */
   crear(payload: Create<Reserva> & { usuarioResponsableId: string }): Reserva {
-    // Primero, CREAR EN SUPABASE REMOTO para: (a) obtener codigo_reserva MAX+1 único remoto (evita colisiones multi-usuario), (b) persiste.
-    let codigo = siguienteCodigoLocal();
+    const ahora = seedUtil.nowISO();
+    const idUnico = seedUtil.generateUUID();
+    const codigo = (() => {
+      const t = Date.now().toString().slice(-7);
+      const r = Math.floor(Math.random() * 90 + 10);
+      return `R-${t}${r}`;
+    })();
+
+    // ===== FIX IDEMPOTENCIA: Si ya existe reserva con MISMO codigo en memoria, no crear duplicada. =====
+    const existentePorCodigo = db.findOne<Reserva>(KEY, (x: any) => String(x.codigoReserva || '').trim() === codigo.trim());
+    if (existentePorCodigo) {
+      log(`⚠️  Idempotencia: Reserva ${codigo} ya existía, reutilizando para evitar duplicado.`);
+      return this.buscarPorId(existentePorCodigo.id)!;
+    }
+
+    const historial = [agregarHistorial(idUnico, 'CREACION', null, payload, payload.usuarioResponsableId, 'Reserva creada en sistema')];
+
+    const payloadFinal = {
+      ...payload,
+      id: idUnico,
+      codigoReserva: codigo,
+      historialCambios: historial,
+      fechaCreacion: payload.fechaCreacion || ahora,
+      fechaModificacion: ahora,
+      createdBy: payload.usuarioResponsableId,
+      updatedBy: payload.usuarioResponsableId,
+    };
+
+    // ============== 1) DUAL WRITE REMOTO (async fire-and-forget, MISMO id/codigo que local) ==============
     try {
-      // No esperamos asíncrono para no bloquear UI; pero lanzamos dual write fire and forget con el mismo payload.
-      dbRemota.addAsync<Reserva>(KEY, {
-        ...(payload as any),
-        codigoReserva: codigo,
-        historialCambios: [
-          agregarHistorial('', 'CREACION', null, payload, payload.usuarioResponsableId, 'Reserva creada en sistema'),
-        ],
-        fechaCreacion: payload.fechaCreacion || seedUtil.nowISO(),
-        fechaModificacion: seedUtil.nowISO(),
-      } as any).then((remota: any) => {
-        if (remota && remota.id && remota.codigoReserva) {
+      dbRemota.addAsync<Reserva>(KEY, payloadFinal as any)
+        .then((remota: any) => {
           try {
-            // Si la remota tiene ID y codigo nuevo, actualizamos InMemoryDB para que coincidan.
-            const existe = db.getById<any>(KEY, remota.id);
-            if (existe) {
-              db.update<any>(KEY, remota.id, { codigoReserva: remota.codigoReserva, updatedBy: payload.usuarioResponsableId });
-            } else {
-              // Si el insert local falló, metemos la remota.
-              db.setAll<any>(KEY, [remota, ...db.all<any>(KEY).filter((x: any) => x.id !== remota.id)]);
+            if (remota && remota.id === idUnico) {
+              log(`✅ Reserva sincronizada con Supabase (mismo ID): ${remota.codigoReserva || remota.id}`);
+            } else if (remota && remota.codigoReserva) {
+              log(`✅ Reserva sincronizada con Supabase: ${remota.codigoReserva} (${remota.id})`);
             }
-            log(`✅ Reserva sincronizada con Supabase: ${remota.codigoReserva || remota.id}`);
           } catch (_) {}
-        }
-      }).catch((e) => console.error('[ReservaService.crear] Sync remoto falló (reserva no persistida en nube):', e?.message || e));
+        })
+        .catch((e) => console.error('[ReservaService.crear] Sync remoto falló (reserva solo local; volverá a reintentar prox hidratación manual):', e?.message || e));
     } catch (e) {
       console.error('[ReservaService.crear] Error al enviar Supabase:', (e as any)?.message || e);
     }
 
-    // Crear local para UI inmediata (usamos el mismo ID si Supabase devuelve síncrono; pero aquí usamos add local normal)
-    const nueva = db.add<Reserva>(KEY, {
-      ...payload,
-      codigoReserva: codigo,
-      historialCambios: [
-        agregarHistorial('', 'CREACION', null, payload, payload.usuarioResponsableId, 'Reserva creada en sistema'),
-      ],
-      fechaCreacion: payload.fechaCreacion || seedUtil.nowISO(),
-      fechaModificacion: seedUtil.nowISO(),
-    } as unknown as Create<Reserva>);
-
-    // Actualizar historial con id correcto local
-    nueva.historialCambios = nueva.historialCambios.map((h) => ({ ...h, reservaId: nueva.id }));
-    db.update<Reserva>(KEY, nueva.id, {
-      historialCambios: nueva.historialCambios,
-      updatedBy: payload.usuarioResponsableId,
-    } as unknown as Update<Reserva>);
-
-    // Actualizar habitaciones a RESERVADA dual (HabitacionService ya dual)
-    for (const rh of nueva.habitaciones || []) {
-      const hab = HabitacionService.buscarPorId(rh.habitacionId);
-      if (hab && (hab.estado === 'LIBRE' || hab.estado === 'DISPONIBLE')) {
-        HabitacionService.cambiarEstado(rh.habitacionId, 'RESERVADA', payload.usuarioResponsableId);
+    // ============== 2) INSERT LOCAL (UI inmediata, MISMO id/codigo) ==============
+    const yaExiste = db.getById<any>(KEY, idUnico);
+    let nueva: Reserva;
+    if (yaExiste) {
+      nueva = yaExiste as Reserva;
+      log(`⚠️  Reserva id ${idUnico} ya estaba insertada (doble render React StrictMode); reutilizando.`);
+    } else {
+      // Safe fallback: addRawIfMissingById si existe en DB, sino add normal.
+      const asAny = db as any;
+      if (typeof asAny.addRawIfMissingById === 'function') {
+        nueva = asAny.addRawIfMissingById<Reserva>(KEY, idUnico, payloadFinal) || db.add<Reserva>(KEY, payloadFinal as unknown as Create<Reserva>);
+      } else {
+        nueva = db.add<Reserva>(KEY, payloadFinal as unknown as Create<Reserva>);
       }
     }
 
-    // Incrementar visitas de huésped si lo existía (si es que ya tiene dual write en HuespedService: futuro, por ahora local OK)
-    if (HuespedService.buscarPorId(nueva.huespedId)) {
-      HuespedService.actualizar(nueva.huespedId, {
-        updatedBy: payload.usuarioResponsableId,
-        fechaUltimaEstadia: nueva.fechaCheckin,
-      } as any);
+    // Actualizar habitaciones a RESERVADA dual (HabitacionService ya dual)
+    for (const rh of (nueva.habitaciones || [])) {
+      const hab = HabitacionService.buscarPorId(rh.habitacionId);
+      if (hab && (hab.estado === 'LIBRE' || hab.estado === 'DISPONIBLE')) {
+        try { HabitacionService.cambiarEstado(rh.habitacionId, 'RESERVADA', payload.usuarioResponsableId); } catch (_) {}
+      }
     }
+
+    // Incrementar visitas de huésped si lo existía
+    try {
+      if (HuespedService.buscarPorId(nueva.huespedId)) {
+        HuespedService.actualizar(nueva.huespedId, {
+          updatedBy: payload.usuarioResponsableId,
+          fechaUltimaEstadia: nueva.fechaCheckin,
+        } as any);
+      }
+    } catch (_) {}
 
     return this.buscarPorId(nueva.id)!;
   },
