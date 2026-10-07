@@ -8,8 +8,8 @@ import {
   IonImg,
   IonIcon,
 } from '@ionic/react';
-import type { Color } from '@ionic/core';
-import { people, bed, restaurant, trendingUp } from 'ionicons/icons';
+import { useHistory } from 'react-router-dom';
+import { home, calendar, bed, restaurant, personCircle } from 'ionicons/icons';
 import type { Usuario } from '../../types';
 import './Home.css';
 
@@ -80,18 +80,18 @@ async function findFirstAsset(candidatos: string[], checkType: 'image' | 'any'):
   return null;
 }
 
-interface DashboardKpiItem {
+interface NavButtonItem {
   id: string;
   label: string;
-  value: number;
-  badge?: string;
+  route: string;
   icon: string;
-  color: Color;
+  colorClass: string;
 }
 
 interface HomePageProps {}
 
 const HomePage: React.FC<HomePageProps> = () => {
+  const history = useHistory();
   const today = new Date().toLocaleDateString('es-PE', {
     weekday: 'long',
     year: 'numeric',
@@ -106,12 +106,17 @@ const HomePage: React.FC<HomePageProps> = () => {
     return () => { alive = false; };
   }, []);
 
-  const dashboardItems: DashboardKpiItem[] = [
-    { id: 'kpi-llegadas', label: 'Llegadas hoy',    value: 0,           icon: people,      color: 'primary' },
-    { id: 'kpi-salidas',  label: 'Salidas hoy',     value: 0,           icon: trendingUp,  color: 'warning' },
-    { id: 'kpi-hab',      label: 'Hab. ocupadas',   value: 0, badge:'/5', icon: bed,         color: 'tertiary' },
-    { id: 'kpi-com',      label: 'Comandas activas',value: 0,           icon: restaurant,  color: 'success' },
+  const navButtons: NavButtonItem[] = [
+    { id: 'nav-inicio',      label: 'Inicio',        route: '/home',         icon: home,          colorClass: 'nv-inicio' },
+    { id: 'nav-reservas',    label: 'Reservas',      route: '/reservas',     icon: calendar,      colorClass: 'nv-reservas' },
+    { id: 'nav-habitac',     label: 'Habitaciones',  route: '/habitaciones', icon: bed,           colorClass: 'nv-habitac' },
+    { id: 'nav-pos',         label: 'POS',           route: '/pos',          icon: restaurant,    colorClass: 'nv-pos' },
+    { id: 'nav-perfil',      label: 'Perfil',        route: '/perfil',       icon: personCircle,  colorClass: 'nv-perfil' },
   ];
+
+  const goTo = (route: string) => {
+    history.push(route);
+  };
 
   const sessionUsuario: Usuario = {
     id: 'usr-actual',
@@ -145,19 +150,18 @@ const HomePage: React.FC<HomePageProps> = () => {
               <div className="portada-sub">Sistema de Gestión Hotelera</div>
             </div>
 
-            {/* ============ KPIS DENTRO DE LA PORTADA, EN LA FRANJA BLANCA DERECHA (RECTANGULO AZUL) ============ */}
-            <div className="portada-kpis-col">
-              {dashboardItems.map((item) => (
-                <div key={item.id} className={`pkpi-card pkpi-${item.color}`}>
-                  <div className="pkpi-top">
-                    <IonIcon icon={item.icon} color="light" className="pkpi-icon" />
-                    <div className="pkpi-value">
-                      {item.value}
-                      {item.badge ? <span className="pkpi-badgesub">{item.badge}</span> : null}
-                    </div>
-                  </div>
-                  <div className="pkpi-label">{item.label}</div>
-                </div>
+            {/* ========== 5 BOTONES NAV · COLUMNA DERECHA PORTADA · RECUADRO AZUL ========== */}
+            <div className="portada-nav-col">
+              {navButtons.map((b) => (
+                <button
+                  key={b.id}
+                  type="button"
+                  className={`nv-card ${b.colorClass}`}
+                  onClick={() => goTo(b.route)}
+                >
+                  <IonIcon icon={b.icon} color="light" className="nv-icon" />
+                  <div className="nv-label">{b.label}</div>
+                </button>
               ))}
             </div>
           </div>
