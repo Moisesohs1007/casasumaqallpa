@@ -49,6 +49,24 @@
         var href = window.location.href;
         var ghPagesBase = '/casasumaqallpa/';
         var host = window.location.hostname;
+        try {
+          var usp = new URLSearchParams(window.location.search);
+          var pRestored = usp.get('p');
+          if (pRestored) {
+            usp.delete('p');
+            var qRestored = usp.get('q');
+            usp.delete('q');
+            var restoredPath = pRestored.indexOf('/') === 0 ? pRestored : '/' + pRestored;
+            var restoredSearch = qRestored ? '?' + qRestored.replace(/~and~/g, '&') : (usp.toString() ? '?' + usp.toString() : '');
+            var restoredHash = window.location.hash;
+            var target = ghPagesBase + (restoredPath[0] === '/' ? restoredPath.slice(1) : restoredPath) + restoredSearch + restoredHash;
+            window.sessionStorage && window.sessionStorage.setItem('__spa_restored__', '1');
+            window.location.replace(target);
+            throw new Error('__redirect__');
+          }
+        } catch (e) {
+          if (e && e.message === '__redirect__') throw e;
+        }
         if ((host === 'moisesohs1007.github.io' || host.indexOf('github.io') !== -1) && href.indexOf(ghPagesBase) === -1 && href.indexOf('404') === -1) {
           var rest = window.location.pathname === '/' ? '' : window.location.pathname;
           window.location.replace('/casasumaqallpa/' + (rest[0] === '/' ? rest.slice(1) : rest) + window.location.search + window.location.hash);
