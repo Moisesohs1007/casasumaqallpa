@@ -1,4 +1,4 @@
-/* ============= LAYOUT HOME 100dvh SIN SCROLL · SIN CARTA · SIN INSTRUCCIONES ============= */
+/* ============= LAYOUT HOME 100dvh SIN SCROLL · LIMPIO ============= */
 .home-page {
   height: 100dvh;
   display: flex;
@@ -11,8 +11,8 @@
   min-height: 0;
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  padding: 10px 12px 10px !important;
+  gap: 10px;
+  padding: 12px 14px 12px !important;
   overflow: hidden;
 }
 
@@ -20,14 +20,14 @@
 .portada-wrap {
   position: relative;
   width: 100%;
-  max-height: 58svh;
-  min-height: 38svh;
+  max-height: 74svh;
+  min-height: 52svh;
   height: auto;
   flex: 1 1 auto;
   background: #fff;
-  border-radius: 12px;
+  border-radius: 14px;
   overflow: hidden;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.09);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -36,7 +36,7 @@
 .portada-img {
   width: 100%;
   height: 100%;
-  object-fit: contain;      /* <-- NO CORTA LA IMAGEN, la muestra COMPLETA */
+  object-fit: contain;
   object-position: center center;
   display: block;
   background: #fff;
@@ -47,114 +47,50 @@
   left: 0;
   right: 0;
   bottom: 0;
-  padding: 12px 16px 10px;
+  padding: 14px 18px 12px;
   background: linear-gradient(to top, rgba(0, 0, 0, 0.62) 0%, rgba(0, 0, 0, 0.15) 70%, transparent 100%);
   color: #fff;
   pointer-events: none;
 }
 
 .portada-titulo {
-  font-size: 1.25rem;
+  font-size: 1.4rem;
   font-weight: 700;
   letter-spacing: 0.2px;
   text-shadow: 0 1px 3px rgba(0, 0, 0, 0.45);
 }
 
 .portada-sub {
-  font-size: 0.72rem;
+  font-size: 0.78rem;
   opacity: 0.94;
-  margin-top: 2px;
+  margin-top: 3px;
 }
 
-/* ------------- TODAY (SIN BOTÓN VER CARTA) · MÁS DELGADO ------------- */
+/* ------------- TODAY · MÁS DELGADO ------------- */
 .today-row {
   flex: 0 0 auto;
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: center;
   gap: 8px;
-  padding: 5px 10px;
+  padding: 8px 12px;
   background: #fff;
-  border-radius: 8px;
+  border-radius: 10px;
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.05);
+  text-align: center;
 }
-.today-row-slim { padding: 4px 10px; }
+.today-row-slim { padding: 6px 12px; }
 .today-text { min-width: 0; flex: 1; }
 .today-date {
-  font-size: 0.9rem;
+  font-size: 0.94rem;
   font-weight: 700;
   line-height: 1.2;
   color: #1a1a1a;
 }
 .today-sub {
-  font-size: 0.7rem;
+  font-size: 0.74rem;
   color: #666;
-  margin-top: 1px;
-}
-
-/* ------------- KPIS · MUY COMPACTOS (dejamos altura a portada) ------------- */
-.kpis-row {
-  flex: 0 0 auto;
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 6px;
-}
-.kpis-row-compact { gap: 5px; }
-
-.kpi-card {
-  border-radius: 10px;
-  padding: 5px 6px 6px;
-  min-height: 60px;
-  max-height: 68px;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.07);
-  color: #fff;
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-}
-.kpi-compact { padding: 4px 6px 5px; min-height: 58px; }
-.kpi-primary   { background: var(--ion-color-primary, #3880ff); }
-.kpi-warning   { background: var(--ion-color-warning, #ffc409); color: #1a1a1a; }
-.kpi-tertiary  { background: var(--ion-color-tertiary, #7044ff); }
-.kpi-success   { background: var(--ion-color-success, #10dc60); }
-
-.kpi-warning .kpi-icon { filter: drop-shadow(0 1px 1px rgba(0,0,0,0.1)); color: #111 !important; }
-.kpi-success .kpi-icon { color: #fff !important; }
-
-.kpi-top {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 2px;
-}
-
-.kpi-icon { font-size: 1rem; opacity: 0.98; }
-.kpi-icon.sc-ion-icon-md-h, .kpi-icon.sc-ion-icon-ios-h { font-size: 1rem !important; }
-
-.kpi-value {
-  font-size: 1rem;
-  font-weight: 800;
-  line-height: 1;
-  background: rgba(255,255,255,0.94);
-  color: #1a1a1a;
-  padding: 2px 7px;
-  border-radius: 999px;
-}
-.kpi-badgesub {
-  margin-left: 2px;
-  font-size: 0.65rem;
-  opacity: 0.82;
-  font-weight: 600;
-}
-.kpi-label {
-  font-size: 0.62rem;
-  font-weight: 600;
-  line-height: 1.1;
-  opacity: 0.97;
   margin-top: 2px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 /* Anulamos márgenes Ionic por defecto */

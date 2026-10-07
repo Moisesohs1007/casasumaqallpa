@@ -5,23 +5,9 @@ import {
   IonPage,
   IonTitle,
   IonToolbar,
-  IonCard,
-  IonCardHeader,
-  IonCardTitle,
-  IonCardContent,
-  IonGrid,
-  IonRow,
-  IonCol,
-  IonLabel,
-  IonBadge,
-  IonItem,
-  IonIcon,
   IonImg,
-  IonButton,
 } from '@ionic/react';
-import type { Color } from '@ionic/core';
-import { people, bed, restaurant, trendingUp, documentText } from 'ionicons/icons';
-import type { EstadoReserva, EstadoComanda, EstadoHabitacion, MetodoPago, Moneda, OrigenReserva, Usuario } from '../../types';
+import type { Usuario } from '../../types';
 import './Home.css';
 
 const BASE_URL = (import.meta.env.BASE_URL || '/').replace(/\/$/, '');
@@ -53,26 +39,6 @@ const PORTADA_CANDIDATOS = [
   `${BASE_URL}/portada-sumaq-allpa.png`,
   `${BASE_URL}/portada-sumaq-allpa.jpeg`,
 ].map((u) => encodeUriBajo(u));
-const CARTA_CANDIDATOS = [
-  `${BASE_URL}/carta.pdf`,
-  `${BASE_URL}/carta-sumaq-allpa.pdf`,
-  `${BASE_URL}/menu.pdf`,
-  `${BASE_URL}/CARTA SUMAQ ALLPA.pdf`,
-  `${BASE_URL}/CARTA SUMAQ ALLPA..pdf`,
-  `${BASE_URL}/CARTA SUMAQ ALLPA...pdf`,
-  `${BASE_URL}/CARTA SUMAQ ALLPA....pdf`,
-  `${BASE_URL}/CARTA SUMAQ ALLPA.....pdf`,
-  `${BASE_URL}/CARTA SUMAQ ALLPA….pdf`,
-  `${BASE_URL}/CARTA SUMAQ ALLPA……pdf`,
-  `${BASE_URL}/CARTA SUMAQ ALLPA ...pdf`,
-  `${BASE_URL}/CARTA SUMAQ ALLPA ….pdf`,
-  `${BASE_URL}/CARTA SUMAQ ALLPA  ...pdf`,
-  `${BASE_URL}/Carta Sumaq Allpa...pdf`,
-  `${BASE_URL}/CARTA.pdf`,
-  `${BASE_URL}/Carta.pdf`,
-  `${BASE_URL}/Menu.pdf`,
-].map((u) => encodeUriBajo(u));
-
 function probeUrl(url: string): Promise<string | null> {
   return new Promise((resolve) => {
     const img = new Image();
@@ -111,15 +77,6 @@ async function findFirstAsset(candidatos: string[], checkType: 'image' | 'any'):
   return null;
 }
 
-interface DashboardKpiItem {
-  id: string;
-  label: string;
-  value: number;
-  badge?: string;
-  icon: string;
-  color: Color;
-}
-
 interface HomePageProps {}
 
 const HomePage: React.FC<HomePageProps> = () => {
@@ -130,21 +87,12 @@ const HomePage: React.FC<HomePageProps> = () => {
     day: 'numeric',
   });
   const [portadaSrc, setPortadaSrc] = useState<string | null>(null);
-  const [cartaHref, setCartaHref] = useState<string | null>(null);
 
   useEffect(() => {
     let alive = true;
     findFirstAsset(PORTADA_CANDIDATOS, 'image').then((url) => alive && setPortadaSrc(url));
-    findFirstAsset(CARTA_CANDIDATOS, 'any').then((url) => alive && setCartaHref(url));
     return () => { alive = false; };
   }, []);
-
-  const dashboardItems: DashboardKpiItem[] = [
-    { id: 'kpi-llegadas', label: 'Llegadas hoy', value: 0, icon: people, color: 'primary' },
-    { id: 'kpi-salidas', label: 'Salidas hoy', value: 0, icon: trendingUp, color: 'warning' },
-    { id: 'kpi-hab', label: 'Habitaciones ocupadas', value: 0, badge: '/5', icon: bed, color: 'tertiary' },
-    { id: 'kpi-com', label: 'Comandas activas', value: 0, icon: restaurant, color: 'success' },
-  ];
 
   const sessionUsuario: Usuario = {
     id: 'usr-actual',
@@ -185,21 +133,6 @@ const HomePage: React.FC<HomePageProps> = () => {
             <div className="today-date ion-text-capitalize">{today}</div>
             <div className="today-sub">Bienvenido(a) al panel de gestión.</div>
           </div>
-        </div>
-
-        <div className="kpis-row kpis-row-compact">
-          {dashboardItems.map((item) => (
-            <div key={item.id} className={`kpi-card kpi-${item.color} kpi-compact`}>
-              <div className="kpi-top">
-                <IonIcon icon={item.icon} color="light" className="kpi-icon" />
-                <div className="kpi-value">
-                  {item.value}
-                  {item.badge ? <span className="kpi-badgesub">{item.badge}</span> : null}
-                </div>
-              </div>
-              <div className="kpi-label">{item.label}</div>
-            </div>
-          ))}
         </div>
       </IonContent>
     </IonPage>
