@@ -1,13 +1,60 @@
 // @ts-nocheck
 import { db, seedUtil, type Create, type Update, type Habitacion, type TipoHabitacion, type EstadoHabitacion } from './__db__';
+import SupabaseDB, { db as dbRemota } from './__supabase_db__';
 
 const KEY_HAB = 'habitaciones' as const;
 const KEY_TIPO = 'tiposHabitacion' as const;
+const KEY_TAR = 'tarifas' as const;
+const KEY_POL = 'politicasCancelacion' as const;
+
+let _hidratacionDone = false;
+let _hidratandoPromise: Promise<boolean> | null = null;
+
+const log = (msg: string, ...rest: any[]) => {
+  try { console.debug(`[HabitacionService] ${msg}`, ...rest); } catch (_) {}
+};
 
 export const HabitacionService = {
+  // ============= INICIALIZACIÓN: CARGAR DATOS DE SUPABASE REMOTO A INMEMORYDB (solo 1 vez) =============
+  async hidratarDesdeSupabase(force = false): Promise<boolean> {
+    if (_hidratacionDone && !force) return true;
+    if (_hidratandoPromise && !force) return _hidratandoPromise;
+
+    const run = async (): Promise<boolean> => {
+      try {
+        log('Hidratando desde Supabase Cloud...');
+        const [tiposRem, tarifasRem, polsRem, habsRem] = await Promise.all([
+          dbRemota.allAsync<TipoHabitacion>(KEY_TIPO),
+          dbRemota.allAsync<any>(KEY_TAR),
+          dbRemota.allAsync<any>(KEY_POL),
+          dbRemota.allAsync<Habitacion>(KEY_HAB),
+        ]);
+
+        let ok = false;
+        if (tiposRem && tiposRem.length > 0) { db.setAll(KEY_TIPO, tiposRem); ok = true; log(`→ tiposHabitacion cargados: ${tiposRem.length}`); }
+        if (tarifasRem && tarifasRem.length > 0) { db.setAll(KEY_TAR, tarifasRem); ok = true; log(`→ tarifas cargadas: ${tarifasRem.length}`); }
+        if (polsRem && polsRem.length > 0)     { db.setAll(KEY_POL, polsRem);   ok = true; log(`→ politicasCancelacion: ${polsRem.length}`); }
+        if (habsRem && habsRem.length > 0)      { db.setAll(KEY_HAB, habsRem);   ok = true; log(`→ habitaciones cargadas: ${habsRem.length}`); }
+
+        _hidratacionDone = ok;
+        if (ok) log('✅ Hidratación OK. Ahora InMemoryDB sincronizado con Supabase Cloud.');
+        else    log('⚠️  Ninguna tabla remota con datos. Se mantiene seed local InMemoryDB.');
+        return ok;
+      } catch (e) {
+        console.error('[HabitacionService] Error hidratando desde Supabase:', (e as any)?.message || e);
+        _hidratacionDone = false;
+        return false;
+      } finally {
+        _hidratandoPromise = null;
+      }
+    };
+    _hidratandoPromise = run();
+    return _hidratandoPromise;
+  },
+
   // ===== TIPOS DE HABITACIÓN =====
   listarTipos(): TipoHabitacion[] {
-    return db.all<TipoHabitacion>(KEY_TIPO).sort((a, b) => a.precioBaseNoche - b.precioBaseNoche);
+    return db.all<TipoHabitacion>(KEY_TIPO).sort((a, b) => (a.precioBaseNoche || 0) - (b.precioBaseNoche || 0));
   },
 
   buscarTipoPorId(id: string): TipoHabitacion | undefined {
@@ -15,11 +62,18 @@ export const HabitacionService = {
   },
 
   crearTipo(payload: Create<TipoHabitacion>): TipoHabitacion {
-    return db.add<TipoHabitacion>(KEY_TIPO, payload);
+    const tipo = db.add<TipoHabitacion>(KEY_TIPO, payload);
+    // dual-write: no esperar asíncrono para no bloquear UI
+    dbRemota.addAsync<TipoHabitacion>(KEY_TIPO, tipo as any).catch((e) => console.error('[HabitacionService] crearTipo sync remoto falló:', e?.message || e));
+    return tipo;
   },
 
   actualizarTipo(id: string, changes: Update<TipoHabitacion>): TipoHabitacion | undefined {
-    return db.update<TipoHabitacion>(KEY_TIPO, id, changes);
+    const local = db.update<TipoHabitacion>(KEY_TIPO, id, changes);
+    if (local) {
+      dbRemota.updateAsync<TipoHabitacion>(KEY_TIPO, id, changes as any).catch((e) => console.error('[HabitacionService] actualizarTipo sync remoto falló:', e?.message || e));
+    }
+    return local;
   },
 
   // ===== HABITACIONES =====
@@ -44,7 +98,7 @@ export const HabitacionService = {
       lista = lista.filter((h) => {
         const tipo = h.tipoHabitacion || HabitacionService.buscarTipoPorId(h.tipoHabitacionId);
         const cap = (tipo?.capacidadAdultos || 0) + (tipo?.capacidadNinos || 0);
-        return cap >= params.capacidadMinimaPax!;
+        return cap >= params!.capacidadMinimaPax!;
       });
     }
 
@@ -72,7 +126,7 @@ export const HabitacionService = {
     total: number; libres: number; ocupadas: number; mantenimiento: number; limpieza: number; bloqueadas: number; inspeccionadas: number; reservadas: number;
   } {
     const todas = db.all<Habitacion>(KEY_HAB);
-    const count = (estado: EstadoHabitacion) => todas.filter((h) => h.estado === estado).length;
+    const count = (estado: EstadoHabitacion) => todas.filter((h) => (h.estado === estado || (estado === 'LIBRE' && h.estado === 'DISPONIBLE'))).length;
     return {
       total: todas.length,
       libres: count('LIBRE'),
@@ -99,42 +153,60 @@ export const HabitacionService = {
 
   crear(payload: Create<Habitacion>): Habitacion {
     const hab = db.add<Habitacion>(KEY_HAB, payload);
-    if (!hab.tipoHabitacion && hab.tipoHabitacionId) {
-      hab.tipoHabitacion = this.buscarTipoPorId(hab.tipoHabitacionId);
-    }
+    if (!hab.tipoHabitacion && hab.tipoHabitacionId) hab.tipoHabitacion = this.buscarTipoPorId(hab.tipoHabitacionId);
+    dbRemota.addAsync<Habitacion>(KEY_HAB, hab as any).catch((e) => console.error('[HabitacionService] crear sync remoto falló:', e?.message || e));
     return hab;
   },
 
   actualizar(id: string, changes: Update<Habitacion>): Habitacion | undefined {
-    return db.update<Habitacion>(KEY_HAB, id, changes);
+    const local = db.update<Habitacion>(KEY_HAB, id, changes);
+    if (local) {
+      dbRemota.updateAsync<Habitacion>(KEY_HAB, id, changes as any).catch((e) => console.error('[HabitacionService] actualizar sync remoto falló:', e?.message || e));
+    }
+    return local;
   },
 
   cambiarEstado(id: string, estado: EstadoHabitacion, actualizadoPor = 'system-habitaciones'): Habitacion | undefined {
     const actual = db.getById<Habitacion>(KEY_HAB, id);
     if (!actual) return undefined;
-    const cambios: Partial<Habitacion> = { estado, updatedAt: seedUtil.nowISO(), updatedBy: actualizadoPor };
-    if (estado === 'LIBRE') cambios.estadoLimpieza = 'INSPECCIONADA';
-    if (estado === 'LIMPIEZA') cambios.estadoLimpieza = 'EN_PROGRESO';
-    if (estado === 'MANTENIMIENTO') cambios.estadoLimpieza = 'PENDIENTE';
-    return db.update<Habitacion>(KEY_HAB, id, cambios as unknown as Update<Habitacion>);
+    const cambios: Partial<Habitacion> = { estado, updatedAt: seedUtil.nowISO(), updatedBy: actualizadoPor } as any;
+    if (estado === 'LIBRE' || estado === 'DISPONIBLE') cambios.estadoLimpieza = 'INSPECCIONADA' as any;
+    if (estado === 'LIMPIEZA') cambios.estadoLimpieza = 'EN_PROGRESO' as any;
+    if (estado === 'MANTENIMIENTO') cambios.estadoLimpieza = 'PENDIENTE' as any;
+    const local = db.update<Habitacion>(KEY_HAB, id, cambios as unknown as Update<Habitacion>);
+    if (local) {
+      dbRemota.updateAsync<Habitacion>(KEY_HAB, id, cambios as any).catch((e) => console.error('[HabitacionService] cambiarEstado sync remoto falló:', e?.message || e));
+    }
+    return local;
   },
 
   marcarLimpia(id: string, actualizadoPor = 'system-hk'): Habitacion | undefined {
     const actual = db.getById<Habitacion>(KEY_HAB, id);
     if (!actual) return undefined;
-    return db.update<Habitacion>(KEY_HAB, id, {
-      estado: actual.estado === 'LIMPIEZA' ? 'LIBRE' : actual.estado,
+    const patch: any = {
       estadoLimpieza: 'LIMPIA',
       ultimaLimpiezaAt: seedUtil.nowISO(),
       updatedBy: actualizadoPor,
-    } as unknown as Update<Habitacion>);
+    };
+    if (actual.estado === 'LIMPIEZA') patch.estado = 'LIBRE';
+    const local = db.update<Habitacion>(KEY_HAB, id, patch);
+    if (local) {
+      dbRemota.updateAsync<Habitacion>(KEY_HAB, id, patch).catch((e) => console.error('[HabitacionService] marcarLimpia sync remoto falló:', e?.message || e));
+    }
+    return local;
   },
 
   eliminar(id: string): boolean {
-    return db.remove(KEY_HAB, id);
+    const ok = db.remove(KEY_HAB, id);
+    if (ok) {
+      dbRemota.removeAsync(KEY_HAB, id).catch((e) => console.error('[HabitacionService] eliminar sync remoto falló:', e?.message || e));
+    }
+    return ok;
   },
 
   reiniciarSeed(): void {
     db.reset();
+    _hidratacionDone = false;
+    _hidratandoPromise = null;
   },
 };

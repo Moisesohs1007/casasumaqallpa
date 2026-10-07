@@ -21,6 +21,7 @@ import HabitacionesPage from './pages/Habitaciones/Habitaciones';
 import PosPage from './pages/Pos/Pos';
 import PerfilPage from './pages/Perfil/Perfil';
 import FolioPage from './pages/Folio/Folio';
+import { HabitacionService } from './services';
 
 setupIonicReact({
   mode: 'md',
@@ -68,6 +69,22 @@ function ControlPestanaPersistente() {
 }
 
 const App: React.FC = () => {
+  // 1 vez al boot: hidratar InMemoryDB con datos reales de Supabase Cloud (tipos/hab/tarifas/politicas)
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const hidratado = await HabitacionService.hidratarDesdeSupabase(false);
+        if (!cancelled && window && (window as any).console) {
+          (window as any).console.debug('[App] Boot hidratación habitaciones Supabase:', hidratado ? 'OK' : 'falló (se usa seed local)');
+        }
+      } catch (e) {
+        if (!cancelled) console.warn('[App] Boot hidratación error (no fatal):', (e as any)?.message || e);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
   return (
     <IonApp>
       <IonReactRouter basename="/casasumaqallpa">
