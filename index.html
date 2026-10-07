@@ -21,29 +21,51 @@
         try {
           if ('serviceWorker' in navigator) {
             var killSW = function () {
-              navigator.serviceWorker.getRegistrations().then(function (regs) {
-                var killed = 0;
-                regs.forEach(function (r) {
-                  r.unregister();
-                  killed++;
-                });
-                if (killed > 0 && window.console) {
-                  console.log('[SW Cleanup] Se desactivaron ' + killed + ' service workers antiguos. Refresh ahora.');
-                }
-              }).catch(function () {});
-              if ('caches' in window) {
-                caches.keys().then(function (keys) {
-                  return Promise.all(keys.map(function (k) { return caches.delete(k); }));
+              try {
+                navigator.serviceWorker.getRegistrations().then(function (regs) {
+                  var killed = 0;
+                  regs.forEach(function (r) {
+                    try { r.unregister(); } catch (_) {}
+                    killed++;
+                  });
+                  if (killed > 0 && window.console) {
+                    console.log('[SW Cleanup] Se desactivaron ' + killed + ' service workers antiguos. Refrescando...');
+                  }
                 }).catch(function () {});
+              } catch (_) {}
+              if ('caches' in window) {
+                try {
+                  caches.keys().then(function (keys) {
+                    return Promise.all(keys.map(function (k) {
+                      try { return caches.delete(k); } catch (_) { return Promise.resolve(false); }
+                    }));
+                  }).then(function () {
+                    if (window.sessionStorage) {
+                      var alreadyReloaded = window.sessionStorage.getItem('__sw_reloaded__');
+                      if (!alreadyReloaded) {
+                        window.sessionStorage.setItem('__sw_reloaded__', '1');
+                        try { window.location.reload(true); } catch (_) { window.location.reload(); }
+                      }
+                    }
+                  }).catch(function () {});
+                } catch (_) {}
               }
             };
             killSW();
-            navigator.serviceWorker.addEventListener('controllerchange', function () {
-              window.location.reload();
-            });
+            try {
+              navigator.serviceWorker.addEventListener('controllerchange', function () {
+                if (window.sessionStorage) {
+                  var alreadyReloaded = window.sessionStorage.getItem('__sw_reloaded__');
+                  if (!alreadyReloaded) {
+                    window.sessionStorage.setItem('__sw_reloaded__', '1');
+                    try { window.location.reload(true); } catch (_) { window.location.reload(); }
+                  }
+                }
+              });
+            } catch (_) {}
           }
           if (window.performance && performance.navigation && performance.navigation.type === 1) {
-            window.sessionStorage.setItem('__no_sw_loop__', '1');
+            window.sessionStorage && window.sessionStorage.setItem('__no_sw_loop__', '1');
           }
         } catch (e) {}
         var href = window.location.href;
