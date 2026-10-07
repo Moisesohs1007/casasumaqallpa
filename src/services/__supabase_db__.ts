@@ -116,7 +116,40 @@ class SupabaseDB {
       updatedBy: (item as any).updatedBy || 'system-supabase',
       ...(item as any),
     };
-    const snake = toSnake(itemWithAudit);
+    let snake: any = toSnake(itemWithAudit);
+
+    if (key === 'reservas') {
+      // FIX codigo_reserva: siempre generar único desde Supabase remoto MAX+1 (no R-1001 demo ni timestamp)
+      try {
+        const { data: codsList } = await supabase.from(TABLE[key]).select('codigo_reserva');
+        let max = 1000;
+        (codsList || []).forEach((r: any) => {
+          const num = parseInt(String(r.codigo_reserva || '').replace(/^R-/i, ''), 10);
+          if (Number.isFinite(num) && num > max) max = num;
+        });
+        snake.codigo_reserva = `R-${max + 1}`;
+      } catch (_e) {
+        snake.codigo_reserva = `R-${Date.now().toString().slice(-7)}`;
+      }
+
+      // FIX whitelist columnas reales schema public.reservas L334-370; sobrante → payload JSONB
+      const RESERVA_WHITELIST = new Set([
+        'id','codigo_reserva','huesped_id','origen','sub_origen','estado','fecha_creacion','fecha_confirmacion',
+        'fecha_checkin','fecha_checkout','fecha_checkin_real','fecha_checkout_real','total_noches','total_personas',
+        'adultos','ninos','moneda','politica_cancelacion_id','codigo_promocional_id','monto_total_reserva',
+        'subtotal_alojamiento','impuestos','descuentos','pago_garantia','huesped','habitaciones','acompanantes',
+        'historial_cambios','checkin_info','checkout_info','payload','created_at','updated_at','created_by','updated_by'
+      ]);
+      const row: any = {};
+      const payloadExtra: any = {};
+      Object.entries(snake).forEach(([k, v]) => {
+        if (RESERVA_WHITELIST.has(k)) row[k] = v;
+        else payloadExtra[k] = v;
+      });
+      row.payload = { ...(row.payload || {}), ...(payloadExtra || {}) };
+      snake = row;
+    }
+
     const { data, error } = await supabase.from(TABLE[key]).insert(snake).select().maybeSingle();
     if (error) {
       console.error(`[SupabaseDB.addAsync] ${TABLE[key]} →`, error.message, snake);

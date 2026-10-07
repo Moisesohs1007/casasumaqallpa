@@ -326,7 +326,6 @@ const NuevaReserva: React.FC = () => {
         huespedId: huespedFinal.id,
         huesped: huespedFinal,
         origen,
-        canalReservaId: null as any,
         codigoOtaConirmacion: origen === 'BOOKING' ? 'OTA-' + Math.floor(Math.random() * 900000 + 100000) : '',
         fechaSolicitud: seedUtil.nowISO(),
         fechaCheckin: `${checkin}T15:00:00.000Z`,

@@ -8,12 +8,8 @@ const KEY = 'reservas';
 
 const PREFIJO = 'R-';
 const siguienteCodigo = (): string => {
-  const existentes = db.all<Reserva>(KEY).map((r) => r.codigoReserva.replace(PREFIJO, ''));
-  const maxNum = existentes.reduce((max, v) => {
-    const n = parseInt(v, 10);
-    return Number.isFinite(n) && n > max ? n : max;
-  }, 1000);
-  return `${PREFIJO}${maxNum + 1}`;
+  const sufijo = Date.now().toString().slice(-7);
+  return `${PREFIJO}${sufijo}`;
 };
 
 const agregarHistorial = (
