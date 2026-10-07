@@ -1,9 +1,11 @@
-/* ============= LAYOUT HOME 100dvh SIN SCROLL · LIMPIO · 5 BOTONES NAV COLUMNA DERECHA PORTADA ============= */
+/* ============= LAYOUT HOME 100dvh SIN SCROLL · MOBILE READY · 5 BOTONES NAV COLUMNA DERECHA PORTADA ============= */
 .home-page {
   height: 100dvh;
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
 }
 
 .home-content {
@@ -97,6 +99,8 @@
   transition: transform 0.12s ease, box-shadow 0.12s ease, filter 0.12s ease;
   font-family: inherit;
   box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
 }
 
 .nv-card:active {
@@ -106,11 +110,11 @@
 }
 
 /* Paleta consistente con pestañas tabbar */
-.nv-inicio    { background: var(--ion-color-primary,  #2dd36f); }  /* verde Inicio tabbar */
-.nv-reservas  { background: var(--ion-color-medium,   #92949c); color: #fff; }  /* gris tabbar inactivo → lo ponemos acento */
-.nv-habitac   { background: #7b61ff; }                                                /* morado suave Hab */
-.nv-pos       { background: var(--ion-color-success,  #10dc60); }                  /* verde POS */
-.nv-perfil    { background: #3b82f6; }                                                /* azul Perfil */
+.nv-inicio    { background: var(--ion-color-primary,  #2dd36f); }
+.nv-reservas  { background: var(--ion-color-medium,   #92949c); color: #fff; }
+.nv-habitac   { background: #7b61ff; }
+.nv-pos       { background: var(--ion-color-success,  #10dc60); }
+.nv-perfil    { background: #3b82f6; }
 
 .nv-icon {
   font-size: 1.05rem;
@@ -172,6 +176,90 @@ ion-card-header { padding: 8px 10px !important; }
 ion-card-content { padding: 8px 10px 10px !important; }
 ion-label h2 { margin: 0 !important; font-size: 0.9rem; font-weight: 600; }
 ion-label p { margin: 0 !important; font-size: 0.75rem; color: #666; }
+
+/* ============= MEDIA QUERIES MÓVIL (celulares < 520px) ============= */
+@media (max-width: 520px) {
+  .home-content {
+    gap: 8px;
+    padding: 10px 10px calc(10px + env(safe-area-inset-bottom, 0px)) !important;
+  }
+
+  .portada-wrap {
+    max-height: 70svh;
+    min-height: 48svh;
+    border-radius: 12px;
+    box-shadow: 0 3px 10px rgba(0, 0, 0, 0.08);
+  }
+
+  .portada-overlay {
+    padding: 10px 12px 9px;
+  }
+  .portada-titulo {
+    font-size: 1.12rem;
+    letter-spacing: 0.1px;
+  }
+  .portada-sub {
+    font-size: 0.66rem;
+    margin-top: 2px;
+  }
+
+  /* ========= BOTONES NAV MÓVIL: MÁS COMPACTOS ========= */
+  .portada-nav-col {
+    right: 2%;
+    width: 26%;
+    min-width: 0;
+    max-width: 144px;
+    gap: 5px;
+  }
+  .nv-card {
+    border-radius: 9px;
+    padding: 4.5px 7px;
+    gap: 6px;
+    box-shadow: 0 1.5px 4px rgba(0, 0, 0, 0.1);
+  }
+  .nv-icon { font-size: 0.95rem; }
+  .nv-icon.sc-ion-icon-md-h, .nv-icon.sc-ion-icon-ios-h { font-size: 0.95rem !important; }
+  .nv-label {
+    font-size: 0.63rem;
+    font-weight: 700;
+  }
+
+  .today-row {
+    padding: 6px 10px;
+    border-radius: 9px;
+  }
+  .today-row-slim { padding: 5px 10px; }
+  .today-date { font-size: 0.82rem; }
+  .today-sub { font-size: 0.66rem; margin-top: 1px; }
+}
+
+/* ============= MÓVIL MUY PEQUEÑO (< 380px) ============= */
+@media (max-width: 380px) {
+  .home-content {
+    gap: 6px;
+    padding: 8px 8px calc(8px + env(safe-area-inset-bottom, 0px)) !important;
+  }
+  .portada-wrap {
+    max-height: 68svh;
+    min-height: 46svh;
+    border-radius: 10px;
+  }
+  .portada-titulo { font-size: 1rem; }
+  .portada-sub   { font-size: 0.6rem; }
+
+  .portada-nav-col {
+    width: 28%;
+    right: 1.5%;
+    gap: 4px;
+  }
+  .nv-card { padding: 4px 6px; gap: 5px; border-radius: 8px; }
+  .nv-icon { font-size: 0.86rem; }
+  .nv-icon.sc-ion-icon-md-h, .nv-icon.sc-ion-icon-ios-h { font-size: 0.86rem !important; }
+  .nv-label { font-size: 0.58rem; }
+
+  .today-date { font-size: 0.76rem; }
+  .today-sub  { font-size: 0.62rem; }
+}
 
 /* ---- Ajustes viewport móvil: dvh ---- */
 @supports (height: 100dvh) {
