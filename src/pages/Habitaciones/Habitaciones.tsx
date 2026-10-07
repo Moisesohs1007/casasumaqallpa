@@ -431,7 +431,10 @@ const HabitacionesPage: React.FC = () => {
             ))}
             {!loading && habitaciones.map((h) => {
               const tipo: any = h.tipoHabitacion;
-              const capacidadTotal = (tipo?.capacidadAdultos ?? 0) + (tipo?.capacidadNinos ?? 0) || (h as any).capacidadMaximaPersonas || 2;
+              // Prioridad capacidad: habitacion individual (editable en Panel Admin Perfil) > tipo FK > fallback 2
+              const capH = Number((h as any).capacidadMaximaPax ?? (h as any).capacidadPersonas ?? 0);
+              const capT = tipo ? (Number(tipo?.capacidadAdultos ?? 0) + Number(tipo?.capacidadNinos ?? 0)) : 0;
+              const capacidadTotal = capH || capT || Number((h as any).capacidadMaximaPersonas || 0) || 2;
               const tarifaBase = tipo?.precioBaseNoche ?? 0;
               return (
                 <IonCol key={h.id} size="6" size-xs="6" size-sm="6" size-md="4" size-lg="3" size-xl="3">

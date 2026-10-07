@@ -72,9 +72,10 @@ const ESTADOS_HAB: Array<EstadoHabitacion> = ['LIBRE','OCUPADA','RESERVADA','BLO
 interface HabForm {
   codigo: string; nombre: string; tipoHabitacionId: string; piso: string;
   ubicacion: string; estado: EstadoHabitacion; precioNoche: number; notasInternas: string;
+  capacidadMaximaPax: number;
 }
 
-const FORM_VACIO: HabForm = { codigo:'', nombre:'', tipoHabitacionId:'', piso:'', ubicacion:'', estado:'LIBRE', precioNoche:0, notasInternas:'' };
+const FORM_VACIO: HabForm = { codigo:'', nombre:'', tipoHabitacionId:'', piso:'', ubicacion:'', estado:'LIBRE', precioNoche:0, notasInternas:'', capacidadMaximaPax:2 };
 const fmtSoles = (n: number) => `S/ ${Number(n || 0).toFixed(2)}`;
 
 const PerfilPage: React.FC = () => {
@@ -100,13 +101,17 @@ const PerfilPage: React.FC = () => {
 
   const abrirNuevo = () => {
     setEditandoId(null);
-    const primerTipo = tiposHab[0]?.id || '';
-    setForm({ ...FORM_VACIO, tipoHabitacionId: primerTipo, estado: 'LIBRE' });
+    const primerTipo = tiposHab[0];
+    const capTipo = primerTipo ? (Number(primerTipo.capacidadAdultos || 0) + Number(primerTipo.capacidadNinos || 0)) : 2;
+    setForm({ ...FORM_VACIO, tipoHabitacionId: primerTipo?.id || '', estado: 'LIBRE', precioNoche: Number(primerTipo?.precioBaseNoche ?? 0), capacidadMaximaPax: capTipo || 2 });
     setModalAbierto(true);
   };
 
   const abrirEditar = (h: Habitacion) => {
-    const precio = Number(h.tipoHabitacion?.precioBaseNoche ?? 0) || 0;
+    const tipo = tiposHab.find((t) => t.id === h.tipoHabitacionId);
+    const precio = Number(tipo?.precioBaseNoche ?? 0);
+    const capTipo = tipo ? (Number(tipo.capacidadAdultos || 0) + Number(tipo.capacidadNinos || 0)) : 2;
+    const capHab = Number((h as any).capacidadMaximaPax ?? (h as any).capacidadPersonas ?? 0);
     setEditandoId(h.id);
     setForm({
       codigo: h.codigo || '',
@@ -117,6 +122,7 @@ const PerfilPage: React.FC = () => {
       estado: (h.estado as EstadoHabitacion) || 'LIBRE',
       precioNoche: precio,
       notasInternas: (h as any).notasInternas || (h as any).motivoBloqueo || '',
+      capacidadMaximaPax: capHab || capTipo || 2,
     });
     setModalAbierto(true);
   };
@@ -132,6 +138,8 @@ const PerfilPage: React.FC = () => {
         piso: form.piso.trim(),
         ubicacion: form.ubicacion.trim(),
         estado: form.estado,
+        capacidadMaximaPax: Math.max(1, Number(form.capacidadMaximaPax || 2)),
+        capacidadPersonas: Math.max(1, Number(form.capacidadMaximaPax || 2)),
         estadoLimpieza: form.estado === 'LIBRE' ? 'LIMPIA' : form.estado === 'MANTENIMIENTO' ? 'PENDIENTE' : 'EN_PROGRESO',
         notasInternas: form.notasInternas.trim(),
         motivoBloqueo: form.estado === 'MANTENIMIENTO' ? form.notasInternas.trim() : undefined,
@@ -396,6 +404,31 @@ const PerfilPage: React.FC = () => {
                         value={form.precioNoche}
                         onIonInput={(e: any) => setForm({ ...form, precioNoche: Number(e.target.value || 0) })}
                       />
+                    </IonItem>
+                  </IonCol>
+                </IonRow>
+                <IonRow>
+                  <IonCol size="6">
+                    <IonItem>
+                      <IonInput
+                        label="Capacidad máxima (pax) *"
+                        labelPlacement="stacked"
+                        type="number"
+                        step="1"
+                        min="1"
+                        max="20"
+                        inputMode="numeric"
+                        placeholder="Ej: 2"
+                        value={form.capacidadMaximaPax}
+                        onIonInput={(e: any) => setForm({ ...form, capacidadMaximaPax: Math.max(1, Number(e.target.value || 1)) })}
+                      />
+                    </IonItem>
+                  </IonCol>
+                  <IonCol size="6">
+                    <IonItem lines="none">
+                      <IonNote color="medium" className="capacidad-hint">
+                        Indica cuántas personas pueden dormir en esta habitación (adultos + niños).
+                      </IonNote>
                     </IonItem>
                   </IonCol>
                 </IonRow>

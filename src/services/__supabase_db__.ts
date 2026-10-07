@@ -60,10 +60,51 @@ const CLONE = <T>(x: T): T => JSON.parse(JSON.stringify(x));
 const tryNum = (v: any): any => (typeof v === 'bigint' ? Number(v) : v);
 const normalizeRow = <T>(r: any): T => {
   if (!r) return undefined as any;
-  const obj: any = {};
-  for (const k of Object.keys(r)) obj[k] = tryNum(r[k]);
-  return toCamel<T>(obj);
+  const flat: any = {};
+  for (const k of Object.keys(r)) flat[k] = tryNum(r[k]);
+  // Expand JSONB payload al nivel superior (permite guardar campos custom
+  // sin ALTER TABLE, evitando HTTP 400 column not found en el API REST).
+  // Los campos reales (columnas físicas) tienen prioridad sobre payload.
+  if (flat.payload && typeof flat.payload === 'object' && !Array.isArray(flat.payload)) {
+    for (const pk of Object.keys(flat.payload)) {
+      if (flat[pk] === undefined || flat[pk] === null) flat[pk] = tryNum((flat.payload as any)[pk]);
+    }
+  }
+  return toCamel<T>(flat);
 };
+
+// Columnas FÍSICAS reales de public.habitaciones (schema L119-138 initial_lodge_schema).
+// Campos extra (capacidad, etc.) van al JSONB payload automáticamente.
+const HABITACIONES_WHITELIST = new Set([
+  'id','tipo_habitacion_id','codigo','nombre','piso','ubicacion','vista_efectiva',
+  'estado','estado_limpieza','notas_internas','bloqueada_hasta','motivo_bloqueo',
+  'ultima_limpieza_at','payload','created_at','updated_at','created_by','updated_by'
+]);
+
+// Columnas FÍSICAS reales de public.reservas (schema L334-370).
+const RESERVA_WHITELIST = new Set([
+  'id','codigo_reserva','huesped_id','origen','sub_origen','estado','fecha_creacion','fecha_confirmacion',
+  'fecha_checkin','fecha_checkout','fecha_checkin_real','fecha_checkout_real','total_noches','total_personas',
+  'adultos','ninos','moneda','politica_cancelacion_id','codigo_promocional_id','monto_total_reserva',
+  'subtotal_alojamiento','impuestos','descuentos','pago_garantia','huesped','habitaciones','acompanantes',
+  'historial_cambios','checkin_info','checkout_info','payload','created_at','updated_at','created_by','updated_by'
+]);
+
+/**
+ * Aplica filtro de whitelist a un objeto snake_case para enviar al API REST de Supabase.
+ * Campos fuera del whitelist se mergean en payload JSONB.
+ */
+function applyWhitelist(snake: any, whitelist: Set<string>): any {
+  const row: any = {};
+  const payloadExtra: any = {};
+  Object.entries(snake || {}).forEach(([k, v]) => {
+    if (k === 'payload') return; // manejado al final
+    if (whitelist.has(k)) row[k] = v;
+    else payloadExtra[k] = v;
+  });
+  row.payload = { ...(snake?.payload || {}), ...(payloadExtra || {}) };
+  return row;
+}
 
 class SupabaseDB {
   all<T>(key: CollectionKey): T[] {
@@ -119,7 +160,7 @@ class SupabaseDB {
     let snake: any = toSnake(itemWithAudit);
 
     if (key === 'reservas') {
-      // FIX codigo_reserva: siempre generar único desde Supabase remoto MAX+1 (no R-1001 demo ni timestamp)
+      // FIX codigo_reserva: siempre generar único desde Supabase remoto MAX+1
       try {
         const { data: codsList } = await supabase.from(TABLE[key]).select('codigo_reserva');
         let max = 1000;
@@ -131,24 +172,11 @@ class SupabaseDB {
       } catch (_e) {
         snake.codigo_reserva = `R-${Date.now().toString().slice(-7)}`;
       }
-
-      // FIX whitelist columnas reales schema public.reservas L334-370; sobrante → payload JSONB
-      const RESERVA_WHITELIST = new Set([
-        'id','codigo_reserva','huesped_id','origen','sub_origen','estado','fecha_creacion','fecha_confirmacion',
-        'fecha_checkin','fecha_checkout','fecha_checkin_real','fecha_checkout_real','total_noches','total_personas',
-        'adultos','ninos','moneda','politica_cancelacion_id','codigo_promocional_id','monto_total_reserva',
-        'subtotal_alojamiento','impuestos','descuentos','pago_garantia','huesped','habitaciones','acompanantes',
-        'historial_cambios','checkin_info','checkout_info','payload','created_at','updated_at','created_by','updated_by'
-      ]);
-      const row: any = {};
-      const payloadExtra: any = {};
-      Object.entries(snake).forEach(([k, v]) => {
-        if (RESERVA_WHITELIST.has(k)) row[k] = v;
-        else payloadExtra[k] = v;
-      });
-      row.payload = { ...(row.payload || {}), ...(payloadExtra || {}) };
-      snake = row;
     }
+
+    // Aplicar whitelist para tablas con schema estricto (evita HTTP 400 column not found)
+    if (key === 'reservas') snake = applyWhitelist(snake, RESERVA_WHITELIST);
+    if (key === 'habitaciones') snake = applyWhitelist(snake, HABITACIONES_WHITELIST);
 
     const { data, error } = await supabase.from(TABLE[key]).insert(snake).select().maybeSingle();
     if (error) {
@@ -176,7 +204,19 @@ class SupabaseDB {
       id,
       updatedAt: seedUtil.nowISO(),
     };
-    const snake = toSnake(patch);
+    let snake = toSnake(patch);
+    // Aplicar whitelist para tablas con schema estricto (evita HTTP 400 column not found).
+    // Para payload JSONB, leer existente primero y mergear para no perder campos previos.
+    if (key === 'reservas' || key === 'habitaciones') {
+      const whitelist = key === 'reservas' ? RESERVA_WHITELIST : HABITACIONES_WHITELIST;
+      try {
+        const { data: actual } = await supabase.from(TABLE[key]).select('payload').eq('id', id).maybeSingle() as any;
+        if (actual && actual.payload && typeof actual.payload === 'object' && !Array.isArray(actual.payload)) {
+          snake.payload = { ...actual.payload, ...(snake.payload || {}) };
+        }
+      } catch (_e) { /* ignore */ }
+      snake = applyWhitelist(snake, whitelist);
+    }
     const { data, error } = await supabase.from(TABLE[key]).update(snake).eq('id', id).select().maybeSingle();
     if (error) {
       console.error(`[SupabaseDB.updateAsync] ${TABLE[key]}/${id} →`, error.message);

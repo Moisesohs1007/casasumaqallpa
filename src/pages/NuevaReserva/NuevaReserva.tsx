@@ -290,6 +290,22 @@ const NuevaReserva: React.FC = () => {
   };
 
   // ===== Acciones Paso 2 =====
+  const seleccionarHabitacion = (h: Habitacion) => {
+    setHabitacionSeleccionada(h);
+    setTarifaSeleccionadaId(null);
+    setPrecioNocheManual('');
+    const capHab = Number((h as any).capacidadMaximaPax ?? (h as any).capacidadPersonas ?? 0);
+    const tipo = HabitacionService.listarTipos().find((t) => t.id === h.tipoHabitacionId);
+    const capTipo = tipo ? (Number(tipo.capacidadAdultos || 0) + Number(tipo.capacidadNinos || 0)) : 0;
+    const capMax = capHab || capTipo || 2;
+    if (capMax && (adultos + ninos) !== capMax) {
+      const ninosMantener = Math.min(ninos, capMax);
+      const adultosPorDefecto = Math.max(1, capMax - ninosMantener);
+      setNinos(ninosMantener);
+      setAdultos(adultosPorDefecto);
+    }
+  };
+
   const buscarHabitaciones = () => {
     setErrorMsg(null);
     if (noches < 1) {
@@ -308,9 +324,11 @@ const NuevaReserva: React.FC = () => {
     });
     setHabitacionesDisponibles(list);
     const seleccionada = list.find((x) => x.id === habitacionSeleccionada?.id) || list[0] || null;
-    setHabitacionSeleccionada(seleccionada);
-    setTarifaSeleccionadaId(null);
-    setPrecioNocheManual('');
+    if (seleccionada && seleccionada.id !== habitacionSeleccionada?.id) {
+      seleccionarHabitacion(seleccionada);
+    } else {
+      setHabitacionSeleccionada(seleccionada);
+    }
   };
 
   // ===== Paso 4: Crear =====
@@ -748,7 +766,7 @@ const NuevaReserva: React.FC = () => {
                         ) : (
                           <IonList>
                             {habitacionesDisponibles.map((h) => (
-                              <IonItem key={h.id} button onClick={() => setHabitacionSeleccionada(h)}>
+                              <IonItem key={h.id} button onClick={() => seleccionarHabitacion(h)}>
                                 <IonLabel>
                                   <h2>
                                     <IonBadge color={habitacionSeleccionada?.id === h.id ? 'success' : 'primary'}>{h.codigo}</IonBadge> &nbsp;
