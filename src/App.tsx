@@ -1,3 +1,4 @@
+import React, { useEffect } from 'react';
 import {
   IonApp,
   IonIcon,
@@ -10,7 +11,7 @@ import {
 } from '@ionic/react';
 import { IonReactRouter } from '@ionic/react-router';
 import { home, calendar, bed, restaurant, person } from 'ionicons/icons';
-import { Redirect, Route } from 'react-router-dom';
+import { Redirect, Route, useHistory, useLocation } from 'react-router-dom';
 
 import HomePage from './pages/Home/Home';
 import ReservasPage from './pages/Reservas/Reservas';
@@ -26,10 +27,51 @@ setupIonicReact({
   animated: true,
 });
 
+const STORAGE_KEY = 'lodge_ultima_pestana_v1';
+const RUTAS_TAB = ['/home', '/reservas', '/habitaciones', '/pos', '/perfil'];
+
+function esRutaTab(pathname: string): boolean {
+  return RUTAS_TAB.some((r) => pathname === r);
+}
+
+function ControlPestanaPersistente() {
+  const history = useHistory();
+  const location = useLocation();
+
+  useEffect(() => {
+    if (!window || !window.sessionStorage) return;
+    try {
+      const actual = location.pathname;
+      if (esRutaTab(actual)) {
+        sessionStorage.setItem(STORAGE_KEY, actual);
+      }
+    } catch {}
+  }, [location.pathname]);
+
+  useEffect(() => {
+    if (!window || !window.sessionStorage) return;
+    try {
+      const actual = location.pathname;
+      const search = location.search;
+      const hash = location.hash;
+      if (actual === '/' || actual === '') {
+        const recordada = sessionStorage.getItem(STORAGE_KEY);
+        const destino = recordada && esRutaTab(recordada) ? recordada : '/home';
+        if (destino !== actual) {
+          history.replace(destino + search + hash);
+        }
+      }
+    } catch {}
+  }, []);
+
+  return null;
+}
+
 const App: React.FC = () => {
   return (
     <IonApp>
-      <IonReactRouter>
+      <IonReactRouter basename="/casasumaqallpa">
+        <ControlPestanaPersistente />
         <IonTabs>
           <IonRouterOutlet>
             <Route exact path="/home">

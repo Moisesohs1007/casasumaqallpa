@@ -1,3 +1,4 @@
+import React, { useEffect, useState } from 'react';
 import {
   IonContent,
   IonHeader,
@@ -15,11 +16,78 @@ import {
   IonBadge,
   IonItem,
   IonIcon,
+  IonImg,
+  IonButton,
 } from '@ionic/react';
 import type { Color } from '@ionic/core';
-import { people, bed, restaurant, trendingUp } from 'ionicons/icons';
+import { people, bed, restaurant, trendingUp, documentText } from 'ionicons/icons';
 import type { EstadoReserva, EstadoComanda, EstadoHabitacion, MetodoPago, Moneda, OrigenReserva, Usuario } from '../../types';
 import './Home.css';
+
+const BASE_URL = (import.meta.env.BASE_URL || '/').replace(/\/$/, '');
+function encodeUriBajo(url: string): string {
+  const re = /^(.*?)([^/]+)$/;
+  const m = url.match(re);
+  if (!m) return url;
+  const base = m[1];
+  const name = m[2];
+  return base + encodeURIComponent(name);
+}
+const PORTADA_CANDIDATOS = [
+  `${BASE_URL}/portada.webp`,
+  `${BASE_URL}/portada.jpg`,
+  `${BASE_URL}/portada.png`,
+  `${BASE_URL}/portada.jpeg`,
+  `${BASE_URL}/WhatsApp Image 2026-10-06 at 2.07.54 PM(1).jpeg`,
+  `${BASE_URL}/WhatsApp Image 2026-10-06 at 2.07.54 PM 1 .jpeg`,
+  `${BASE_URL}/logo.webp`,
+  `${BASE_URL}/logo.jpg`,
+  `${BASE_URL}/logo.png`,
+  `${BASE_URL}/logo.jpeg`,
+  `${BASE_URL}/portada-sumaq.webp`,
+  `${BASE_URL}/portada-sumaq.jpg`,
+  `${BASE_URL}/portada-sumaq.png`,
+  `${BASE_URL}/portada-sumaq.jpeg`,
+  `${BASE_URL}/portada-sumaq-allpa.webp`,
+  `${BASE_URL}/portada-sumaq-allpa.jpg`,
+  `${BASE_URL}/portada-sumaq-allpa.png`,
+  `${BASE_URL}/portada-sumaq-allpa.jpeg`,
+].map((u) => encodeUriBajo(u));
+const CARTA_CANDIDATOS = [
+  `${BASE_URL}/carta.pdf`,
+  `${BASE_URL}/carta-sumaq-allpa.pdf`,
+  `${BASE_URL}/menu.pdf`,
+  `${BASE_URL}/CARTA SUMAQ ALLPA.pdf`,
+  `${BASE_URL}/CARTA SUMAQ ALLPA....pdf`,
+  `${BASE_URL}/CARTA.pdf`,
+  `${BASE_URL}/Carta.pdf`,
+  `${BASE_URL}/Menu.pdf`,
+].map((u) => encodeUriBajo(u));
+
+function probeUrl(url: string): Promise<string | null> {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => resolve(url);
+    img.onerror = () => resolve(null);
+    img.src = url;
+  });
+}
+async function findFirstAsset(candidatos: string[], checkType: 'image' | 'any'): Promise<string | null> {
+  if (checkType === 'image') {
+    for (const c of candidatos) {
+      const r = await probeUrl(c);
+      if (r) return r;
+    }
+    return null;
+  }
+  for (const c of candidatos) {
+    try {
+      const resp = await fetch(c, { method: 'HEAD' });
+      if (resp.ok) return c;
+    } catch {}
+  }
+  return null;
+}
 
 interface DashboardKpiItem {
   id: string;
@@ -39,12 +107,21 @@ const HomePage: React.FC<HomePageProps> = () => {
     month: 'long',
     day: 'numeric',
   });
+  const [portadaSrc, setPortadaSrc] = useState<string | null>(null);
+  const [cartaHref, setCartaHref] = useState<string | null>(null);
+
+  useEffect(() => {
+    let alive = true;
+    findFirstAsset(PORTADA_CANDIDATOS, 'image').then((url) => alive && setPortadaSrc(url));
+    findFirstAsset(CARTA_CANDIDATOS, 'any').then((url) => alive && setCartaHref(url));
+    return () => { alive = false; };
+  }, []);
 
   const dashboardItems: DashboardKpiItem[] = [
-    { id: 'kpi-llegadas', label: 'Llegadas hoy', value: 3, badge: '+1', icon: people, color: 'primary' },
-    { id: 'kpi-salidas', label: 'Salidas hoy', value: 2, icon: trendingUp, color: 'warning' },
-    { id: 'kpi-hab', label: 'Habitaciones ocupadas', value: 12, badge: '/15', icon: bed, color: 'tertiary' },
-    { id: 'kpi-com', label: 'Comandas activas', value: 5, icon: restaurant, color: 'success' },
+    { id: 'kpi-llegadas', label: 'Llegadas hoy', value: 0, icon: people, color: 'primary' },
+    { id: 'kpi-salidas', label: 'Salidas hoy', value: 0, icon: trendingUp, color: 'warning' },
+    { id: 'kpi-hab', label: 'Habitaciones ocupadas', value: 0, badge: '/5', icon: bed, color: 'tertiary' },
+    { id: 'kpi-com', label: 'Comandas activas', value: 0, icon: restaurant, color: 'success' },
   ];
 
   const sessionUsuario: Usuario = {
@@ -77,11 +154,34 @@ const HomePage: React.FC<HomePageProps> = () => {
           </IonToolbar>
         </IonHeader>
 
+        {portadaSrc && (
+          <IonCard className="portada-card">
+            <div className="portada-wrap">
+              <IonImg src={portadaSrc} alt="Portada Casa Sumaq Allpa" className="portada-img" />
+              <div className="portada-overlay">
+                <div className="portada-titulo">Casa Sumaq Allpa</div>
+                <div className="portada-sub">Sistema de Gestión Hotelera</div>
+              </div>
+            </div>
+          </IonCard>
+        )}
+
         <IonItem lines="none" className="ion-margin-bottom">
           <IonLabel>
             <h2 className="ion-text-capitalize">{today}</h2>
             <p>Bienvenido(a) al panel de gestión.</p>
           </IonLabel>
+          {cartaHref && (
+            <IonButton
+              slot="end"
+              size="default"
+              color="secondary"
+              onClick={() => window.open(cartaHref, '_blank', 'noopener,noreferrer')}
+            >
+              <IonIcon slot="start" icon={documentText} />
+              Ver carta
+            </IonButton>
+          )}
         </IonItem>
 
         <IonGrid>
@@ -99,9 +199,6 @@ const HomePage: React.FC<HomePageProps> = () => {
                     </div>
                     <IonCardTitle className="ion-padding-top card-title">{item.label}</IonCardTitle>
                   </IonCardHeader>
-                  <IonCardContent>
-                    <small>Etapa 1 + Etapa 2 — Base preparada</small>
-                  </IonCardContent>
                 </IonCard>
               </IonCol>
             ))}
@@ -110,18 +207,15 @@ const HomePage: React.FC<HomePageProps> = () => {
 
         <IonCard className="ion-margin-top">
           <IonCardHeader>
-            <IonCardTitle>Estructura del sistema</IonCardTitle>
+            <IonCardTitle>Instrucciones rápidas</IonCardTitle>
           </IonCardHeader>
           <IonCardContent>
             <ul className="home-ul">
-              <li>Etapa 1: Núcleo de reservas (Habitaciones, Tarifas, Calendario, Reservas, Huéspedes)</li>
-              <li>Etapa 2: Recepción, Cuenta y POS F&amp;B (Check-in/out, Folio, Cobros, Usuarios y POS)</li>
-              <li>Etapas 3-8: Operación diaria, Facturación SUNAT, Extras, Distribución, Experiencia, Admin.</li>
+              <li><strong>📸 Portada/Logo:</strong> Guarda la imagen en <code>public/portada.jpg</code> (o .png / .webp) y aparecerá automáticamente arriba. No usar carpeta <code>dist/</code>, se borra en cada build.</li>
+              <li><strong>📄 Carta del lodge:</strong> Guarda el PDF en <code>public/carta.pdf</code> para que aparezca el botón "Ver carta" arriba.</li>
+              <li><strong>🛏️ Operación diaria:</strong> Todo desde la pestaña <strong>Habitaciones</strong>. POS para clientes eventuales walk-in.</li>
+              <li><strong>💾 Base de datos SQL:</strong> Usa <code>npm run db:migrate -- --file tu_migracion.sql</code> (sin popup Run/Skip).</li>
             </ul>
-            <p className="ion-margin-top">
-              <strong>Siguiente paso:</strong> implementar los modelos (tipos TypeScript) y servicios mock
-              para Reservas, Habitaciones y Huéspedes (Etapa 1).
-            </p>
           </IonCardContent>
         </IonCard>
       </IonContent>
