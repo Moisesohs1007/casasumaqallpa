@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   IonContent,
   IonHeader,
@@ -147,6 +147,8 @@ const PerfilPage: React.FC = () => {
   const [modalStockAbierto, setModalStockAbierto] = useState(false);
   const [formStock, setFormStock] = useState<StockForm>({ modo: 'AGREGAR', delta: 0, motivo: '' });
   const [confirmQuitarStock, setConfirmQuitarStock] = useState<{ resumen: string; ejecutar: () => void } | null>(null);
+  const [modalStockGlobalAbierto, setModalStockGlobalAbierto] = useState(false);
+  const [busqStockGlobal, setBusqStockGlobal] = useState('');
 
   const [toast, setToast] = useState('');
   const mostrarToast = (t: string) => { setToast(t); window.setTimeout(() => setToast(''), 2600); };
@@ -252,6 +254,45 @@ const PerfilPage: React.FC = () => {
 
   useIonViewWillEnter(() => { cargarHabs(); cargarCatProd(); });
 
+  const intentosRefPerfil = useRef(0);
+  useEffect(() => {
+    let alive = true;
+    const recargarTodo = () => { try { cargarHabs(); } catch {} try { cargarCatProd(); } catch {} };
+    const onHidratado = (e: any) => {
+      if (!alive) return;
+      const g = String(e?.detail?.grupo || '');
+      if (g === 'habitaciones' || g === 'pos' || g === 'todos') recargarTodo();
+    };
+    try { window.addEventListener('lodge:hidratacion-listo', onHidratado as EventListener); } catch {}
+    const id = window.setInterval(() => {
+      if (!alive) return;
+      intentosRefPerfil.current++;
+      if (intentosRefPerfil.current >= 5) { window.clearInterval(id); return; }
+      recargarTodo();
+    }, 1000);
+    return () => {
+      alive = false;
+      window.clearInterval(id);
+      try { window.removeEventListener('lodge:hidratacion-listo', onHidratado as EventListener); } catch {}
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const generarCodigoProdAuto = (categoriaIdSel: string): string => {
+    const cat = categoriasFB.find(c => c.id === categoriaIdSel);
+    if (!cat) return '';
+    const prefijoFull = String((cat.payload?.codigo) || cat.codigo || `CAT-${String(cat.id||'').slice(0,3).toUpperCase()}`);
+    const prefijo = prefijoFull.replace(/^CAT-/, '').slice(0, 6).toUpperCase();
+    if (!prefijo) return '';
+    const existentes = productosFB.filter(p => String(p.codigo || '').toUpperCase().startsWith(`${prefijo}-`));
+    const consecutivo = existentes.reduce((max: number, p: any) => {
+      const suf = String(p.codigo || '').split('-')[1];
+      const n = parseInt(suf || '0', 10);
+      return Number.isFinite(n) ? Math.max(max, n) : max;
+    }, 0);
+    return `${prefijo}-${String(consecutivo + 1).padStart(3, '0')}`;
+  };
+
   const stockPlanoProd = (p: any) => {
     const pAny = p as any;
     const sc = typeof pAny.stockControl === 'boolean' ? pAny.stockControl : (pAny.payload?.stockControl ?? false);
@@ -311,9 +352,11 @@ const PerfilPage: React.FC = () => {
   // --- PRODUCTOS ---
   const abrirNuevoProd = () => {
     setEditandoProdId(null);
+    const catDefaultId = categoriasFB[0]?.id || '';
     setFormProd({
       ...FORM_VACIO_PROD,
-      categoriaId: categoriasFB[0]?.id || '',
+      categoriaId: catDefaultId,
+      codigo: catDefaultId ? generarCodigoProdAuto(catDefaultId) : '',
     });
     setModalProdAbierto(true);
   };
@@ -342,9 +385,12 @@ const PerfilPage: React.FC = () => {
     if (!formProd.nombre.trim()) { mostrarToast('Nombre producto es obligatorio'); return; }
     if (!formProd.categoriaId) { mostrarToast('Selecciona categoría'); return; }
     try {
+      const codigoFinal = (formProd.codigo || '').trim()
+        ? formProd.codigo.trim()
+        : (generarCodigoProdAuto(formProd.categoriaId) || formProd.nombre.trim());
       const data = {
         ...formProd,
-        codigo: (formProd.codigo || formProd.nombre).trim(),
+        codigo: codigoFinal,
         nombre: formProd.nombre.trim(),
         descripcion: formProd.descripcion.trim(),
         precioVentaBase: Number(formProd.precioVentaBase || 0),
@@ -612,6 +658,10 @@ const PerfilPage: React.FC = () => {
               <IonButton size="default" color="success" className="btn-stock-header" onClick={abrirNuevoProd}>
                 <IonIcon slot="start" icon={add} />
                 Producto
+              </IonButton>
+              <IonButton size="default" color="primary" className="btn-stock-header" onClick={() => { setBusqStockGlobal(''); setModalStockGlobalAbierto(true); }}>
+                <IonIcon slot="start" icon={archive} />
+                +Stock Global
               </IonButton>
             </div>
           </IonCardHeader>
@@ -1254,7 +1304,15 @@ const PerfilPage: React.FC = () => {
                             labelPlacement="stacked"
                             value={formProd.categoriaId}
                             placeholder="Selecciona categoría"
-                            onIonChange={(e: any) => setFormProd({ ...formProd, categoriaId: e.target.value })}
+                            onIonChange={(e: any) => {
+                              const nuevaCatId = e.target.value;
+                              const catPrevia = categoriasFB.find(c => c.id === formProd.categoriaId);
+                              const prefijoPrevio = catPrevia ? String((catPrevia.payload?.codigo) || catPrevia.codigo || '').replace(/^CAT-/, '').slice(0, 6).toUpperCase() : '';
+                              const codigoActual = String(formProd.codigo || '').toUpperCase();
+                              const debeRegenerar = !formProd.codigo.trim() || (prefijoPrevio && codigoActual.startsWith(`${prefijoPrevio}-`));
+                              const nuevoCodigo = (debeRegenerar && nuevaCatId) ? generarCodigoProdAuto(nuevaCatId) : formProd.codigo;
+                              setFormProd({ ...formProd, categoriaId: nuevaCatId, codigo: nuevoCodigo });
+                            }}
                             interface="action-sheet"
                           >
                             {(categoriasFB || []).map((c) => (
@@ -1299,7 +1357,7 @@ const PerfilPage: React.FC = () => {
                       <IonCol size="12" sizeMd="4">
                         <IonItem className="form-item">
                           <IonInput
-                            label="Costo aproximado (S/)"
+                            label="Precio costo (S/)"
                             labelPlacement="stacked"
                             type="number" step="0.01" inputMode="decimal"
                             placeholder="Ej: 9.50"
@@ -1310,13 +1368,23 @@ const PerfilPage: React.FC = () => {
                       </IonCol>
                       <IonCol size="12" sizeMd="4">
                         <IonItem className="form-item">
-                          <IonInput
+                          <IonSelect
                             label="Unidad de medida"
                             labelPlacement="stacked"
-                            placeholder="UND / L / KG / ML"
                             value={formProd.unidadMedida}
-                            onIonInput={(e: any) => setFormProd({ ...formProd, unidadMedida: String(e.target.value || 'UND').toUpperCase() })}
-                          />
+                            placeholder="Selecciona unidad"
+                            interface="action-sheet"
+                            onIonChange={(e: any) => setFormProd({ ...formProd, unidadMedida: e.target.value })}
+                          >
+                            <IonSelectOption value="UND">UND (Unidad)</IonSelectOption>
+                            <IonSelectOption value="L">L (Litros)</IonSelectOption>
+                            <IonSelectOption value="ML">ML (Mililitros)</IonSelectOption>
+                            <IonSelectOption value="KG">KG (Kilogramos)</IonSelectOption>
+                            <IonSelectOption value="G">G (Gramos)</IonSelectOption>
+                            <IonSelectOption value="DOC">DOC (Docena)</IonSelectOption>
+                            <IonSelectOption value="CAJ">CAJ (Caja)</IonSelectOption>
+                            <IonSelectOption value="PAQ">PAQ (Paquete)</IonSelectOption>
+                          </IonSelect>
                         </IonItem>
                       </IonCol>
                     </IonRow>
@@ -1587,6 +1655,94 @@ const PerfilPage: React.FC = () => {
                 {formStock.modo === 'AGREGAR' ? 'Registrar ingreso' : 'Quitar del inventario'}
               </IonButton>
             </div>
+          </IonContent>
+        </IonModal>
+
+        {/* ============ MODAL: +Stock Global · Selector producto ============ */}
+        <IonModal isOpen={modalStockGlobalAbierto} onDidDismiss={() => setModalStockGlobalAbierto(false)} initialBreakpoint={0.85} breakpoints={[0, 0.6, 0.85, 1]}>
+          <IonHeader className="ion-no-border">
+            <IonToolbar color="primary">
+              <IonButtons slot="start">
+                <IonButton onClick={() => setModalStockGlobalAbierto(false)}>
+                  <IonIcon slot="icon-only" icon={close} />
+                </IonButton>
+              </IonButtons>
+              <IonTitle>
+                <IonIcon icon={archive} />
+                &nbsp;Seleccionar producto para agregar stock
+              </IonTitle>
+            </IonToolbar>
+          </IonHeader>
+          <IonContent className="ion-padding modal-padding">
+            <IonSearchbar
+              placeholder="Buscar producto por nombre, código..."
+              value={busqStockGlobal}
+              onIonInput={(e: any) => setBusqStockGlobal(String(e.target.value || ''))}
+              showCancelButton="never"
+              debounce={200}
+              mode="ios"
+              searchIcon={search}
+            />
+            {(() => {
+              const q = busqStockGlobal.trim().toLowerCase();
+              const filtrados = q
+                ? productosFB.filter((p: any) =>
+                    String(p.nombre || '').toLowerCase().includes(q) ||
+                    String(p.codigo || '').toLowerCase().includes(q) ||
+                    String(p.descripcion || '').toLowerCase().includes(q)
+                  )
+                : productosFB;
+              if (productosFB.length === 0) {
+                return (
+                  <div className="empty-state">
+                    <IonIcon icon={fileTray} className="empty-state-icon" />
+                    <div className="empty-state-title">No hay productos creados</div>
+                    <div className="empty-state-text">Crea primero productos desde el botón "+ Producto".</div>
+                  </div>
+                );
+              }
+              if (filtrados.length === 0) {
+                return (
+                  <div className="empty-state">
+                    <IonIcon icon={search} className="empty-state-icon" />
+                    <div className="empty-state-title">Sin coincidencias</div>
+                    <div className="empty-state-text">Cambia el texto de búsqueda.</div>
+                  </div>
+                );
+              }
+              return (
+                <IonList className="global-stock-list">
+                  {filtrados.slice(0, 150).map((p: any) => {
+                    const cat = categoriasFB.find((c: any) => c.id === p.categoriaId);
+                    const plano = stockPlanoProd(p);
+                    return (
+                      <IonItem
+                        key={p.id}
+                        button
+                        detail
+                        className="global-stock-item"
+                        onClick={() => {
+                          setModalStockGlobalAbierto(false);
+                          abrirStockAgregar(p);
+                        }}
+                      >
+                        <IonBadge color="light" slot="start" className="gs-cod-badge">{p.codigo || '—'}</IonBadge>
+                        <IonLabel>
+                          <div className="gs-nombre">{p.nombre}</div>
+                          <div className="gs-meta">
+                            <IonChip color="light" outline className="gs-chip-mini">{cat?.nombre || 'Sin cat.'}</IonChip>
+                            <IonChip color="medium" outline className="gs-chip-mini">UM: {p.unidadMedida || 'UND'}</IonChip>
+                            <IonBadge color={!plano.stockControl ? 'medium' : plano.stockActual < 0 ? 'danger' : plano.stockActual <= (plano.stockMinimo || 0) ? 'warning' : 'success'}>
+                              Stock: {plano.stockControl ? `${fmtNum(plano.stockActual)} uds` : 'N/A'}
+                            </IonBadge>
+                          </div>
+                        </IonLabel>
+                      </IonItem>
+                    );
+                  })}
+                </IonList>
+              );
+            })()}
           </IonContent>
         </IonModal>
 

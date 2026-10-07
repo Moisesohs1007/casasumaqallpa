@@ -82,7 +82,7 @@ const HABS: any[] = [
   { id: 'HAB-H202', codigo: 'H202', nombre: 'Habitación 202', tipoHabitacionId: 'TIPO-DOBLE-P2', piso: '2', ubicacion: 'Piso 2 · Interior', estado: 'LIBRE', estadoLimpieza: 'LIMPIA', vistaEfectiva: 'INTERIOR', capacidadMaximaPax: 2, capacidadPersonas: 2, capacidadActualUsada: 0, ...auditSeed },
   { id: 'HAB-H203', codigo: 'H203', nombre: 'Habitación 203', tipoHabitacionId: 'TIPO-DOBLE-P2', piso: '2', ubicacion: 'Piso 2 · Fondo', estado: 'LIBRE', estadoLimpieza: 'LIMPIA', vistaEfectiva: 'VISTA_JARDIN', capacidadMaximaPax: 2, capacidadPersonas: 2, capacidadActualUsada: 0, ...auditSeed },
   { id: 'HAB-SUITE', codigo: 'SUITE', nombre: 'Suite Principal', tipoHabitacionId: 'TIPO-SUITE', piso: '3', ubicacion: 'Piso 3', estado: 'LIBRE', estadoLimpieza: 'LIMPIA', vistaEfectiva: 'VISTA_PANORAMICA', capacidadMaximaPax: 3, capacidadPersonas: 3, capacidadActualUsada: 0, ...auditSeed },
-  { id: 'HAB-CABANA', codigo: 'CABAÑA', nombre: 'Cabaña Independiente', tipoHabitacionId: 'TIPO-CABANA', piso: '1', ubicacion: 'Jardín trasero', estado: 'MANTENIMIENTO', motivoBloqueo: 'Calefón en mantenimiento', estadoLimpieza: 'PENDIENTE', capacidadMaximaPax: 2, capacidadPersonas: 2, capacidadActualUsada: 0, ...auditSeed },
+  { id: 'HAB-CABANA', codigo: 'CABAÑA', nombre: 'Cabaña Independiente', tipoHabitacionId: 'TIPO-CABANA', piso: '1', ubicacion: 'Jardín trasero', estado: 'LIBRE', motivoBloqueo: undefined, estadoLimpieza: 'LIMPIA', capacidadMaximaPax: 2, capacidadPersonas: 2, capacidadActualUsada: 0, ...auditSeed },
 ];
 
 const POL_CANC: any[] = [

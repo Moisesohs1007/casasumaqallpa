@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect, useRef } from 'react';
 import {
   IonContent, IonHeader, IonPage, IonTitle, IonToolbar,
   IonGrid, IonRow, IonCol, IonCard, IonCardHeader, IonCardTitle, IonCardSubtitle, IonCardContent,
@@ -147,6 +147,36 @@ const HabitacionesPage: React.FC = () => {
     }
   };
   useIonViewWillEnter(() => { cargar(); });
+
+  // ============ REFRESH POST HIDRATACION BOOT ============
+  // Patron: polling 1s x 5s + listener evento custom 'lodge:hidratacion-listo'
+  // (doble seguridad: App hidrata async después del primer render)
+  const refrescosMax = 5;
+  const intentosRef = useRef(0);
+  useEffect(() => {
+    let alive = true;
+    const onHidratado = (e: any) => {
+      if (!alive) return;
+      const g = (e?.detail?.grupo || '') as string;
+      if (g === 'habitaciones' || g === 'todos') cargar();
+    };
+    try { window.addEventListener('lodge:hidratacion-listo', onHidratado as EventListener); } catch {}
+    const id = window.setInterval(() => {
+      if (!alive) return;
+      intentosRef.current++;
+      if (intentosRef.current >= refrescosMax) {
+        window.clearInterval(id);
+        return;
+      }
+      cargar();
+    }, 1000);
+    return () => {
+      alive = false;
+      window.clearInterval(id);
+      try { window.removeEventListener('lodge:hidratacion-listo', onHidratado as EventListener); } catch {}
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const mostrarAlerta = (header: string, sub?: string) => { setAlertMsg({ header, sub }); setAlertOpen(true); };
 
