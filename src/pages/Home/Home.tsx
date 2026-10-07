@@ -142,31 +142,29 @@ const HomePage: React.FC<HomePageProps> = () => {
       </IonHeader>
 
       <IonContent fullscreen scrollY={false} className="home-content">
+        {/* ============ PORTADA GIGANTE, SIN OVERLAY, SIN BOTONES ADENTRO ============ */}
         {portadaSrc && (
           <div className="portada-wrap">
             <IonImg src={portadaSrc} alt="Portada Casa Sumaq Allpa" className="portada-img" />
-            <div className="portada-overlay">
-              <div className="portada-titulo">Casa Sumaq Allpa</div>
-              <div className="portada-sub">Sistema de Gestión Hotelera</div>
-            </div>
-
-            {/* ========== 5 BOTONES NAV · COLUMNA DERECHA PORTADA · RECUADRO AZUL ========== */}
-            <div className="portada-nav-col">
-              {navButtons.map((b) => (
-                <button
-                  key={b.id}
-                  type="button"
-                  className={`nv-card ${b.colorClass}`}
-                  onClick={() => goTo(b.route)}
-                >
-                  <IonIcon icon={b.icon} color="light" className="nv-icon" />
-                  <div className="nv-label">{b.label}</div>
-                </button>
-              ))}
-            </div>
           </div>
         )}
 
+        {/* ============ 5 BOTONES NAV · FILA HORIZONTAL, DEBAJO DE LA PORTADA ============ */}
+        <div className="home-nav-row">
+          {navButtons.map((b) => (
+            <button
+              key={b.id}
+              type="button"
+              className={`nv-card ${b.colorClass}`}
+              onClick={() => goTo(b.route)}
+            >
+              <IonIcon icon={b.icon} color="light" className="nv-icon" />
+              <div className="nv-label">{b.label}</div>
+            </button>
+          ))}
+        </div>
+
+        {/* ============ FECHA HOY ============ */}
         <div className="today-row today-row-slim">
           <div className="today-text">
             <div className="today-date ion-text-capitalize">{today}</div>
