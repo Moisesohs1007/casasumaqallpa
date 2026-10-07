@@ -21,7 +21,7 @@ import HabitacionesPage from './pages/Habitaciones/Habitaciones';
 import PosPage from './pages/Pos/Pos';
 import PerfilPage from './pages/Perfil/Perfil';
 import FolioPage from './pages/Folio/Folio';
-import { HabitacionService } from './services';
+import { HabitacionService, ReservaService } from './services';
 
 setupIonicReact({
   mode: 'md',
@@ -74,12 +74,20 @@ const App: React.FC = () => {
     let cancelled = false;
     (async () => {
       try {
-        const hidratado = await HabitacionService.hidratarDesdeSupabase(false);
+        const hidratadoHab = await HabitacionService.hidratarDesdeSupabase(false);
         if (!cancelled && window && (window as any).console) {
-          (window as any).console.debug('[App] Boot hidratación habitaciones Supabase:', hidratado ? 'OK' : 'falló (se usa seed local)');
+          (window as any).console.debug('[App] Boot hidratación habitaciones Supabase:', hidratadoHab ? 'OK' : 'falló (seed local)');
         }
       } catch (e) {
-        if (!cancelled) console.warn('[App] Boot hidratación error (no fatal):', (e as any)?.message || e);
+        if (!cancelled) console.warn('[App] Boot hidratación habitaciones (no fatal):', (e as any)?.message || e);
+      }
+      try {
+        const hidratadoRes = await ReservaService.hidratarDesdeSupabase(false);
+        if (!cancelled && window && (window as any).console) {
+          (window as any).console.debug('[App] Boot hidratación reservas Supabase:', hidratadoRes ? 'OK' : 'falló (sin datos remotos)');
+        }
+      } catch (e) {
+        if (!cancelled) console.warn('[App] Boot hidratación reservas (no fatal):', (e as any)?.message || e);
       }
     })();
     return () => { cancelled = true; };

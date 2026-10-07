@@ -3,13 +3,18 @@ import { db, seedUtil, type Create, type Update, type Reserva, type EstadoReserv
 import { HabitacionService } from './HabitacionService';
 import { TarifaService, PoliticaCancelacionService } from './TarifaService';
 import { HuespedService } from './HuespedService';
+import { db as dbRemota } from './__supabase_db__';
 
 const KEY = 'reservas';
 
-const PREFIJO = 'R-';
-const siguienteCodigo = (): string => {
+let _hidratacionDone = false;
+let _hidratandoPromise: Promise<boolean> | null = null;
+
+const log = (m: string, ...rest: any[]) => { try { console.debug(`[ReservaService] ${m}`, ...rest); } catch (_) {} };
+
+const siguienteCodigoLocal = (): string => {
   const sufijo = Date.now().toString().slice(-7);
-  return `${PREFIJO}${sufijo}`;
+  return `R-${sufijo}`;
 };
 
 const agregarHistorial = (
@@ -35,6 +40,37 @@ const agregarHistorial = (
 });
 
 export const ReservaService = {
+  // ============== BOOT: Hidratar InMemoryDB desde Supabase Cloud (singleton 1 vez) ==============
+  async hidratarDesdeSupabase(force = false): Promise<boolean> {
+    if (_hidratacionDone && !force) return true;
+    if (_hidratandoPromise && !force) return _hidratandoPromise;
+
+    const run = async (): Promise<boolean> => {
+      try {
+        log('Hidratando reservas desde Supabase Cloud...');
+        const reservasRemotas = await dbRemota.allAsync<Reserva>(KEY);
+        if (reservasRemotas && reservasRemotas.length > 0) {
+          db.setAll<Reserva>(KEY, reservasRemotas);
+          _hidratacionDone = true;
+          log(`✅ reservas cargadas: ${reservasRemotas.length}`);
+          return true;
+        } else {
+          log('⚠️  0 reservas en Supabase Cloud. InMemoryDB se mantiene vacía.');
+          _hidratacionDone = true;
+          return true;
+        }
+      } catch (e) {
+        console.error('[ReservaService] Error hidratando reservas Supabase:', (e as any)?.message || e);
+        _hidratacionDone = false;
+        return false;
+      } finally {
+        _hidratandoPromise = null;
+      }
+    };
+    _hidratandoPromise = run();
+    return _hidratandoPromise;
+  },
+
   listarTodas(params?: {
     estado?: EstadoReserva;
     origen?: OrigenReserva;
@@ -51,7 +87,7 @@ export const ReservaService = {
     if (params?.origen) lista = lista.filter((r) => r.origen === params.origen);
     if (params?.huespedId) lista = lista.filter((r) => r.huespedId === params.huespedId);
     if (params?.habitacionId) {
-      lista = lista.filter((r) => r.habitaciones.some((rh) => rh.habitacionId === params.habitacionId));
+      lista = lista.filter((r) => (r.habitaciones || []).some((rh) => rh.habitacionId === params.habitacionId));
     }
     if (params?.rangoFechasCheckin) {
       const { inicioISO, finISO } = params.rangoFechasCheckin;
@@ -64,18 +100,18 @@ export const ReservaService = {
         (r) =>
           r.estado !== 'CANCELADA' &&
           r.estado !== 'CHECKED_OUT' &&
-          r.pagoGarantia.tipoGarantia === 'PENDIENTE_CONFIRMACION'
+          (r.pagoGarantia as any)?.tipoGarantia === 'PENDIENTE_CONFIRMACION'
       );
     }
     if (params?.buscar) {
       const q = params.buscar.toLowerCase().trim();
       lista = lista.filter((r) =>
-        r.codigoReserva.toLowerCase().includes(q) ||
-        r.huesped?.nombreCompleto.toLowerCase().includes(q) ||
-        r.huesped?.numeroDocumento.includes(q) ||
-        (r.huesped?.telefono1 && r.huesped.telefono1.includes(q)) ||
-        r.codigoOtaConirmacion?.toLowerCase().includes(q) ||
-        r.habitaciones.some((rh) => rh.habitacion.codigo.toLowerCase().includes(q))
+        ((r.codigoReserva || '') as string).toLowerCase().includes(q) ||
+        (r.huesped?.nombreCompleto || '').toString().toLowerCase().includes(q) ||
+        (r.huesped?.numeroDocumento || '').toString().includes(q) ||
+        ((r.huesped?.telefono1 || '') as string).includes(q) ||
+        ((r as any).codigoOtaConirmacion || (r as any).codigoOtaConfirmacion || '').toString().toLowerCase().includes(q) ||
+        (r.habitaciones || []).some((rh) => (rh.habitacion?.codigo || '').toLowerCase().includes(q))
       );
     }
     return lista;
@@ -93,12 +129,12 @@ export const ReservaService = {
     const activas = this.listarTodas();
     return {
       reservasActivas: activas.filter((r) => r.estado !== 'CANCELADA').length,
-      llegadasHoy: activas.filter((r) => r.fechaCheckin.startsWith(hoy.slice(0, 10)) && ['CONFIRMADA', 'CHECKED_IN', 'PENDIENTE'].includes(r.estado)).length,
-      salidasHoy: activas.filter((r) => r.fechaCheckout.startsWith(hoy.slice(0, 10)) && ['CHECKED_IN', 'CONFIRMADA'].includes(r.estado)).length,
+      llegadasHoy: activas.filter((r) => (r.fechaCheckin || '').startsWith(hoy.slice(0, 10)) && ['CONFIRMADA', 'CHECKED_IN', 'PENDIENTE', 'MODIFICADA'].includes(r.estado)).length,
+      salidasHoy: activas.filter((r) => (r.fechaCheckout || '').startsWith(hoy.slice(0, 10)) && ['CHECKED_IN', 'CONFIRMADA', 'MODIFICADA'].includes(r.estado)).length,
       enCasa: activas.filter((r) => r.estado === 'CHECKED_IN').length,
-      enCheckIn: activas.filter((r) => r.estado === 'CHECKED_IN').reduce((sum, r) => sum + r.totalPersonas, 0),
+      enCheckIn: activas.filter((r) => r.estado === 'CHECKED_IN').reduce((sum, r) => sum + (r.totalPersonas || 0), 0),
       pendientesGarantia: activas.filter(
-        (r) => ['CONFIRMADA', 'PENDIENTE'].includes(r.estado) && r.pagoGarantia.tipoGarantia === 'PENDIENTE_CONFIRMACION'
+        (r) => ['CONFIRMADA', 'PENDIENTE', 'MODIFICADA'].includes(r.estado) && ((r.pagoGarantia as any)?.tipoGarantia === 'PENDIENTE_CONFIRMACION')
       ).length,
     };
   },
@@ -110,7 +146,7 @@ export const ReservaService = {
       if (huesped) r.huesped = huesped;
     }
     if (r) {
-      r.habitaciones = r.habitaciones.map((rh) => {
+      r.habitaciones = (r.habitaciones || []).map((rh) => {
         if (rh.habitacion) return rh;
         const hab = HabitacionService.buscarPorId(rh.habitacionId);
         return hab ? { ...rh, habitacion: hab } : rh;
@@ -120,7 +156,7 @@ export const ReservaService = {
   },
 
   buscarPorCodigo(codigo: string): Reserva | undefined {
-    const r = db.findOne<Reserva>(KEY, (x) => x.codigoReserva.trim().toUpperCase() === codigo.trim().toUpperCase());
+    const r = db.findOne<Reserva>(KEY, (x) => ((x.codigoReserva || '') as string).trim().toUpperCase() === codigo.trim().toUpperCase());
     return r ? this.buscarPorId(r.id) : undefined;
   },
 
@@ -134,7 +170,7 @@ export const ReservaService = {
     return this.listarTodas().filter((r) => {
       if (r.estado === 'CANCELADA') return false;
       if (excluirReservaId && r.id === excluirReservaId) return false;
-      if (!r.habitaciones.some((rh) => rh.habitacionId === habitacionId)) return false;
+      if (!(r.habitaciones || []).some((rh) => rh.habitacionId === habitacionId)) return false;
       return checkinISO < r.fechaCheckout && checkoutISO > r.fechaCheckin;
     });
   },
@@ -161,7 +197,6 @@ export const ReservaService = {
     ));
     if (noches < 1) return { valido: false, noches: 0, motivo: 'Check-out debe ser después de check-in' };
 
-    // Habitación: seleccionar disponible
     let habitacion: Habitacion | undefined;
     if (params.habitacionIdSeleccionada) {
       const conflictos = this.listarPorHabitacionYFechas({
@@ -185,7 +220,6 @@ export const ReservaService = {
       return { valido: false, noches, motivo: 'No hay habitaciones disponibles para las fechas y capacidad seleccionadas.' };
     }
 
-    // Calcular tarifa
     const tarifaCalc = TarifaService.buscarMejorParaFecha({
       tipoHabitacionId: habitacion.tipoHabitacionId,
       fechaCheckinISO: params.checkinISO,
@@ -199,9 +233,40 @@ export const ReservaService = {
     return { valido: true, habitacion, noches, tarifaCalculada: tarifaCalc };
   },
 
-  /** Paso 2 del flujo: crear la reserva. */
+  /** Paso 2 del flujo: crear la reserva. DUAL WRITE local + Supabase Cloud (persiste). */
   crear(payload: Create<Reserva> & { usuarioResponsableId: string }): Reserva {
-    const codigo = siguienteCodigo();
+    // Primero, CREAR EN SUPABASE REMOTO para: (a) obtener codigo_reserva MAX+1 único remoto (evita colisiones multi-usuario), (b) persiste.
+    let codigo = siguienteCodigoLocal();
+    try {
+      // No esperamos asíncrono para no bloquear UI; pero lanzamos dual write fire and forget con el mismo payload.
+      dbRemota.addAsync<Reserva>(KEY, {
+        ...(payload as any),
+        codigoReserva: codigo,
+        historialCambios: [
+          agregarHistorial('', 'CREACION', null, payload, payload.usuarioResponsableId, 'Reserva creada en sistema'),
+        ],
+        fechaCreacion: payload.fechaCreacion || seedUtil.nowISO(),
+        fechaModificacion: seedUtil.nowISO(),
+      } as any).then((remota: any) => {
+        if (remota && remota.id && remota.codigoReserva) {
+          try {
+            // Si la remota tiene ID y codigo nuevo, actualizamos InMemoryDB para que coincidan.
+            const existe = db.getById<any>(KEY, remota.id);
+            if (existe) {
+              db.update<any>(KEY, remota.id, { codigoReserva: remota.codigoReserva, updatedBy: payload.usuarioResponsableId });
+            } else {
+              // Si el insert local falló, metemos la remota.
+              db.setAll<any>(KEY, [remota, ...db.all<any>(KEY).filter((x: any) => x.id !== remota.id)]);
+            }
+            log(`✅ Reserva sincronizada con Supabase: ${remota.codigoReserva || remota.id}`);
+          } catch (_) {}
+        }
+      }).catch((e) => console.error('[ReservaService.crear] Sync remoto falló (reserva no persistida en nube):', e?.message || e));
+    } catch (e) {
+      console.error('[ReservaService.crear] Error al enviar Supabase:', (e as any)?.message || e);
+    }
+
+    // Crear local para UI inmediata (usamos el mismo ID si Supabase devuelve síncrono; pero aquí usamos add local normal)
     const nueva = db.add<Reserva>(KEY, {
       ...payload,
       codigoReserva: codigo,
@@ -212,22 +277,22 @@ export const ReservaService = {
       fechaModificacion: seedUtil.nowISO(),
     } as unknown as Create<Reserva>);
 
-    // Actualizar historial con id correcto
+    // Actualizar historial con id correcto local
     nueva.historialCambios = nueva.historialCambios.map((h) => ({ ...h, reservaId: nueva.id }));
     db.update<Reserva>(KEY, nueva.id, {
       historialCambios: nueva.historialCambios,
       updatedBy: payload.usuarioResponsableId,
     } as unknown as Update<Reserva>);
 
-    // Actualizar habitaciones a RESERVADA
-    for (const rh of nueva.habitaciones) {
+    // Actualizar habitaciones a RESERVADA dual (HabitacionService ya dual)
+    for (const rh of nueva.habitaciones || []) {
       const hab = HabitacionService.buscarPorId(rh.habitacionId);
-      if (hab && hab.estado === 'LIBRE') {
+      if (hab && (hab.estado === 'LIBRE' || hab.estado === 'DISPONIBLE')) {
         HabitacionService.cambiarEstado(rh.habitacionId, 'RESERVADA', payload.usuarioResponsableId);
       }
     }
 
-    // Incrementar visitas de huésped si lo existía
+    // Incrementar visitas de huésped si lo existía (si es que ya tiene dual write en HuespedService: futuro, por ahora local OK)
     if (HuespedService.buscarPorId(nueva.huespedId)) {
       HuespedService.actualizar(nueva.huespedId, {
         updatedBy: payload.usuarioResponsableId,
@@ -249,6 +314,17 @@ export const ReservaService = {
         agregarHistorial(id, 'MODIFICACION', anterior, changes, changes.usuarioResponsableId, 'Actualización manual'),
       ],
     } as unknown as Update<Reserva>);
+
+    // Dual-write: remoto
+    dbRemota.updateAsync<Reserva>(KEY, id, {
+      ...changes,
+      fechaModificacion: seedUtil.nowISO(),
+      historialCambios: [
+        ...anterior.historialCambios,
+        agregarHistorial(id, 'MODIFICACION', anterior, changes, changes.usuarioResponsableId, 'Actualización manual'),
+      ],
+    } as any).catch((e) => console.error('[ReservaService.actualizar] Sync remoto falló:', e?.message || e));
+
     return this.buscarPorId(actualizados!.id);
   },
 
@@ -278,7 +354,7 @@ export const ReservaService = {
         `Transición inválida: ${anterior.estado} → ${nuevoEstado}. Válidos: ${actuales.join(', ') || '(ninguno)'}`
       );
     }
-    const actual = db.update<Reserva>(KEY, id, {
+    const payloadLocal: any = {
       estado: nuevoEstado,
       fechaModificacion: seedUtil.nowISO(),
       historialCambios: [
@@ -286,11 +362,16 @@ export const ReservaService = {
         agregarHistorial(id, 'CAMBIO_ESTADO', anterior.estado, nuevoEstado, params.usuarioResponsableId, params.comentario || `Cambio de estado: ${anterior.estado} → ${nuevoEstado}`),
       ],
       ...params.informacionAdicional,
-    } as unknown as Update<Reserva>);
+    };
+    const actual = db.update<Reserva>(KEY, id, payloadLocal as unknown as Update<Reserva>);
+
+    // Dual-write: remoto
+    dbRemota.updateAsync<Reserva>(KEY, id, payloadLocal as any).catch((e) => console.error('[ReservaService.cambiarEstado] Sync remoto falló:', e?.message || e));
+
     return this.buscarPorId(actual!.id);
   },
 
-  /** Valida y calcula cancelación (multa). */
+  /** Valida y calcula cancelación (multa). Dual-write también. */
   cancelar(
     id: string,
     params: {
@@ -317,9 +398,9 @@ export const ReservaService = {
       comentario: params.motivoCancelacion,
     });
 
-    // Liberar habitaciones reservadas
+    // Liberar habitaciones reservadas (HabitacionService dual write)
     if (reserva) {
-      for (const rh of reserva.habitaciones) {
+      for (const rh of reserva.habitaciones || []) {
         const hab = HabitacionService.buscarPorId(rh.habitacionId);
         if (hab && hab.estado === 'RESERVADA') {
           HabitacionService.cambiarEstado(rh.habitacionId, 'LIBRE', params.usuarioResponsableId);
@@ -336,10 +417,16 @@ export const ReservaService = {
   },
 
   eliminar(id: string): boolean {
-    return db.remove(KEY, id);
+    const ok = db.remove(KEY, id);
+    if (ok) {
+      dbRemota.removeAsync(KEY, id).catch((e) => console.error('[ReservaService.eliminar] Sync remoto falló:', e?.message || e));
+    }
+    return ok;
   },
 
   reiniciarSeed(): void {
     db.reset();
+    _hidratacionDone = false;
+    _hidratandoPromise = null;
   },
 };
