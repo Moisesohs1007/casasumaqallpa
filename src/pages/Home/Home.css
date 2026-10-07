@@ -1,4 +1,4 @@
-/* ============= LAYOUT HOME 100dvh SIN SCROLL ============= */
+/* ============= LAYOUT HOME 100dvh SIN SCROLL · SIN CARTA · SIN INSTRUCCIONES ============= */
 .home-page {
   height: 100dvh;
   display: flex;
@@ -12,28 +12,34 @@
   display: flex;
   flex-direction: column;
   gap: 8px;
-  padding: 8px 10px 6px !important;
+  padding: 10px 12px 10px !important;
   overflow: hidden;
 }
 
-/* ------------- PORTADA ------------- */
+/* ------------- PORTADA: OCUPA CASI TODO EL ALTO, IMAGEN COMPLETA SIN CORTAR ------------- */
 .portada-wrap {
   position: relative;
   width: 100%;
-  max-height: 22svh;
-  min-height: 100px;
-  flex: 0 0 auto;
-  background: #1a1a1a;
-  border-radius: 10px;
+  max-height: 58svh;
+  min-height: 38svh;
+  height: auto;
+  flex: 1 1 auto;
+  background: #fff;
+  border-radius: 12px;
   overflow: hidden;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .portada-img {
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  object-fit: contain;      /* <-- NO CORTA LA IMAGEN, la muestra COMPLETA */
+  object-position: center center;
   display: block;
+  background: #fff;
 }
 
 .portada-overlay {
@@ -41,144 +47,117 @@
   left: 0;
   right: 0;
   bottom: 0;
-  padding: 10px 12px 8px;
-  background: linear-gradient(to top, rgba(0, 0, 0, 0.7) 0%, rgba(0, 0, 0, 0.18) 70%, transparent 100%);
+  padding: 12px 16px 10px;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.62) 0%, rgba(0, 0, 0, 0.15) 70%, transparent 100%);
   color: #fff;
+  pointer-events: none;
 }
 
 .portada-titulo {
-  font-size: 1.05rem;
+  font-size: 1.25rem;
   font-weight: 700;
   letter-spacing: 0.2px;
-  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.45);
 }
 
 .portada-sub {
-  font-size: 0.7rem;
-  opacity: 0.92;
-  margin-top: 1px;
+  font-size: 0.72rem;
+  opacity: 0.94;
+  margin-top: 2px;
 }
 
-/* ------------- TODAY + BOTÓN VER CARTA ------------- */
+/* ------------- TODAY (SIN BOTÓN VER CARTA) · MÁS DELGADO ------------- */
 .today-row {
   flex: 0 0 auto;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  padding: 6px 8px;
+  padding: 5px 10px;
   background: #fff;
   border-radius: 8px;
-  box-shadow: 0 1px 5px rgba(0, 0, 0, 0.05);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.05);
 }
-
-.today-text { min-width: 0; }
+.today-row-slim { padding: 4px 10px; }
+.today-text { min-width: 0; flex: 1; }
 .today-date {
   font-size: 0.9rem;
-  font-weight: 600;
+  font-weight: 700;
   line-height: 1.2;
   color: #1a1a1a;
 }
 .today-sub {
-  font-size: 0.72rem;
+  font-size: 0.7rem;
   color: #666;
-  margin-top: 2px;
+  margin-top: 1px;
 }
 
-/* ------------- KPIs ------------- */
+/* ------------- KPIS · MUY COMPACTOS (dejamos altura a portada) ------------- */
 .kpis-row {
   flex: 0 0 auto;
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   gap: 6px;
 }
+.kpis-row-compact { gap: 5px; }
 
 .kpi-card {
   border-radius: 10px;
-  padding: 7px 8px;
-  min-height: 74px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  padding: 5px 6px 6px;
+  min-height: 60px;
+  max-height: 68px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.07);
   color: #fff;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
 }
+.kpi-compact { padding: 4px 6px 5px; min-height: 58px; }
 .kpi-primary   { background: var(--ion-color-primary, #3880ff); }
 .kpi-warning   { background: var(--ion-color-warning, #ffc409); color: #1a1a1a; }
 .kpi-tertiary  { background: var(--ion-color-tertiary, #7044ff); }
 .kpi-success   { background: var(--ion-color-success, #10dc60); }
 
-.kpi-warning .kpi-icon, .kpi-success .kpi-icon { filter: drop-shadow(0 1px 1px rgba(0,0,0,0.15)); }
-.kpi-warning { color: #111; }
-.kpi-success { color: #fff; }
+.kpi-warning .kpi-icon { filter: drop-shadow(0 1px 1px rgba(0,0,0,0.1)); color: #111 !important; }
+.kpi-success .kpi-icon { color: #fff !important; }
 
 .kpi-top {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 4px;
+  gap: 2px;
 }
 
-.kpi-icon { font-size: 1.25rem; opacity: 0.98; }
-.kpi-icon.sc-ion-icon-md-h, .kpi-icon.sc-ion-icon-ios-h { font-size: 1.25rem !important; }
+.kpi-icon { font-size: 1rem; opacity: 0.98; }
+.kpi-icon.sc-ion-icon-md-h, .kpi-icon.sc-ion-icon-ios-h { font-size: 1rem !important; }
 
 .kpi-value {
-  font-size: 1.2rem;
+  font-size: 1rem;
   font-weight: 800;
   line-height: 1;
-  background: rgba(255,255,255,0.92);
+  background: rgba(255,255,255,0.94);
   color: #1a1a1a;
-  padding: 2px 8px;
+  padding: 2px 7px;
   border-radius: 999px;
 }
 .kpi-badgesub {
   margin-left: 2px;
-  font-size: 0.72rem;
-  opacity: 0.8;
+  font-size: 0.65rem;
+  opacity: 0.82;
   font-weight: 600;
 }
 .kpi-label {
-  font-size: 0.66rem;
+  font-size: 0.62rem;
   font-weight: 600;
-  line-height: 1.15;
-  opacity: 0.96;
-  margin-top: 3px;
-}
-
-/* ------------- TIPS / INSTRUCCIONES ------------- */
-.tips-box {
-  flex: 1 1 auto;
-  min-height: 0;
-  padding: 7px 10px;
-  background: #f7f7fb;
-  border: 1px solid #e7e7f0;
-  border-radius: 8px;
+  line-height: 1.1;
+  opacity: 0.97;
+  margin-top: 2px;
   overflow: hidden;
-}
-.tips-title {
-  font-size: 0.76rem;
-  font-weight: 700;
-  color: #4a4a68;
-  margin-bottom: 4px;
-}
-.tips-list {
-  margin: 0;
-  padding-left: 18px;
-  line-height: 1.38;
-}
-.tips-list li {
-  font-size: 0.7rem;
-  color: #555;
-  margin-bottom: 2px;
-}
-.tips-list code {
-  background: rgba(0, 0, 0, 0.06);
-  padding: 0 4px;
-  border-radius: 3px;
-  font-size: 0.68rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-/* Anulamos márgenes Ionic por defecto de ion-card/ion-grid si quedaran */
+/* Anulamos márgenes Ionic por defecto */
 ion-card { margin: 0 !important; }
 ion-grid { padding: 0 !important; }
 ion-row { margin: 0 !important; }
@@ -194,7 +173,7 @@ ion-card-content { padding: 8px 10px 10px !important; }
 ion-label h2 { margin: 0 !important; font-size: 0.9rem; font-weight: 600; }
 ion-label p { margin: 0 !important; font-size: 0.75rem; color: #666; }
 
-/* ---- Ajustes viewport móvil: ocultar barras iOS ---- */
+/* ---- Ajustes viewport móvil: dvh ---- */
 @supports (height: 100dvh) {
   .home-page { height: 100dvh; }
 }

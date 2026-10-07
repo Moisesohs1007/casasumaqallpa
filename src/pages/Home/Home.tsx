@@ -180,26 +180,16 @@ const HomePage: React.FC<HomePageProps> = () => {
           </div>
         )}
 
-        <div className="today-row">
+        <div className="today-row today-row-slim">
           <div className="today-text">
             <div className="today-date ion-text-capitalize">{today}</div>
             <div className="today-sub">Bienvenido(a) al panel de gestión.</div>
           </div>
-          {cartaHref && (
-            <IonButton
-              size="small"
-              color="secondary"
-              onClick={() => window.open(cartaHref, '_blank', 'noopener,noreferrer')}
-            >
-              <IonIcon slot="start" icon={documentText} />
-              Ver carta
-            </IonButton>
-          )}
         </div>
 
-        <div className="kpis-row">
+        <div className="kpis-row kpis-row-compact">
           {dashboardItems.map((item) => (
-            <div key={item.id} className={`kpi-card kpi-${item.color}`}>
+            <div key={item.id} className={`kpi-card kpi-${item.color} kpi-compact`}>
               <div className="kpi-top">
                 <IonIcon icon={item.icon} color="light" className="kpi-icon" />
                 <div className="kpi-value">
@@ -210,14 +200,6 @@ const HomePage: React.FC<HomePageProps> = () => {
               <div className="kpi-label">{item.label}</div>
             </div>
           ))}
-        </div>
-
-        <div className="tips-box">
-          <div className="tips-title">Instrucciones rápidas</div>
-          <ol className="tips-list">
-            <li>📸 Portada: <code>public/portada.jpg</code> · 📄 Carta: <code>public/carta.pdf</code></li>
-            <li>🛏️ Operación diaria: pestaña <strong>Habitaciones</strong> · 💳 Walk-in: pestaña POS</li>
-          </ol>
         </div>
       </IonContent>
     </IonPage>
