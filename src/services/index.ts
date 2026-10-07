@@ -4,5 +4,6 @@ export * from './TarifaService';
 export * from './ReservaService';
 export * from './FolioService';
 export * from './PosService';
+export * from './InventarioService';
 export * from './supabaseClient';
 export * from './__db__';

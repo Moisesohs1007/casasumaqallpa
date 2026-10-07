@@ -1,5 +1,6 @@
 // @ts-nocheck
 import { db, seedUtil, type Create, type Update, type Folio, type CargoFolio, type PagoFolio, type Reserva, type Habitacion, type EstadoFolio, type EstadoPago, type MetodoPago } from './__db__';
+import { dbRemota } from './__supabase_db__';
 import { ReservaService } from './ReservaService';
 import { HabitacionService } from './HabitacionService';
 import { HuespedService } from './HuespedService';
@@ -9,14 +10,41 @@ const KEY_FOLIO = 'folios';
 const KEY_CARGO = 'cargosFolio';
 const KEY_PAGO = 'pagosFolio';
 
+const FOLIO_KEYS_HIDRATAR = [KEY_FOLIO, KEY_CARGO, KEY_PAGO] as const;
+let _hidratadoFolio = false;
+let _hidratandoFolio: Promise<boolean> | null = null;
+
+async function _hidratarDesdeSupabaseFolio(force = false): Promise<boolean> {
+  if (_hidratadoFolio && !force) return true;
+  if (!dbRemota.isOnline()) return false;
+  if (_hidratandoFolio) return _hidratandoFolio;
+  _hidratandoFolio = (async () => {
+    try {
+      const resultados = await Promise.all(FOLIO_KEYS_HIDRATAR.map((k) => dbRemota.allAsync<any>(k).catch((e) => { console.warn('[FolioService.hidratar] fail key=', k, e); return null; })));
+      FOLIO_KEYS_HIDRATAR.forEach((k, idx) => {
+        const rows = resultados[idx];
+        if (Array.isArray(rows) && rows.length > 0) {
+          try { db.setAll(k, rows); } catch (e) { console.warn('[FolioService.hidratar] setAll fail key=', k, e); }
+        }
+      });
+      _hidratadoFolio = true;
+      return true;
+    } catch (e) {
+      console.warn('[FolioService.hidratar] error general:', e);
+      return false;
+    } finally { _hidratandoFolio = null; }
+  })();
+  return _hidratandoFolio;
+}
+
 const siguienteNumeroFolio = (): string => {
   const fecha = new Date();
   const yyyymmdd = `${fecha.getFullYear()}${String(fecha.getMonth() + 1).padStart(2, '0')}${String(fecha.getDate()).padStart(2, '0')}`;
   const existentes = db
     .all<Folio>(KEY_FOLIO)
-    .filter((f) => f.numeroFolio.includes(yyyymmdd))
+    .filter((f) => (f.numeroFolio || '').includes(yyyymmdd))
     .map((f) => {
-      const m = f.numeroFolio.match(/-(\d+)$/);
+      const m = (f.numeroFolio || '').match(/-(\d+)$/);
       return m ? parseInt(m[1], 10) : 0;
     });
   const maxNum = existentes.reduce((max, n) => (n > max ? n : max), 0);
@@ -25,27 +53,42 @@ const siguienteNumeroFolio = (): string => {
 
 export const CargoFolioService = {
   crear(c: Create<CargoFolio>): CargoFolio {
-    const nuevo = db.add<CargoFolio>(KEY_CARGO, c);
+    const now = seedUtil.nowISO();
+    const payload: any = { createdAt: (c as any).createdAt || now, updatedAt: (c as any).updatedAt || now, createdBy: (c as any).createdBy || 'system-cargo', updatedBy: (c as any).updatedBy || 'system-cargo', ...c };
+    const nuevo = db.add<CargoFolio>(KEY_CARGO, payload);
+    dbRemota.addAsync<CargoFolio>(KEY_CARGO, { ...payload, id: nuevo.id } as any).catch((e) => console.error('[CargoFolio.crear] remoto fail:', e));
     const folio = db.getById<Folio>(KEY_FOLIO, nuevo.folioId);
-    if (folio) FolioService.recalcularTotales(nuevo.folioId, nuevo.updatedBy || 'system-cargo');
+    if (folio) FolioService.recalcularTotales(nuevo.folioId, (payload as any).updatedBy || 'system-cargo');
     return nuevo;
   },
   actualizar(id: string, changes: Update<CargoFolio>): CargoFolio | undefined {
-    const act = db.update<CargoFolio>(KEY_CARGO, id, changes);
-    if (act) FolioService.recalcularTotales(act.folioId, changes.updatedBy || 'system-cargo');
+    const delta: any = { updatedAt: seedUtil.nowISO(), ...changes };
+    const act = db.update<CargoFolio>(KEY_CARGO, id, delta);
+    if (act) {
+      dbRemota.updateAsync<CargoFolio>(KEY_CARGO, id, delta as any).catch((e) => console.error('[CargoFolio.actualizar] remoto fail:', e));
+      FolioService.recalcularTotales(act.folioId, (changes as any).updatedBy || 'system-cargo');
+    }
     return act;
   },
   anular(id: string, motivo: string, usuarioId: string): CargoFolio | undefined {
-    const act = db.update<CargoFolio>(KEY_CARGO, id, {
+    const now = seedUtil.nowISO();
+    const existing = db.getById<CargoFolio>(KEY_CARGO, id);
+    const delta = {
       esAnulado: true,
       motivoAnulacion: motivo,
       estado: 'ANULADO',
       monto: 0,
       subtotal: 0,
-      impuestosMontoDesglosado: (db.getById<CargoFolio>(KEY_CARGO, id)?.impuestosMontoDesglosado || []).map((x) => ({ ...x, montoImpuesto: 0 })),
+      total: 0,
+      impuestosMontoDesglosado: (existing?.impuestosMontoDesglosado || []).map((x) => ({ ...x, montoImpuesto: 0 })),
       updatedBy: usuarioId,
-    } as unknown as Update<CargoFolio>);
-    if (act) FolioService.recalcularTotales(act.folioId, usuarioId);
+      updatedAt: now,
+    } as unknown as Update<CargoFolio>;
+    const act = db.update<CargoFolio>(KEY_CARGO, id, delta);
+    if (act) {
+      dbRemota.updateAsync<CargoFolio>(KEY_CARGO, id, delta as any).catch((e) => console.error('[CargoFolio.anular] remoto fail:', e));
+      FolioService.recalcularTotales(act.folioId, usuarioId);
+    }
     return act;
   },
   listarPorFolio(folioId: string): CargoFolio[] {
@@ -55,22 +98,51 @@ export const CargoFolioService = {
 
 export const PagoFolioService = {
   crear(p: Create<PagoFolio>): PagoFolio {
-    const nuevo = db.add<PagoFolio>(KEY_PAGO, p);
+    const now = seedUtil.nowISO();
+    const payload: any = { createdAt: (p as any).createdAt || now, updatedAt: (p as any).updatedAt || now, createdBy: (p as any).createdBy || ((p as any).usuarioId || 'system-pago'), updatedBy: (p as any).updatedBy || ((p as any).usuarioId || 'system-pago'), ...p };
+    const nuevo = db.add<PagoFolio>(KEY_PAGO, payload);
+    dbRemota.addAsync<PagoFolio>(KEY_PAGO, { ...payload, id: nuevo.id } as any).catch((e) => console.error('[PagoFolio.crear] remoto fail:', e));
     if (nuevo.folioId && nuevo.estado !== 'ANULADO') {
-      FolioService.recalcularTotales(nuevo.folioId, nuevo.usuarioId || 'system-pago');
+      FolioService.recalcularTotales(nuevo.folioId, (payload as any).usuarioId || 'system-pago');
     }
     return nuevo;
+  },
+  actualizar(id: string, changes: Update<PagoFolio>): PagoFolio | undefined {
+    const delta: any = { updatedAt: seedUtil.nowISO(), ...changes };
+    if (delta.monto !== undefined) delta.monto = Number(delta.monto || 0);
+    const upd = db.update<PagoFolio>(KEY_PAGO, id, delta);
+    if (upd) {
+      dbRemota.updateAsync<PagoFolio>(KEY_PAGO, id, delta as any).catch((e) => console.error('[PagoFolio.actualizar] remoto fail:', e));
+      if (upd.folioId) FolioService.recalcularTotales(upd.folioId, (changes as any).usuarioId || (changes as any).updatedBy || 'system-pago');
+    }
+    return upd;
+  },
+  anular(id: string, motivo: string, usuarioId: string): PagoFolio | undefined {
+    const delta = {
+      estado: 'ANULADO' as EstadoPago,
+      esDevolucion: true,
+      monto: 0,
+      total: 0,
+      motivoAnulacion: motivo,
+      observaciones: `Anulado: ${motivo}`,
+      updatedBy: usuarioId,
+      updatedAt: seedUtil.nowISO(),
+    } as unknown as Update<PagoFolio>;
+    const upd = db.update<PagoFolio>(KEY_PAGO, id, delta);
+    if (upd) {
+      dbRemota.updateAsync<PagoFolio>(KEY_PAGO, id, delta as any).catch((e) => console.error('[PagoFolio.anular] remoto fail:', e));
+      if (upd.folioId) FolioService.recalcularTotales(upd.folioId, usuarioId);
+    }
+    return upd;
   },
   listarPorFolio(folioId: string): PagoFolio[] {
     return db.findMany<PagoFolio>(KEY_PAGO, (p) => p.folioId === folioId && p.estado !== 'ANULADO');
   },
 };
 
-// Inicializar cargos/pagos desde folios seed al iniciar
 const initFromSeed = () => {
   const folios = db.all<Folio>(KEY_FOLIO);
   for (const f of folios) {
-    // Cargos
     for (const c of f.cargos || []) {
       if (!db.findOne<CargoFolio>(KEY_CARGO, (x) => x.id === c.id)) {
         db.add<CargoFolio>(KEY_CARGO, c as Create<CargoFolio>);
@@ -86,6 +158,8 @@ const initFromSeed = () => {
 try { initFromSeed(); } catch (e) { /* no pasa nada */ }
 
 export const FolioService = {
+  hidratarDesdeSupabase: _hidratarDesdeSupabaseFolio,
+
   listarTodos(params?: {
     estado?: EstadoFolio;
     habitacionId?: string;
@@ -102,13 +176,13 @@ export const FolioService = {
     if (params?.habitacionId) lista = lista.filter((f) => f.habitacionId === params.habitacionId);
     if (params?.huespedId) lista = lista.filter((f) => f.huespedId === params.huespedId);
     if (params?.reservaId) lista = lista.filter((f) => f.reservaId === params.reservaId);
-    if (params?.fechaAperturaDesde) lista = lista.filter((f) => f.fechaApertura >= params.fechaAperturaDesde!);
+    if (params?.fechaAperturaDesde) lista = lista.filter((f) => (f.fechaApertura || '') >= params.fechaAperturaDesde!);
     if (params?.buscar) {
       const q = params.buscar.toLowerCase().trim();
       lista = lista.filter((f) =>
-        f.numeroFolio.toLowerCase().includes(q) ||
-        f.huesped?.nombreCompleto.toLowerCase().includes(q) ||
-        f.habitacion?.codigo.toLowerCase().includes(q) ||
+        (f.numeroFolio || '').toLowerCase().includes(q) ||
+        (f.huesped?.nombreCompleto || '').toLowerCase().includes(q) ||
+        (f.habitacion?.codigo || '').toLowerCase().includes(q) ||
         (f.reserva?.codigoReserva || '').toLowerCase().includes(q)
       );
     }
@@ -204,14 +278,23 @@ export const FolioService = {
       cargos: CargoFolioService.listarPorFolio(f.id),
       pagos: PagoFolioService.listarPorFolio(f.id),
     });
-    return db.update<Folio>(KEY_FOLIO, folioId, {
-      ...recalculado,
+    const delta: any = {
+      subTotalSinImpuestos: recalculado.subTotalSinImpuestos,
+      totalImpuestos: recalculado.totalImpuestos,
+      totalDescuentos: recalculado.totalDescuentos,
+      totalPropinas: recalculado.totalPropinas,
+      totalFolio: recalculado.totalFolio,
+      totalPagado: recalculado.totalPagado,
+      saldoPendiente: recalculado.saldoPendiente,
+      creditoExcedido: recalculado.creditoExcedido,
       updatedBy,
       updatedAt: seedUtil.nowISO(),
-    } as unknown as Update<Folio>);
+    };
+    const upd = db.update<Folio>(KEY_FOLIO, folioId, delta as unknown as Update<Folio>);
+    if (upd) dbRemota.updateAsync<Folio>(KEY_FOLIO, folioId, delta as any).catch((e) => console.error('[Folio.recalc] remoto fail:', e));
+    return upd;
   },
 
-  /** A.3: Check-in de reserva. Crea folio, actualiza reserva a CHECKED_IN, cambia habitación a OCUPADA. */
   registrarCheckIn(params: {
     reservaId: string;
     usuarioIdRecepcionista: string;
@@ -232,10 +315,11 @@ export const FolioService = {
       return { error: `Estado de reserva inválido para check-in: ${reserva.estado}` };
     }
 
-    // Crear checkInInfo
+    const now = seedUtil.nowISO();
+    const userId = params.usuarioIdRecepcionista;
     const checkInInfo: NonNullable<Reserva['checkInInfo']> = {
-      fechaHoraCheckin: seedUtil.nowISO(),
-      recepcionistaId: params.usuarioIdRecepcionista,
+      fechaHoraCheckin: now,
+      recepcionistaId: userId,
       llaveEntregadaCodigo: params.llaveCodigo,
       cantidadLlavesEntregadas: params.cantidadLlaves ?? 2,
       depositoLlavesMonto: params.depositoLlavesMonto ?? 0,
@@ -245,15 +329,14 @@ export const FolioService = {
       aceptaPoliticaCancelacion: true,
       autorizaCargosExtras: true,
       observaciones: params.observaciones || '',
-      createdAt: seedUtil.nowISO(),
-      updatedAt: seedUtil.nowISO(),
-      createdBy: params.usuarioIdRecepcionista,
-      updatedBy: params.usuarioIdRecepcionista,
+      createdAt: now,
+      updatedAt: now,
+      createdBy: userId,
+      updatedBy: userId,
     };
 
-    // Actualizar reserva
     const reservaActualizada = ReservaService.cambiarEstado(params.reservaId, 'CHECKED_IN', {
-      usuarioResponsableId: params.usuarioIdRecepcionista,
+      usuarioResponsableId: userId,
       comentario: `Check-in realizado ${checkInInfo.fechaHoraCheckin}. Llave: ${checkInInfo.llaveEntregadaCodigo}.`,
       informacionAdicional: {
         fechaCheckinReal: checkInInfo.fechaHoraCheckin,
@@ -263,12 +346,10 @@ export const FolioService = {
 
     if (!reservaActualizada) return { error: 'No se pudo actualizar la reserva' };
 
-    // Cambiar habitaciones a OCUPADA
     for (const rh of reservaActualizada.habitaciones) {
-      HabitacionService.cambiarEstado(rh.habitacionId, 'OCUPADA', params.usuarioIdRecepcionista);
+      HabitacionService.cambiarEstado(rh.habitacionId, 'OCUPADA', userId);
     }
 
-    // Registrar visita huésped (incrementar visitas)
     const montoProyectadoEstadia = reservaActualizada.montoTotalReserva || 0;
     HuespedService.incrementarVisita(
       reservaActualizada.huespedId,
@@ -276,22 +357,21 @@ export const FolioService = {
       reservaActualizada.totalNoches || 0
     );
 
-    // Crear FOLIOS (1 por habitación)
     const folios: Folio[] = [];
     for (const rh of reservaActualizada.habitaciones) {
       const numeroFolio = siguienteNumeroFolio();
-      const folioSeed = db.add<Folio>(KEY_FOLIO, {
+      const folioData = {
         numeroFolio,
         reservaId: reservaActualizada.id,
         checkInId: `CHECKIN-${reservaActualizada.id}`,
         huespedId: reservaActualizada.huespedId,
         habitacionId: rh.habitacionId,
-        fechaApertura: seedUtil.nowISO(),
+        fechaApertura: now,
         fechaCheckout: reservaActualizada.fechaCheckout,
         estado: 'ABIERTO',
         esCuentaCompartida: reservaActualizada.habitaciones.length > 1,
-        foliosCompartidosIds: reservaActualizada.habitaciones.filter((x) => x.habitacionId !== rh.habitacionId).map(() => '__placeholder__'), // lo actualizamos después
-        usuarioIdApertura: params.usuarioIdRecepcionista,
+        foliosCompartidosIds: reservaActualizada.habitaciones.filter((x) => x.habitacionId !== rh.habitacionId).map(() => '__placeholder__'),
+        usuarioIdApertura: userId,
         moneda: reservaActualizada.moneda,
         limiteCreditoAutorizado: 5000,
         notasInternas: `Folio creado en check-in automático. Hab: ${rh.habitacion.codigo}. Autoriza cargos extras: SÍ.`,
@@ -306,24 +386,24 @@ export const FolioService = {
         creditoExcedido: false,
         cargos: [],
         pagos: [],
-        createdAt: seedUtil.nowISO(),
-        updatedAt: seedUtil.nowISO(),
-        createdBy: params.usuarioIdRecepcionista,
-        updatedBy: params.usuarioIdRecepcionista,
-      } as unknown as Create<Folio>);
+        createdAt: now,
+        updatedAt: now,
+        createdBy: userId,
+        updatedBy: userId,
+      };
+      const folioSeed = db.add<Folio>(KEY_FOLIO, folioData as unknown as Create<Folio>);
+      dbRemota.addAsync<Folio>(KEY_FOLIO, { ...folioData, id: folioSeed.id } as any).catch((e) => console.error('[Folio.registrarCheckIn.folio] remoto fail:', e));
 
-      // Cargo AUTOMÁTICO de alojamiento por habitación (días de la reserva)
-      const montoCargoAlojamiento = Number((rh.totalNoches * rh.precioBaseAcordadoPorNoche).toFixed(2));
-      // Usuario confirmó: SOLO IGV 18%. NO hay IMP-SELVA-5.
+      const montoCargoAlojamiento = Number((rh.totalNoches * (rh.precioBaseAcordadoPorNoche || 0)).toFixed(2));
       const divisor = 1.18;
       const subtotal = Number((montoCargoAlojamiento / divisor).toFixed(2));
       const impuestosIds = ['IMP-IGV-18'];
-      const cargo: CargoFolio = {
+      const cargo: CargoFolio & any = {
         id: seedUtil.generateUUID(),
         folioId: folioSeed.id,
         tipo: 'ALOJAMIENTO',
         concepto: `Alojamiento ${rh.totalNoches} noches - Hab ${rh.habitacion.codigo}`,
-        descripcion: `Tarifa base S/ ${Number(rh.precioBaseAcordadoPorNoche).toFixed(2)} × ${rh.totalNoches} noches. ${rh.observaciones || ''}`,
+        descripcion: `Tarifa base S/ ${Number(rh.precioBaseAcordadoPorNoche || 0).toFixed(2)} × ${rh.totalNoches} noches. ${rh.observaciones || ''}`,
         origen: 'ALOJAMIENTO_RESERVA',
         referenciaId: rh.id,
         reservaId: reservaActualizada.id,
@@ -333,13 +413,14 @@ export const FolioService = {
         comandaId: null,
         comandaDetalleId: null,
         cajaSesionId: null,
-        usuarioId: params.usuarioIdRecepcionista,
+        usuarioId: userId,
         monto: montoCargoAlojamiento,
+        total: montoCargoAlojamiento,
         moneda: reservaActualizada.moneda,
         impuestosIds,
         impuestosMontoDesglosado: impuestosIds.flatMap((impId) => {
           const imp = ImpuestoService.buscarPorId(impId);
-          if (!imp) return []; // IMPORTANTE null-safety: si impuesto id no existe en maestro → SKIP no crash
+          if (!imp) return [];
           const montoImp = imp.tipo === 'PORCENTAJE' ? Number(((subtotal * (Number(imp.valor) || 0)) / 100).toFixed(2)) : Number(imp.valor) || 0;
           return [{ impuestoId: impId, impuestoNombre: imp.nombre || impId, montoImpuesto: montoImp }];
         }),
@@ -348,34 +429,35 @@ export const FolioService = {
         descuentosMontoDesglosado: [],
         propinaMonto: 0,
         estado: 'PENDIENTE_COBRO',
-        fechaCargo: seedUtil.nowISO(),
+        fechaCargo: now,
         fechaAplicacion: reservaActualizada.fechaCheckin,
         fechaVencimiento: reservaActualizada.fechaCheckout,
         esAnulado: false,
         motivoAnulacion: '',
         comprobanteAsociadoId: null,
         comentarios: `Cargo automático check-in. Folio #${numeroFolio}. Reserva ${reservaActualizada.codigoReserva}.`,
-        createdAt: seedUtil.nowISO(),
-        updatedAt: seedUtil.nowISO(),
-        createdBy: params.usuarioIdRecepcionista,
-        updatedBy: params.usuarioIdRecepcionista,
+        createdAt: now,
+        updatedAt: now,
+        createdBy: userId,
+        updatedBy: userId,
       };
-      db.add<CargoFolio>(KEY_CARGO, cargo as Create<CargoFolio>);
+      const cargoCreado = db.add<CargoFolio>(KEY_CARGO, cargo as Create<CargoFolio>);
+      dbRemota.addAsync<CargoFolio>(KEY_CARGO, { ...cargo, id: cargoCreado.id } as any).catch((e) => console.error('[Folio.registrarCheckIn.cargo] remoto fail:', e));
 
-      // Pago adelantado (check-in)
       if (params.pagoAdelantado && params.pagoAdelantado.monto && params.pagoAdelantado.monto > 0) {
-        const pago: PagoFolio = {
+        const pago: PagoFolio & any = {
           id: seedUtil.generateUUID(),
           folioId: folioSeed.id,
           cajaSesionId: null,
-          usuarioId: params.usuarioIdRecepcionista,
+          usuarioId: userId,
           metodoPago: (params.pagoAdelantado.metodoPago || 'TARJETA_CREDITO') as MetodoPago,
           subMetodoPago: params.pagoAdelantado.subMetodoPago || '',
           monto: params.pagoAdelantado.monto,
+          total: params.pagoAdelantado.monto,
           moneda: params.pagoAdelantado.moneda || reservaActualizada.moneda,
           tipoCambioMonedaReferencia: params.pagoAdelantado.tipoCambioMonedaReferencia || 1,
           montoMonedaOriginal: params.pagoAdelantado.montoMonedaOriginal || params.pagoAdelantado.monto,
-          fechaHoraPago: seedUtil.nowISO(),
+          fechaHoraPago: now,
           referenciaBancaria: params.pagoAdelantado.referenciaBancaria || `PAGO-CHECKIN-${reservaActualizada.codigoReserva}`,
           comprobanteAsociadoId: null,
           comprobanteNumero: '',
@@ -390,26 +472,29 @@ export const FolioService = {
           cajeroNombre: null,
           aprobacionCodigo: params.pagoAdelantado.aprobacionCodigo || '',
           observaciones: `Pago adelantado en check-in. Reserva: ${reservaActualizada.codigoReserva}. Folio: ${numeroFolio}. ${params.pagoAdelantado.observaciones || ''}`,
-          createdAt: seedUtil.nowISO(),
-          updatedAt: seedUtil.nowISO(),
-          createdBy: params.usuarioIdRecepcionista,
-          updatedBy: params.usuarioIdRecepcionista,
+          createdAt: now,
+          updatedAt: now,
+          createdBy: userId,
+          updatedBy: userId,
         };
-        db.add<PagoFolio>(KEY_PAGO, pago as Create<PagoFolio>);
+        const pagoCreado = db.add<PagoFolio>(KEY_PAGO, pago as Create<PagoFolio>);
+        dbRemota.addAsync<PagoFolio>(KEY_PAGO, { ...pago, id: pagoCreado.id } as any).catch((e) => console.error('[Folio.registrarCheckIn.pago] remoto fail:', e));
       }
 
-      this.recalcularTotales(folioSeed.id, params.usuarioIdRecepcionista);
+      this.recalcularTotales(folioSeed.id, userId);
       folios.push(this.buscarPorId(folioSeed.id)!);
     }
 
-    // Actualizar folios compartidos cross-reference
     if (folios.length > 1) {
       const ids = folios.map((f) => f.id);
       for (const f of folios) {
-        db.update<Folio>(KEY_FOLIO, f.id, {
+        const delta = {
           foliosCompartidosIds: ids.filter((id) => id !== f.id),
-          updatedBy: params.usuarioIdRecepcionista,
-        } as unknown as Update<Folio>);
+          updatedBy: userId,
+          updatedAt: seedUtil.nowISO(),
+        };
+        const upd = db.update<Folio>(KEY_FOLIO, f.id, delta as unknown as Update<Folio>);
+        if (upd) dbRemota.updateAsync<Folio>(KEY_FOLIO, f.id, delta as any).catch((e) => console.error('[Folio.registrarCheckIn.compartidos] remoto fail:', e));
       }
     }
 
@@ -419,7 +504,6 @@ export const FolioService = {
     };
   },
 
-  /** A.6: Check-out. Cierra folio(s), actualiza reserva a CHECKED_OUT, habitación a LIMPIEZA. */
   registrarCheckOut(params: {
     folioId?: string;
     reservaId?: string;
@@ -437,6 +521,7 @@ export const FolioService = {
     reservaActualizada?: Reserva;
   } {
     const folios: Folio[] = [];
+    const userId = params.usuarioIdRecepcionista;
 
     if (params.reservaId) {
       folios.push(...this.listarTodos({ reservaId: params.reservaId, estado: 'ABIERTO' }));
@@ -450,23 +535,24 @@ export const FolioService = {
 
     const cerrados: Folio[] = [];
     let reservaIdFinal: string | undefined;
+    const now = seedUtil.nowISO();
 
     for (const f of folios) {
-      // 1. Procesar pagos finales
-      if (params.pagosFinales && f.saldoPendiente > 0.01) {
+      if (params.pagosFinales && (f.saldoPendiente ?? 0) > 0.01) {
         for (const pago of params.pagosFinales) {
           if (!pago.monto) continue;
           PagoFolioService.crear({
             folioId: f.id,
             cajaSesionId: null,
-            usuarioId: params.usuarioIdRecepcionista,
+            usuarioId: userId,
             metodoPago: (pago.metodoPago || 'EFECTIVO') as MetodoPago,
             subMetodoPago: pago.subMetodoPago || '',
             monto: pago.monto,
+            total: pago.monto,
             moneda: pago.moneda || f.moneda,
             tipoCambioMonedaReferencia: pago.tipoCambioMonedaReferencia || 1,
             montoMonedaOriginal: pago.montoMonedaOriginal || pago.monto,
-            fechaHoraPago: seedUtil.nowISO(),
+            fechaHoraPago: now,
             referenciaBancaria: pago.referenciaBancaria || `CHECKOUT-${f.numeroFolio}`,
             comprobanteAsociadoId: null,
             comprobanteNumero: '',
@@ -481,40 +567,43 @@ export const FolioService = {
             cajeroNombre: null,
             aprobacionCodigo: pago.aprobacionCodigo || '',
             observaciones: `Pago checkout. Folio ${f.numeroFolio}. ${pago.observaciones || ''} ${params.observaciones || ''}`,
-            createdAt: seedUtil.nowISO(),
-            updatedAt: seedUtil.nowISO(),
-            createdBy: params.usuarioIdRecepcionista,
-            updatedBy: params.usuarioIdRecepcionista,
+            createdAt: now,
+            updatedAt: now,
+            createdBy: userId,
+            updatedBy: userId,
           } as Create<PagoFolio>);
         }
       }
 
-      // Recalcular por si faltaba
-      this.recalcularTotales(f.id, params.usuarioIdRecepcionista);
+      this.recalcularTotales(f.id, userId);
 
-      // 2. Cerrar folio
-      const cerrado = db.update<Folio>(KEY_FOLIO, f.id, {
+      const delta = {
         estado: 'CERRADO',
-        fechaCierre: seedUtil.nowISO(),
-        fechaCheckoutReal: seedUtil.nowISO(),
-        usuarioIdCierre: params.usuarioIdRecepcionista,
-        updatedBy: params.usuarioIdRecepcionista,
-      } as unknown as Update<Folio>);
-      cerrados.push(this.buscarPorId(cerrado!.id)!);
+        fechaCierre: now,
+        fechaCheckoutReal: now,
+        usuarioIdCierre: userId,
+        updatedBy: userId,
+        updatedAt: now,
+      } as unknown as Update<Folio>;
+      const cerrado = db.update<Folio>(KEY_FOLIO, f.id, delta);
+      if (cerrado) {
+        dbRemota.updateAsync<Folio>(KEY_FOLIO, f.id, delta as any).catch((e) => console.error('[Folio.registrarCheckOut.cerrar] remoto fail:', e));
+        cerrados.push(this.buscarPorId(cerrado.id)!);
+      } else if (cerrado === undefined && db.getById<Folio>(KEY_FOLIO, f.id)) {
+        cerrados.push(this.buscarPorId(f.id)!);
+      }
 
-      // 3. Habitación a LIMPIEZA
       if (f.habitacionId) {
         HabitacionService.cambiarEstado(
           f.habitacionId,
           params.estadoHabitacionEntrega || 'LIMPIEZA',
-          params.usuarioIdRecepcionista
+          userId
         );
       }
 
       reservaIdFinal = f.reservaId || reservaIdFinal;
     }
 
-    // 4. Actualizar reserva a CHECKED_OUT
     let reservaActualizada: Reserva | undefined;
     if (reservaIdFinal) {
       const reserva = ReservaService.buscarPorId(reservaIdFinal);
@@ -522,10 +611,10 @@ export const FolioService = {
       const totalCobrado = foliosCerrados.reduce((s, ff) => s + (ff.totalPagado || 0), 0);
       const totalCargos = foliosCerrados.reduce((s, ff) => s + (ff.totalFolio || 0), 0);
       reservaActualizada = ReservaService.cambiarEstado(reservaIdFinal, 'CHECKED_OUT', {
-        usuarioResponsableId: params.usuarioIdRecepcionista,
+        usuarioResponsableId: userId,
         comentario: `Check-out realizado ${new Date().toLocaleString('es-PE')}. Folios: ${foliosCerrados.map((f) => f.numeroFolio).join(', ')}. Total cobrado: S/ ${totalCobrado.toFixed(2)}.`,
         informacionAdicional: {
-          fechaCheckoutReal: seedUtil.nowISO(),
+          fechaCheckoutReal: now,
           estadoPago:
             Math.abs(totalCargos - totalCobrado) < 0.05
               ? 'PAGADO_TOTAL'
@@ -535,8 +624,8 @@ export const FolioService = {
           saldoPendiente: Number((totalCargos - totalCobrado).toFixed(2)),
           montoPagadoAnticipado: totalCobrado,
           checkOutInfo: {
-            fechaHoraCheckout: seedUtil.nowISO(),
-            recepcionistaId: params.usuarioIdRecepcionista,
+            fechaHoraCheckout: now,
+            recepcionistaId: userId,
             llavesDevueltas: params.llavesDevueltas ?? true,
             cantidadLlavesDevueltas: 2,
             estadoHabitacionEntregaFinal: params.estadoHabitacionEntrega || 'SUCIA',
@@ -553,10 +642,10 @@ export const FolioService = {
             comprobanteEnviadoCorreo: params.comprobanteEnvioCorreo ?? false,
             observacionesEntrega: params.observaciones || '',
             firmaRecepcionCliente: true,
-            createdAt: seedUtil.nowISO(),
-            updatedAt: seedUtil.nowISO(),
-            createdBy: params.usuarioIdRecepcionista,
-            updatedBy: params.usuarioIdRecepcionista,
+            createdAt: now,
+            updatedAt: now,
+            createdBy: userId,
+            updatedBy: userId,
           } as NonNullable<Reserva['checkOutInfo']>,
         },
       });
@@ -565,11 +654,57 @@ export const FolioService = {
     return { foliosCerrados: cerrados, reservaActualizada };
   },
 
+  abrir(params: { numeroFolio?: string; habitacionId?: string; huespedId?: string; reservaId?: string; usuarioIdApertura: string; moneda?: string; notasInternas?: string }): Folio {
+    const now = seedUtil.nowISO();
+    const userId = params.usuarioIdApertura;
+    const data = {
+      numeroFolio: params.numeroFolio || siguienteNumeroFolio(),
+      reservaId: params.reservaId || null,
+      checkInId: null,
+      huespedId: params.huespedId || null,
+      habitacionId: params.habitacionId || null,
+      fechaApertura: now,
+      fechaCheckout: null,
+      estado: 'ABIERTO' as EstadoFolio,
+      esCuentaCompartida: false,
+      foliosCompartidosIds: [],
+      usuarioIdApertura: userId,
+      moneda: params.moneda || 'PEN',
+      limiteCreditoAutorizado: 5000,
+      notasInternas: params.notasInternas || '',
+      subTotalSinImpuestos: 0,
+      totalImpuestos: 0,
+      totalPropinas: 0,
+      totalDescuentos: 0,
+      totalBonificacionesCortesia: 0,
+      totalFolio: 0,
+      totalPagado: 0,
+      saldoPendiente: 0,
+      creditoExcedido: false,
+      cargos: [],
+      pagos: [],
+      createdAt: now,
+      updatedAt: now,
+      createdBy: userId,
+      updatedBy: userId,
+    };
+    const nuevo = db.add<Folio>(KEY_FOLIO, data as unknown as Create<Folio>);
+    dbRemota.addAsync<Folio>(KEY_FOLIO, { ...data, id: nuevo.id } as any).catch((e) => console.error('[Folio.abrir] remoto fail:', e));
+    return nuevo;
+  },
+
   crear(params: Create<Folio>): Folio {
-    return db.add<Folio>(KEY_FOLIO, params);
+    const now = seedUtil.nowISO();
+    const payload: any = { createdAt: (params as any).createdAt || now, updatedAt: (params as any).updatedAt || now, createdBy: (params as any).createdBy || 'system-folio', updatedBy: (params as any).updatedBy || 'system-folio', ...params };
+    const nuevo = db.add<Folio>(KEY_FOLIO, payload);
+    dbRemota.addAsync<Folio>(KEY_FOLIO, { ...payload, id: nuevo.id } as any).catch((e) => console.error('[Folio.crear] remoto fail:', e));
+    return nuevo;
   },
   actualizar(id: string, changes: Update<Folio>): Folio | undefined {
-    return db.update<Folio>(KEY_FOLIO, id, changes);
+    const delta: any = { updatedAt: seedUtil.nowISO(), ...changes };
+    const upd = db.update<Folio>(KEY_FOLIO, id, delta);
+    if (upd) dbRemota.updateAsync<Folio>(KEY_FOLIO, id, delta as any).catch((e) => console.error('[Folio.actualizar] remoto fail:', e));
+    return upd;
   },
   reiniciarSeed(): void {
     db.reset();

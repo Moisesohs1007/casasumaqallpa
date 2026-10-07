@@ -1,9 +1,35 @@
 // @ts-nocheck
 import { db, type Create, type Update, type Huesped } from './__db__';
+import { db as dbRemota } from './__supabase_db__';
 
 const KEY = 'huespedes' as const;
 
+let _hidratado = false;
+let _hidratando: Promise<boolean> | null = null;
+
 export const HuespedService = {
+  async hidratarDesdeSupabase(force = false): Promise<boolean> {
+    if (!dbRemota.isOnline()) return false;
+    if (_hidratado && !force) return true;
+    if (_hidratando) return _hidratando;
+    _hidratando = (async () => {
+      try {
+        const rows = await dbRemota.allAsync<Huesped>(KEY);
+        if (rows && rows.length) {
+          db.setAll<Huesped>(KEY, rows);
+        }
+        _hidratado = true;
+        return true;
+      } catch (e) {
+        console.warn('[HuespedService] hidratarDesdeSupabase no fatal:', (e as any)?.message || e);
+        return false;
+      } finally {
+        _hidratando = null;
+      }
+    })();
+    return _hidratando;
+  },
+
   listarTodos(): Huesped[] {
     return db.all<Huesped>(KEY).sort((a, b) =>
       (b.fechaUltimaEstadia || '').localeCompare(a.fechaUltimaEstadia || '')
@@ -24,9 +50,9 @@ export const HuespedService = {
     return db.findMany<Huesped>(
       KEY,
       (h) =>
-        h.nombreCompleto.toLowerCase().includes(q) ||
-        `${h.nombres} ${h.apellidos}`.toLowerCase().includes(q) ||
-        h.numeroDocumento.includes(q) ||
+        (h.nombreCompleto || '').toLowerCase().includes(q) ||
+        `${h.nombres || ''} ${h.apellidos || ''}`.toLowerCase().includes(q) ||
+        (h.numeroDocumento || '').includes(q) ||
         (h.email && h.email.toLowerCase().includes(q)) ||
         (h.telefono1 && h.telefono1.includes(q))
     );
@@ -35,14 +61,21 @@ export const HuespedService = {
   crear(payload: Create<Huesped>): Huesped {
     const data = payload as unknown as Huesped;
     const nombreCompleto =
-      data.nombreCompleto?.trim() || `${data.nombres} ${data.apellidos}`.trim();
-    return db.add<Huesped>(KEY, {
+      (data.nombreCompleto || '').trim() || `${data.nombres || ''} ${data.apellidos || ''}`.trim();
+    const params: any = {
       ...payload,
       nombreCompleto,
       totalVisitas: (data.totalVisitas ?? 0) + 1,
       fechaPrimeraEstadia: data.fechaPrimeraEstadia || new Date().toISOString(),
       fechaUltimaEstadia: data.fechaUltimaEstadia || new Date().toISOString(),
-    } as Create<Huesped>);
+    };
+    const nueva = db.add<Huesped>(KEY, params);
+    dbRemota.addAsync<Huesped>(KEY, params).then((remota: any) => {
+      if (remota && remota.id && remota.id !== nueva.id) {
+        try { db.update(KEY, nueva.id, { ...remota }); } catch (_e) {}
+      }
+    }).catch((e) => console.error('[HuespedService] crear remoto:', e));
+    return nueva;
   },
 
   actualizar(id: string, changes: Update<Huesped>): Huesped | undefined {
@@ -51,36 +84,45 @@ export const HuespedService = {
       const prev = db.getById<Huesped>(KEY, id);
       const nombres = data.nombres ?? prev?.nombres ?? '';
       const apellidos = data.apellidos ?? prev?.apellidos ?? '';
-      (changes as unknown as Huesped).nombreCompleto = prev?.nombreCompleto || `${nombres} ${apellidos}`.trim();
+      (changes as unknown as Huesped).nombreCompleto = (prev?.nombreCompleto) || `${nombres} ${apellidos}`.trim();
     }
-    return db.update<Huesped>(KEY, id, changes);
+    const actualizado = db.update<Huesped>(KEY, id, changes);
+    if (actualizado) {
+      dbRemota.updateAsync<Huesped>(KEY, id, changes).catch((e) => console.error('[HuespedService] actualizar remoto:', e));
+    }
+    return actualizado;
   },
 
   incrementarVisita(id: string, montoGasto: number, noches: number): Huesped | undefined {
     const actual = db.getById<Huesped>(KEY, id);
     if (!actual) return undefined;
-    const puntosGanados = Math.round(montoGasto * 0.10);
-    return db.update<Huesped>(KEY, id, {
+    const puntosGanados = Math.round(Number(montoGasto || 0) * 0.10);
+    const patch: any = {
       updatedBy: 'system-huesped',
       totalVisitas: (actual.totalVisitas ?? 0) + 1,
-      totalNochesAcumuladas: (actual.totalNochesAcumuladas ?? 0) + noches,
-      montoGastoAcumuladoHistorico: (actual.montoGastoAcumuladoHistorico ?? 0) + montoGasto,
+      totalNochesAcumuladas: (actual.totalNochesAcumuladas ?? 0) + Number(noches || 0),
+      montoGastoAcumuladoHistorico: (actual.montoGastoAcumuladoHistorico ?? 0) + Number(montoGasto || 0),
       fechaUltimaEstadia: new Date().toISOString(),
       puntosFidelidadAcumulados: (actual.puntosFidelidadAcumulados ?? 0) + puntosGanados,
       nivelProgramaFidelidad: calcularNivelFidelidad(
         (actual.totalVisitas ?? 0) + 1,
-        (actual.montoGastoAcumuladoHistorico ?? 0) + montoGasto
+        (actual.montoGastoAcumuladoHistorico ?? 0) + Number(montoGasto || 0)
       ),
-    } as unknown as Update<Huesped>);
+    };
+    const actualizado = db.update<Huesped>(KEY, id, patch);
+    if (actualizado) {
+      dbRemota.updateAsync<Huesped>(KEY, id, patch).catch((e) => console.error('[HuespedService] incrementarVisita remoto:', e));
+    }
+    return actualizado;
   },
 
   eliminar(id: string): boolean {
-    return db.remove(KEY, id);
+    const ok = db.remove(KEY, id);
+    if (ok) dbRemota.removeAsync(KEY, id).catch((e) => console.error('[HuespedService] eliminar remoto:', e));
+    return ok;
   },
 
-  reiniciarSeed(): void {
-    db.reset();
-  },
+  reiniciarSeed(): void { db.reset(); },
 };
 
 function calcularNivelFidelidad(visitas: number, gastoAcumulado: number): Huesped['nivelProgramaFidelidad'] {

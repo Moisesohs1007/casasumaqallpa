@@ -21,7 +21,7 @@ import HabitacionesPage from './pages/Habitaciones/Habitaciones';
 import PosPage from './pages/Pos/Pos';
 import PerfilPage from './pages/Perfil/Perfil';
 import FolioPage from './pages/Folio/Folio';
-import { HabitacionService, ReservaService } from './services';
+import { HabitacionService, ReservaService, TarifaService, PosService, HuespedService, FolioService } from './services';
 
 setupIonicReact({
   mode: 'md',
@@ -69,10 +69,12 @@ function ControlPestanaPersistente() {
 }
 
 const App: React.FC = () => {
-  // 1 vez al boot: hidratar InMemoryDB con datos reales de Supabase Cloud (tipos/hab/tarifas/politicas)
+  // 1 vez al boot: hidratar InMemoryDB con datos reales de Supabase Cloud
   useEffect(() => {
     let cancelled = false;
     (async () => {
+      // Orden: Hab (dep none) → Res (dep Hab) → TarifasGroup → PosGroup → Huespedes → FolioGroup (dep Res/Hab/Huesp)
+      // Cada hidratación tiene try/catch individual NO FATAL; si una falla el resto sigue y usa seed local
       try {
         const hidratadoHab = await HabitacionService.hidratarDesdeSupabase(false);
         if (!cancelled && window && (window as any).console) {
@@ -88,6 +90,38 @@ const App: React.FC = () => {
         }
       } catch (e) {
         if (!cancelled) console.warn('[App] Boot hidratación reservas (no fatal):', (e as any)?.message || e);
+      }
+      try {
+        const hidratadoTar = await (TarifaService as any).hidratarDesdeSupabase(false);
+        if (!cancelled && window && (window as any).console) {
+          (window as any).console.debug('[App] Boot hidratación tarifas-group Supabase:', hidratadoTar ? 'OK' : 'falló (seed local)');
+        }
+      } catch (e) {
+        if (!cancelled) console.warn('[App] Boot hidratación tarifas-group (no fatal):', (e as any)?.message || e);
+      }
+      try {
+        const hidratadoPos = await PosService.hidratarDesdeSupabase(false);
+        if (!cancelled && window && (window as any).console) {
+          (window as any).console.debug('[App] Boot hidratación pos-group Supabase:', hidratadoPos ? 'OK' : 'falló (seed local)');
+        }
+      } catch (e) {
+        if (!cancelled) console.warn('[App] Boot hidratación pos-group (no fatal):', (e as any)?.message || e);
+      }
+      try {
+        const hidratadoHuesp = await HuespedService.hidratarDesdeSupabase(false);
+        if (!cancelled && window && (window as any).console) {
+          (window as any).console.debug('[App] Boot hidratación huespedes Supabase:', hidratadoHuesp ? 'OK' : 'falló (sin datos remotos)');
+        }
+      } catch (e) {
+        if (!cancelled) console.warn('[App] Boot hidratación huespedes (no fatal):', (e as any)?.message || e);
+      }
+      try {
+        const hidratadoFol = await FolioService.hidratarDesdeSupabase(false);
+        if (!cancelled && window && (window as any).console) {
+          (window as any).console.debug('[App] Boot hidratación folios-group Supabase:', hidratadoFol ? 'OK' : 'falló (seed local)');
+        }
+      } catch (e) {
+        if (!cancelled) console.warn('[App] Boot hidratación folios-group (no fatal):', (e as any)?.message || e);
       }
     })();
     return () => { cancelled = true; };
