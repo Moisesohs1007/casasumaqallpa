@@ -36,6 +36,8 @@ import {
 import {
   add, create, trash, save, close, bedOutline, buildOutline, pricetag,
   cube, addCircle, removeCircle, archive, restaurant,
+  search, layers, fileTray, warning, checkmarkCircle,
+  informationCircle, documentText, barcode, cash, people,
 } from 'ionicons/icons';
 import { Usuario, Rol, RolUsuario, ModuloPermiso, Moneda, AuditFields, Habitacion, TipoHabitacion, EstadoHabitacion } from '../../types';
 import { HabitacionService, CatalogoFBService, InventarioService, type MoverStockResult } from '../../services';
@@ -129,6 +131,8 @@ const PerfilPage: React.FC = () => {
   const [productosFB, setProductosFB] = useState<any[]>([]);
   const [busqProd, setBusqProd] = useState('');
   const [filtroCatId, setFiltroCatId] = useState<string>('');
+  const [tabStock, setTabStock] = useState<'CATEGORIAS' | 'PRODUCTOS'>('PRODUCTOS');
+  const [prodFormTab, setProdFormTab] = useState<'DATOS' | 'INVENTARIO'>('DATOS');
 
   const [modalCatAbierto, setModalCatAbierto] = useState(false);
   const [editandoCatId, setEditandoCatId] = useState<string | null>(null);
@@ -444,344 +448,537 @@ const PerfilPage: React.FC = () => {
     <IonPage>
       <IonHeader>
         <IonToolbar color="primary">
-          <IonTitle>Perfil</IonTitle>
+          <IonTitle>Panel Admin</IonTitle>
         </IonToolbar>
       </IonHeader>
-      <IonContent fullscreen className="ion-padding">
+      <IonContent fullscreen className="admin-content-page">
         <IonHeader collapse="condense">
           <IonToolbar>
-            <IonTitle size="large">Perfil y Panel Admin</IonTitle>
+            <IonTitle size="large">
+              <IonIcon icon={buildOutline} className="admin-title-lrg-icon" />
+              Casa Sumaq Allpa
+            </IonTitle>
           </IonToolbar>
         </IonHeader>
 
-        <IonCard className="profile-card">
-          <IonCardHeader className="profile-header">
-            <IonAvatar className="profile-avatar">
-              <div className="avatar-inner">{usuario.iniciales}</div>
-            </IonAvatar>
-            <div className="profile-info">
-              <IonCardTitle>{usuario.nombres} {usuario.apellidos}</IonCardTitle>
-              <IonBadge color="tertiary">{String(usuario.rol?.nombre ?? 'Administración').replace('_',' ')}</IonBadge>
+        <IonCard className="admin-hero-card">
+          <IonCardContent className="ion-no-padding">
+            <IonGrid>
+              <IonRow className="admin-hero-row">
+                <IonCol size="4" sizeSm="3">
+                  <IonAvatar className="admin-hero-avatar">
+                    <div className="admin-hero-avatar-inner">{usuario.iniciales}</div>
+                  </IonAvatar>
+                </IonCol>
+                <IonCol size="8" sizeSm="9" className="admin-hero-info">
+                  <div className="admin-hero-name">{usuario.nombres} {usuario.apellidos}</div>
+                  <div className="admin-hero-rol">
+                    <IonChip color="tertiary" outline>
+                      <IonIcon icon={people} />
+                      &nbsp;{String(usuario.rol?.nombre ?? 'Administración').replace('_', ' ')}
+                    </IonChip>
+                  </div>
+                  <div className="admin-hero-sede">
+                    <strong>Sede:</strong> Casa Sumaq Allpa · {usuario.correoElectronico}
+                  </div>
+                </IonCol>
+              </IonRow>
+            </IonGrid>
+          </IonCardContent>
+        </IonCard>
+
+        {/* =============== GESTIÓN HABITACIONES (CARDS PROFESIONALES) =============== */}
+        <IonCard className="section-card">
+          <IonCardHeader className="section-header">
+            <div className="section-header-title">
+              <div className="section-icon section-icon-hab">
+                <IonIcon icon={bedOutline} />
+              </div>
+              <div>
+                <div className="section-title">Gestión de Habitaciones</div>
+                <div className="section-subtitle">
+                  {habsAdmin.length} de 5 habitaciones físicas · Controla estado, capacidad y tarifa
+                </div>
+              </div>
+            </div>
+            <IonButton color="primary" className="section-btn-add" onClick={abrirNuevo}>
+              <IonIcon slot="start" icon={add} />
+              Nueva habitación
+            </IonButton>
+          </IonCardHeader>
+
+          <IonCardContent className="section-content">
+            {habsAdmin.length === 0 ? (
+              <div className="empty-state">
+                <IonIcon icon={bedOutline} className="empty-state-icon" />
+                <div className="empty-state-title">No hay habitaciones registradas</div>
+                <div className="empty-state-text">Crea la primera habitación usando el botón superior.</div>
+              </div>
+            ) : (
+              <IonGrid className="hab-cards-grid">
+                <IonRow>
+                  {habsAdmin.map((h) => {
+                    const precio = precioTipo(h.tipoHabitacionId);
+                    const tipo = tiposHab.find((t) => t.id === h.tipoHabitacionId);
+                    const hAny = h as any;
+                    const capHab = Number(hAny.capacidadMaximaPax ?? hAny.capacidadPersonas ?? 2);
+                    const colorEstado: Record<EstadoHabitacion, string> = {
+                      LIBRE: 'success', DISPONIBLE: 'success', OCUPADA: 'danger',
+                      RESERVADA: 'primary', BLOQUEADA: 'medium', LIMPIEZA: 'warning',
+                      INSPECCIONADA: 'tertiary', MANTENIMIENTO: 'medium',
+                    };
+                    const estadoLbl: Record<EstadoHabitacion, string> = {
+                      LIBRE: 'Libre', DISPONIBLE: 'Disponible', OCUPADA: 'Ocupada',
+                      RESERVADA: 'Reservada', BLOQUEADA: 'Bloqueada', LIMPIEZA: 'Limpieza',
+                      INSPECCIONADA: 'Inspeccionada', MANTENIMIENTO: 'Mantenimiento',
+                    };
+                    return (
+                      <IonCol size="12" sizeMd="6" sizeLg="4" key={h.id}>
+                        <IonCard className={`hab-card hab-${colorEstado[h.estado]}-border`}>
+                          <IonCardHeader className="hab-card-header">
+                            <div className="hab-card-head-l">
+                              <div className="hab-card-codigo">{h.codigo}</div>
+                              <div className="hab-card-nombre">{h.nombre || tipo?.nombre || 'Habitación'}</div>
+                            </div>
+                            <IonBadge color={colorEstado[h.estado]} className="hab-card-estado">
+                              {estadoLbl[h.estado]}
+                            </IonBadge>
+                          </IonCardHeader>
+
+                          <IonCardContent className="hab-card-body">
+                            <div className="hab-card-info-row">
+                              <IonChip className="hab-chip hab-chip-tipo" color="light" outline>
+                                <IonIcon icon={layers} />
+                                &nbsp;{tipo?.nombre || 'Sin tipo'}
+                              </IonChip>
+                              <IonChip className="hab-chip hab-chip-cap" color="primary" outline>
+                                <IonIcon icon={people} />
+                                &nbsp;{capHab} pax
+                              </IonChip>
+                            </div>
+
+                            {h.ubicacion && (
+                              <div className="hab-card-ubic">
+                                <IonIcon icon={informationCircle} />
+                                <span>{h.piso ? `Piso ${h.piso} · ` : ''}{h.ubicacion}</span>
+                              </div>
+                            )}
+
+                            <div className="hab-card-footer">
+                              <div className="hab-card-precio">
+                                <IonIcon icon={pricetag} />
+                                <span className="hab-precio-nro">{fmtSoles(precio)}</span>
+                                <span className="hab-precio-lbl">/ noche</span>
+                              </div>
+                              <div className="hab-card-actions">
+                                <IonButton fill="outline" size="small" color="primary" onClick={() => abrirEditar(h)}>
+                                  <IonIcon slot="icon-only" icon={create} />
+                                </IonButton>
+                                <IonButton fill="outline" size="small" color="danger" onClick={() => setConfirmBorrar({ id: h.id, codigo: h.codigo })}>
+                                  <IonIcon slot="icon-only" icon={trash} />
+                                </IonButton>
+                              </div>
+                            </div>
+                          </IonCardContent>
+                        </IonCard>
+                      </IonCol>
+                    );
+                  })}
+                </IonRow>
+              </IonGrid>
+            )}
+          </IonCardContent>
+        </IonCard>
+
+        {/* =============== GESTIÓN PRODUCTOS & STOCK (PROFESIONAL 2 TABS IONSEGMENT) =============== */}
+        <IonCard className="section-card">
+          <IonCardHeader className="section-header">
+            <div className="section-header-title">
+              <div className="section-icon section-icon-stock">
+                <IonIcon icon={cube} />
+              </div>
+              <div>
+                <div className="section-title">Gestión Productos &amp; Stock</div>
+                <div className="section-subtitle">
+                  {productosFB.length} productos · {categoriasFB.length} categorías · {productosFB.filter(p => stockPlanoProd(p).stockControl && stockPlanoProd(p).stockActual <= stockPlanoProd(p).stockMinimo && stockPlanoProd(p).stockMinimo > 0).length} productos stock bajo
+                </div>
+              </div>
+            </div>
+            <div className="stock-header-actions-v2">
+              <IonButton size="default" color="tertiary" fill="outline" className="btn-stock-header" onClick={abrirNuevoCat}>
+                <IonIcon slot="start" icon={layers} />
+                Categoría
+              </IonButton>
+              <IonButton size="default" color="success" className="btn-stock-header" onClick={abrirNuevoProd}>
+                <IonIcon slot="start" icon={add} />
+                Producto
+              </IonButton>
             </div>
           </IonCardHeader>
-          <IonCardContent>
-            <p><strong>Sede:</strong> Casa Sumaq Allpa</p>
-            <p><strong>Email:</strong> {usuario.correoElectronico}</p>
-            {usuario.ultimoAcceso ? (
-              <p><strong>Último acceso:</strong> {new Date(usuario.ultimoAcceso).toLocaleString('es-PE')}</p>
-            ) : null}
-            <p className="ion-text-color-danger">
-              Recuerda: verifica siempre el badge <strong>"{usuario.iniciales}"</strong> antes de operaciones críticas.
-            </p>
-          </IonCardContent>
-        </IonCard>
 
-        {/* =============== PANEL ADMIN: GESTIÓN HABITACIONES =============== */}
-        <IonCard className="admin-card">
-          <IonCardHeader className="admin-header">
-            <IonCardTitle>
-              <IonIcon icon={buildOutline} className="admin-title-icon" />
-              Panel de Administración
-            </IonCardTitle>
-          </IonCardHeader>
-          <IonCardContent className="admin-content">
-            <IonCard className="subcard">
-              <IonCardHeader className="subcard-header">
-                <IonCardTitle className="subcard-title">
-                  <IonIcon icon={bedOutline} /> Gestión de Habitaciones
-                  <IonNote slot="end" className="admin-count">{habsAdmin.length} / 5 fisicas</IonNote>
-                </IonCardTitle>
-                <IonButton size="small" color="success" onClick={abrirNuevo}>
-                  <IonIcon slot="start" icon={add} /> Agregar
-                </IonButton>
-              </IonCardHeader>
-              <IonCardContent className="admin-habs-list">
-                {habsAdmin.length === 0 ? (
-                  <div className="admin-empty">
-                    <IonNote color="medium">No hay habitaciones. Pulsa <strong>Agregar</strong>.</IonNote>
+          {/* TABS IONSEGMENT CATEGORÍAS / PRODUCTOS */}
+          <div className="stock-tabs-wrap">
+            <IonSegment value={tabStock} onIonChange={(e: any) => setTabStock(e.target.value)} className="stock-segment-tabs">
+              <IonSegmentButton value="CATEGORIAS" type="button" className={tabStock === 'CATEGORIAS' ? 'seg-active' : ''}>
+                <IonIcon icon={layers} />
+                <IonLabel>Categorías ({categoriasFB.length})</IonLabel>
+              </IonSegmentButton>
+              <IonSegmentButton value="PRODUCTOS" type="button" className={tabStock === 'PRODUCTOS' ? 'seg-active' : ''}>
+                <IonIcon icon={cube} />
+                <IonLabel>Productos ({productosFB.length})</IonLabel>
+              </IonSegmentButton>
+            </IonSegment>
+          </div>
+
+          <IonCardContent className="section-content stock-section-content">
+
+            {/* ============== TAB: CATEGORÍAS ============== */}
+            {tabStock === 'CATEGORIAS' && (
+              <>
+                {categoriasFB.length === 0 ? (
+                  <div className="empty-state">
+                    <IonIcon icon={layers} className="empty-state-icon" />
+                    <div className="empty-state-title">No hay categorías</div>
+                    <div className="empty-state-text">Crea categorías como "Cervezas", "Bebidas", "Platos", etc.</div>
+                    <IonButton color="primary" className="mt-xl" onClick={abrirNuevoCat}>
+                      <IonIcon slot="start" icon={add} />
+                      Crear primera categoría
+                    </IonButton>
                   </div>
                 ) : (
-                  <IonList inset lines="full">
-                    {habsAdmin.map((h) => {
-                      const precio = precioTipo(h.tipoHabitacionId);
-                      const tipo = tiposHab.find((t) => t.id === h.tipoHabitacionId);
-                      const colorEstado: Record<EstadoHabitacion, string> = {
-                        LIBRE:'success', DISPONIBLE:'success', OCUPADA:'danger',
-                        RESERVADA:'primary', BLOQUEADA:'medium', LIMPIEZA:'warning',
-                        INSPECCIONADA:'tertiary', MANTENIMIENTO:'medium',
-                      };
-                      return (
-                        <IonItem key={h.id} className="admin-hab-item">
-                          <IonGrid className="hab-grid">
-                            <IonRow>
-                              <IonCol size="4" className="hab-col">
-                                <div className="hab-codigo">{h.codigo}</div>
-                                <div className="hab-nombre">{h.nombre}</div>
-                              </IonCol>
-                              <IonCol size="4" className="hab-col">
-                                <IonBadge color={colorEstado[h.estado]} className="hab-badge">{h.estado}</IonBadge>
-                                <IonNote className="hab-tipo">{tipo?.nombre || '—'}</IonNote>
-                              </IonCol>
-                              <IonCol size="2" className="hab-col hab-precio-col">
-                                <div className="hab-precio">
-                                  <IonIcon icon={pricetag} />
-                                  <span>{fmtSoles(precio)}</span>
+                  <IonGrid>
+                    <IonRow>
+                      {[...categoriasFB].sort((a, b) => Number(a.orden || 0) - Number(b.orden || 0)).map((c) => {
+                        const cnt = productosFB.filter((p) => p.categoriaId === c.id).length;
+                        return (
+                          <IonCol size="12" sizeSm="6" sizeMd="4" key={c.id}>
+                            <IonCard className="cat-card" onClick={() => { setFiltroCatId(c.id); setTabStock('PRODUCTOS'); }}>
+                              <IonCardHeader className="cat-card-head">
+                                <div className="cat-color-dot" style={{ background: c.payload?.colorEtiqueta || c.color || '#2dd36f' }}></div>
+                                <div className="cat-nombre">{c.nombre}</div>
+                                <IonBadge color={c.estado === 'INACTIVO' ? 'medium' : 'primary'} className="cat-count">{cnt} productos</IonBadge>
+                              </IonCardHeader>
+                              <IonCardContent className="cat-card-body">
+                                {c.descripcion && <div className="cat-desc">{c.descripcion}</div>}
+                                <div className="cat-orden">Orden: {c.orden || 0} · {c.estado}</div>
+                                <div className="cat-actions">
+                                  <IonButton fill="outline" size="small" color="primary" onClick={(e: any) => { e.stopPropagation(); abrirEditarCat(c); }}>
+                                    <IonIcon slot="icon-only" icon={create} />
+                                  </IonButton>
+                                  <IonButton fill="outline" size="small" color="danger" onClick={(e: any) => { e.stopPropagation(); setConfirmBorrarCat({ id: c.id, nombre: c.nombre }); }}>
+                                    <IonIcon slot="icon-only" icon={trash} />
+                                  </IonButton>
                                 </div>
-                              </IonCol>
-                              <IonCol size="2" className="hab-col hab-actions-col">
-                                <IonButton fill="clear" size="small" color="primary" onClick={() => abrirEditar(h)}>
-                                  <IonIcon slot="icon-only" icon={create} />
-                                </IonButton>
-                                <IonButton fill="clear" size="small" color="danger" onClick={() => setConfirmBorrar({ id: h.id, codigo: h.codigo })}>
-                                  <IonIcon slot="icon-only" icon={trash} />
-                                </IonButton>
-                              </IonCol>
-                            </IonRow>
-                          </IonGrid>
-                        </IonItem>
-                      );
-                    })}
-                  </IonList>
+                              </IonCardContent>
+                            </IonCard>
+                          </IonCol>
+                        );
+                      })}
+                    </IonRow>
+                  </IonGrid>
                 )}
-              </IonCardContent>
-            </IonCard>
+              </>
+            )}
 
-            {/* ============ 2DA SECCIÓN: GESTIÓN PRODUCTOS & STOCK (nueva) ============ */}
-            <IonCard className="subcard stock-subcard">
-              <IonCardHeader className="subcard-header">
-                <IonCardTitle className="subcard-title">
-                  <IonIcon icon={cube} /> Gestión Productos &amp; Stock
-                  <IonNote slot="end" className="admin-count">{productosFB.length} prod · {categoriasFB.length} cat</IonNote>
-                </IonCardTitle>
-                <div className="stock-header-actions">
-                  <IonButton size="small" color="tertiary" onClick={abrirNuevoCat}>
-                    <IonIcon slot="start" icon={restaurant} /> Categoría
-                  </IonButton>
-                  <IonButton size="small" color="success" onClick={abrirNuevoProd}>
-                    <IonIcon slot="start" icon={add} /> Producto
-                  </IonButton>
-                </div>
-              </IonCardHeader>
-              <IonCardContent className="admin-stock-content">
-
-                {/* FILTROS */}
-                <div className="stock-filters">
+            {/* ============== TAB: PRODUCTOS ============== */}
+            {tabStock === 'PRODUCTOS' && (
+              <>
+                {/* FILTROS PROFESIONALES */}
+                <div className="prod-filters-wrap">
                   <IonSearchbar
-                    placeholder="Buscar producto / código..."
+                    className="prod-searchbar"
+                    placeholder="Buscar por nombre, código o descripción..."
                     value={busqProd}
                     onIonInput={(e: any) => setBusqProd(String(e.target.value || ''))}
-                    className="stock-searchbar"
                     showCancelButton="never"
-                    mode="md"
                     debounce={250}
+                    mode="ios"
+                    searchIcon={search}
                   />
-                  <IonItem lines="none" className="stock-filtro-cat-item">
-                    <IonSelect
-                      label="Categoría"
-                      labelPlacement="stacked"
-                      value={filtroCatId}
-                      placeholder="Todas las categorías"
-                      onIonChange={(e: any) => setFiltroCatId(String(e.target.value || ''))}
-                      interface="action-sheet"
-                      className="stock-filtro-cat"
-                    >
-                      <IonSelectOption value="">Todas</IonSelectOption>
-                      {(categoriasFB || []).map((c) => (
-                        <IonSelectOption key={c.id} value={c.id}>{c.nombre}</IonSelectOption>
-                      ))}
-                    </IonSelect>
-                  </IonItem>
+
+                  {categoriasFB.length > 0 && (
+                    <div className="prod-chips-cat">
+                      <IonChip
+                        className={`prod-chip-cat ${filtroCatId === '' ? 'prod-chip-cat-active' : ''}`}
+                        onClick={() => setFiltroCatId('')}
+                      >
+                        <IonIcon icon={layers} />
+                        &nbsp;Todas ({productosFB.length})
+                      </IonChip>
+                      {[...categoriasFB].sort((a, b) => Number(a.orden || 0) - Number(b.orden || 0)).map((c) => {
+                        const cnt = productosFB.filter((p) => p.categoriaId === c.id).length;
+                        return (
+                          <IonChip
+                            key={c.id}
+                            className={`prod-chip-cat ${filtroCatId === c.id ? 'prod-chip-cat-active' : ''}`}
+                            color={c.estado === 'INACTIVO' ? 'medium' : 'tertiary'}
+                            onClick={() => setFiltroCatId(filtroCatId === c.id ? '' : c.id)}
+                          >
+                            {c.nombre} ({cnt})
+                          </IonChip>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
 
-                {/* LISTA CATEGORIAS (rápido) */}
-                {categoriasFB.length > 0 && (
-                  <div className="stock-cat-chips">
-                    <IonChip
-                      outline={filtroCatId === ''}
-                      color={filtroCatId === '' ? 'primary' : 'medium'}
-                      onClick={() => setFiltroCatId('')}
-                    >
-                      Todas ({productosFB.length})
-                    </IonChip>
-                    {categoriasFB.map((c) => {
-                      const cnt = productosFB.filter((p) => p.categoriaId === c.id).length;
-                      return (
-                        <IonChip
-                          key={c.id}
-                          outline={filtroCatId === c.id}
-                          color={filtroCatId === c.id ? 'primary' : (c.estado === 'INACTIVO' ? 'medium' : 'tertiary')}
-                          onClick={() => setFiltroCatId(filtroCatId === c.id ? '' : c.id)}
-                        >
-                          {c.nombre} ({cnt})
-                          <IonButton
-                            fill="clear" size="small" color="primary"
-                            onClick={(ev: any) => { ev?.stopPropagation?.(); abrirEditarCat(c); }}
-                            style={{ marginInlineStart: '4px', padding: 0, minWidth: 0 }}
-                          >
-                            <IonIcon slot="icon-only" icon={create} style={{ fontSize: '13px' }} />
-                          </IonButton>
-                          <IonButton
-                            fill="clear" size="small" color="danger"
-                            onClick={(ev: any) => { ev?.stopPropagation?.(); setConfirmBorrarCat({ id: c.id, nombre: c.nombre }); }}
-                            style={{ marginInlineStart: '2px', padding: 0, minWidth: 0 }}
-                          >
-                            <IonIcon slot="icon-only" icon={trash} style={{ fontSize: '13px' }} />
-                          </IonButton>
-                        </IonChip>
-                      );
-                    })}
-                  </div>
-                )}
-
-                {/* LISTA PRODUCTOS */}
                 {productosFiltrados.length === 0 ? (
-                  <div className="admin-empty">
-                    <IonNote color="medium">
+                  <div className="empty-state">
+                    <IonIcon icon={fileTray} className="empty-state-icon" />
+                    <div className="empty-state-title">
+                      {busqProd || filtroCatId ? 'Sin resultados' : 'No hay productos'}
+                    </div>
+                    <div className="empty-state-text">
                       {categoriasFB.length === 0
-                        ? 'Paso 1: crea una Categoría (Bebidas, Platos, etc.). Paso 2: crea Productos.'
-                        : 'No hay productos que coincidan. Pulsa <strong>+ Producto</strong> para agregar.'}
-                    </IonNote>
+                        ? 'Crea primero una categoría y luego productos.'
+                        : busqProd || filtroCatId
+                          ? 'Cambia los filtros o limpia la búsqueda.'
+                          : 'Usa el botón "+ Producto" para agregar el primero.'}
+                    </div>
+                    {categoriasFB.length > 0 && !busqProd && !filtroCatId && (
+                      <IonButton color="success" className="mt-xl" onClick={abrirNuevoProd}>
+                        <IonIcon slot="start" icon={add} />
+                        Crear primer producto
+                      </IonButton>
+                    )}
                   </div>
                 ) : (
-                  <IonList inset lines="full" className="stock-prod-list">
-                    {productosFiltrados.map((p) => {
-                      const plano = stockPlanoProd(p);
-                      const cat = categoriasFB.find((c) => c.id === p.categoriaId);
-                      const precioGanancia = Number(p.precioVentaBase || 0) - Number(p.costoAproximado || 0);
-                      const colorStock =
-                        !plano.stockControl ? 'medium' :
-                        plano.stockActual < 0 ? 'danger' :
-                        plano.stockActual < plano.stockMinimo ? 'warning' :
-                        plano.stockActual === 0 ? 'medium' : 'success';
-                      return (
-                        <IonItem key={p.id} className="stock-prod-item">
-                          <IonGrid className="stock-prod-grid">
-                            <IonRow>
-                              <IonCol size="5" className="stock-prod-col">
-                                <div className="stock-prod-cod">{p.codigo || '—'}</div>
-                                <div className="stock-prod-nombre">{p.nombre}</div>
-                                <div className="stock-prod-meta">
-                                  <IonChip color="light" outline className="stock-chip-mini">
-                                    {cat?.nombre || 'Sin cat'}
-                                  </IonChip>
-                                  <IonChip color={p.estado === 'ACTIVO' ? 'success' : 'medium'} outline className="stock-chip-mini">
-                                    {p.estado || 'ACTIVO'}
-                                  </IonChip>
+                  <IonGrid className="prod-cards-grid">
+                    <IonRow>
+                      {productosFiltrados.map((p) => {
+                        const plano = stockPlanoProd(p);
+                        const cat = categoriasFB.find((c) => c.id === p.categoriaId);
+                        const precioGanancia = Number(p.precioVentaBase || 0) - Number(p.costoAproximado || 0);
+                        const pctGan = Number(p.precioVentaBase || 0) > 0
+                          ? Math.round((precioGanancia / Number(p.precioVentaBase || 1)) * 100)
+                          : 0;
+                        // Stock color & status label + progress
+                        let stockColor = 'success';
+                        let stockLabel = 'OK';
+                        let stockIcon = checkmarkCircle;
+                        let stockPct = 0;
+                        if (!plano.stockControl) {
+                          stockColor = 'medium'; stockLabel = 'N/A'; stockIcon = documentText; stockPct = 0;
+                        } else if (plano.stockActual < 0) {
+                          stockColor = 'danger'; stockLabel = 'Stock Negativo'; stockIcon = warning; stockPct = 0;
+                        } else if (plano.stockActual === 0) {
+                          stockColor = 'warning'; stockLabel = 'Stock Cero'; stockIcon = warning; stockPct = 0;
+                        } else if (plano.stockMinimo > 0 && plano.stockActual < plano.stockMinimo) {
+                          stockColor = 'warning'; stockLabel = 'Stock Bajo'; stockIcon = warning;
+                          stockPct = Math.max(5, Math.round((plano.stockActual / Math.max(plano.stockMinimo * 2, 1)) * 100));
+                        } else {
+                          const referencia = Math.max(plano.stockMinimo * 2, 1);
+                          stockPct = Math.min(100, Math.max(25, Math.round((plano.stockActual / referencia) * 100)));
+                        }
+                        return (
+                          <IonCol size="12" sizeSm="6" sizeLg="4" sizeXl="3" key={p.id}>
+                            <IonCard className={`prod-card prod-${stockColor}-accent ${p.estado === 'INACTIVO' ? 'prod-inactivo' : ''}`}>
+                              <IonCardHeader className="prod-card-head">
+                                <div className="prod-head-l">
+                                  <IonBadge color="light" className="prod-cod-badge">
+                                    <IonIcon icon={barcode} />
+                                    &nbsp;{p.codigo || '—'}
+                                  </IonBadge>
+                                  <div className="prod-nombre">{p.nombre}</div>
+                                  <div className="prod-meta">
+                                    <IonChip color="light" outline className="prod-chip-mini">
+                                      {cat?.nombre || 'Sin cat.'}
+                                    </IonChip>
+                                    <IonChip color={p.estado === 'ACTIVO' ? 'success' : 'medium'} outline className="prod-chip-mini prod-chip-estado">
+                                      {p.estado || 'ACTIVO'}
+                                    </IonChip>
+                                  </div>
                                 </div>
-                              </IonCol>
-                              <IonCol size="3" className="stock-prod-col stock-precios-col">
-                                <div className="stock-precio">{fmtSoles(p.precioVentaBase)}</div>
-                                <IonNote className="stock-costo">Costo {fmtSoles(p.costoAproximado)} · Gan. {fmtSoles(precioGanancia)}</IonNote>
-                                <div className="stock-um">{p.unidadMedida || 'UND'}</div>
-                              </IonCol>
-                              <IonCol size="2" className="stock-prod-col stock-stock-col">
-                                <IonBadge color={colorStock} className="stock-badge">
-                                  <IonIcon icon={archive} />
-                                  &nbsp;{plano.stockControl ? fmtNum(plano.stockActual) : 'N/A'}
-                                </IonBadge>
-                                {plano.stockControl && (
-                                  <IonNote className="stock-min">
-                                    Min {fmtNum(plano.stockMinimo)}
-                                  </IonNote>
-                                )}
-                              </IonCol>
-                              <IonCol size="2" className="stock-prod-col stock-actions-col">
-                                <IonButton fill="clear" size="small" color="success" disabled={!plano.stockControl} onClick={() => abrirStockAgregar(p)} title="Agregar stock">
-                                  <IonIcon slot="icon-only" icon={addCircle} />
-                                </IonButton>
-                                <IonButton fill="clear" size="small" color="warning" disabled={!plano.stockControl} onClick={() => abrirStockQuitar(p)} title="Quitar stock">
-                                  <IonIcon slot="icon-only" icon={removeCircle} />
-                                </IonButton>
-                                <IonButton fill="clear" size="small" color="primary" onClick={() => abrirEditarProd(p)} title="Editar">
-                                  <IonIcon slot="icon-only" icon={create} />
-                                </IonButton>
-                                <IonButton fill="clear" size="small" color="danger" onClick={() => setConfirmBorrarProd({ id: p.id, nombre: p.nombre })} title="Eliminar">
-                                  <IonIcon slot="icon-only" icon={trash} />
-                                </IonButton>
-                              </IonCol>
-                            </IonRow>
-                          </IonGrid>
-                        </IonItem>
-                      );
-                    })}
-                  </IonList>
-                )}
+                              </IonCardHeader>
 
-              </IonCardContent>
-            </IonCard>
+                              <IonCardContent className="prod-card-body">
+                                {/* PRECIOS */}
+                                <div className="prod-precios-row">
+                                  <div className="prod-precio-vta">
+                                    <IonIcon icon={cash} />
+                                    <span>{fmtSoles(p.precioVentaBase)}</span>
+                                  </div>
+                                  <div className="prod-gan-pct" style={{ color: pctGan >= 40 ? '#2dd36f' : pctGan >= 20 ? '#ffc409' : '#eb445a' }}>
+                                    {pctGan}% margen
+                                  </div>
+                                </div>
+                                <div className="prod-costos-line">
+                                  Costo {fmtSoles(p.costoAproximado)} · Gan. {fmtSoles(precioGanancia)} · {p.unidadMedida || 'UND'}
+                                </div>
+
+                                {/* STOCK CONTROL */}
+                                <div className={`prod-stock-box prod-stock-${stockColor}`}>
+                                  <div className="prod-stock-head">
+                                    <div className="prod-stock-label">
+                                      <IonIcon icon={stockIcon} />
+                                      <span>{stockLabel}</span>
+                                    </div>
+                                    {plano.stockControl ? (
+                                      <div className="prod-stock-nro">
+                                        <strong>{fmtNum(plano.stockActual)}</strong>
+                                        <span className="prod-stock-um">/ {fmtNum(plano.stockMinimo)} min</span>
+                                      </div>
+                                    ) : (
+                                      <div className="prod-stock-nro"><span style={{ color: '#999' }}>Sin control</span></div>
+                                    )}
+                                  </div>
+                                  {plano.stockControl && (
+                                    <div className="stock-progress-wrap">
+                                      <div className="stock-progress-bar">
+                                        <div
+                                          className={`stock-progress-fill stock-fill-${stockColor}`}
+                                          style={{ width: `${stockPct}%` }}
+                                        ></div>
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
+
+                                {/* ACCIONES GRID 4 BOTONES */}
+                                <div className="prod-actions-grid">
+                                  <IonButton
+                                    size="default"
+                                    color="success"
+                                    fill="outline"
+                                    expand="block"
+                                    disabled={!plano.stockControl}
+                                    onClick={() => abrirStockAgregar(p)}
+                                  >
+                                    <IonIcon slot="start" icon={addCircle} />
+                                    Agregar
+                                  </IonButton>
+                                  <IonButton
+                                    size="default"
+                                    color="warning"
+                                    fill="outline"
+                                    expand="block"
+                                    disabled={!plano.stockControl}
+                                    onClick={() => abrirStockQuitar(p)}
+                                  >
+                                    <IonIcon slot="start" icon={removeCircle} />
+                                    Quitar
+                                  </IonButton>
+                                  <IonButton size="default" color="primary" fill="outline" expand="block" onClick={() => abrirEditarProd(p)}>
+                                    <IonIcon slot="start" icon={create} />
+                                    Editar
+                                  </IonButton>
+                                  <IonButton size="default" color="danger" fill="outline" expand="block" onClick={() => setConfirmBorrarProd({ id: p.id, nombre: p.nombre })}>
+                                    <IonIcon slot="start" icon={trash} />
+                                    Eliminar
+                                  </IonButton>
+                                </div>
+                              </IonCardContent>
+                            </IonCard>
+                          </IonCol>
+                        );
+                      })}
+                    </IonRow>
+                  </IonGrid>
+                )}
+              </>
+            )}
           </IonCardContent>
         </IonCard>
 
-        <IonList inset>
-          <IonItem button detail><IonLabel>Configuración de cuenta</IonLabel></IonItem>
-          <IonItem button detail><IonLabel>Permisos y roles</IonLabel></IonItem>
-          <IonItem button detail><IonLabel>Preferencias de notificaciones</IonLabel></IonItem>
-          <IonItem button lines="none"><IonLabel className="ion-text-color-danger">Cerrar sesión</IonLabel></IonItem>
-        </IonList>
+        <IonCard className="section-card config-card">
+          <IonCardHeader className="section-header section-header-sm">
+            <div className="section-title small">Configuración del sistema</div>
+          </IonCardHeader>
+          <IonList lines="inset" inset>
+            <IonItem button detail><IonLabel>Configuración de cuenta</IonLabel></IonItem>
+            <IonItem button detail><IonLabel>Permisos y roles</IonLabel></IonItem>
+            <IonItem button detail><IonLabel>Preferencias de notificaciones</IonLabel></IonItem>
+            <IonItem button lines="none" className="ion-text-color-danger"><IonLabel className="ion-text-color-danger">Cerrar sesión</IonLabel></IonItem>
+          </IonList>
+        </IonCard>
 
         {toast && <div className="admin-toast">{toast}</div>}
 
-        {/* ============ MODAL: Nueva / Editar Habitación ============ */}
-        <IonModal isOpen={modalAbierto} onDidDismiss={() => setModalAbierto(false)} initialBreakpoint={0.88} breakpoints={[0, 0.5, 0.88, 1]}>
+        {/* ============ MODAL: Nueva / Editar Habitación PROFESIONAL ============ */}
+        <IonModal isOpen={modalAbierto} onDidDismiss={() => setModalAbierto(false)} initialBreakpoint={0.95} breakpoints={[0, 0.5, 0.95, 1]}>
           <IonHeader className="ion-no-border">
             <IonToolbar color={editandoId ? 'primary' : 'success'}>
-              <IonTitle>{editandoId ? 'Editar habitación' : 'Nueva habitación'}</IonTitle>
               <IonButtons slot="start">
                 <IonButton onClick={() => setModalAbierto(false)}>
                   <IonIcon slot="icon-only" icon={close} />
                 </IonButton>
               </IonButtons>
+              <IonTitle>
+                <IonIcon icon={bedOutline} />
+                &nbsp;{editandoId ? 'Editar habitación' : 'Nueva habitación'}
+              </IonTitle>
               <IonButtons slot="end">
                 <IonButton color="light" onClick={() => setModalAbierto(false)}>Cancelar</IonButton>
                 <IonButton strong onClick={guardarHab}>
-                  <IonIcon slot="start" icon={save} />
-                  Guardar
+                  <IonIcon slot="start" icon={save} /> Guardar
                 </IonButton>
               </IonButtons>
             </IonToolbar>
           </IonHeader>
-          <IonContent className="ion-padding">
-            <IonList lines="inset">
-              <IonItem>
-                <IonInput
-                  label="Código *"
-                  labelPlacement="stacked"
-                  placeholder="Ej: H204 / SUITE 2"
-                  value={form.codigo}
-                  onIonInput={(e: any) => setForm({ ...form, codigo: String(e.target.value || '').toUpperCase() })}
-                  inputmode="text"
-                  maxlength={12}
-                />
-              </IonItem>
-              <IonItem>
-                <IonInput
-                  label="Nombre"
-                  labelPlacement="stacked"
-                  placeholder="Ej: Habitación Familiar"
-                  value={form.nombre}
-                  onIonInput={(e: any) => setForm({ ...form, nombre: String(e.target.value || '') })}
-                />
-              </IonItem>
-              <IonItem>
+          <IonContent className="ion-padding modal-padding">
+            <div className="modal-section">
+              <div className="modal-section-title"><IonIcon icon={barcode} /> Identificación</div>
+              <IonGrid>
+                <IonRow>
+                  <IonCol size="12" sizeMd="4">
+                    <IonItem className="form-item">
+                      <IonInput
+                        label="Código *"
+                        labelPlacement="stacked"
+                        placeholder="Ej: H204 / SUITE 2"
+                        value={form.codigo}
+                        onIonInput={(e: any) => setForm({ ...form, codigo: String(e.target.value || '').toUpperCase() })}
+                        inputmode="text"
+                        maxlength={12}
+                      />
+                    </IonItem>
+                  </IonCol>
+                  <IonCol size="12" sizeMd="8">
+                    <IonItem className="form-item">
+                      <IonInput
+                        label="Nombre comercial"
+                        labelPlacement="stacked"
+                        placeholder="Ej: Habitación Doble Frente Piscina"
+                        value={form.nombre}
+                        onIonInput={(e: any) => setForm({ ...form, nombre: String(e.target.value || '') })}
+                      />
+                    </IonItem>
+                  </IonCol>
+                </IonRow>
+              </IonGrid>
+            </div>
+
+            <div className="modal-section">
+              <div className="modal-section-title"><IonIcon icon={bedOutline} /> Tipo y ubicación</div>
+              <IonItem className="form-item">
                 <IonSelect
                   label="Tipo habitación *"
                   labelPlacement="stacked"
                   value={form.tipoHabitacionId}
                   placeholder="Selecciona un tipo"
-                  onIonChange={(e: any) => setForm({ ...form, tipoHabitacionId: e.target.value })}
+                  onIonChange={(e: any) => {
+                    const selTipo = (tiposHab || []).find((t: any) => t.id === e.target.value);
+                    const capTipo = selTipo ? (Number(selTipo.capacidadAdultos || 0) + Number(selTipo.capacidadNinos || 0)) : 2;
+                    setForm({
+                      ...form,
+                      tipoHabitacionId: e.target.value,
+                      precioNoche: selTipo ? Number(selTipo.precioBaseNoche ?? 0) : form.precioNoche,
+                      capacidadMaximaPax: Math.max(capTipo || 2, form.capacidadMaximaPax || 2),
+                    });
+                  }}
                   interface="action-sheet"
                 >
                   {(tiposHab || []).map((t) => (
                     <IonSelectOption key={t.id} value={t.id}>
-                      {t.nombre}{t.precioBaseNoche ? `  ·  S/ ${t.precioBaseNoche}/noche` : ''}
+                      {t.nombre}{t.precioBaseNoche ? `  ·  ${fmtSoles(Number(t.precioBaseNoche))}/noche` : ''}
                     </IonSelectOption>
                   ))}
                 </IonSelect>
               </IonItem>
-              <IonGrid className="hab-form-grid">
+              <IonGrid>
                 <IonRow>
-                  <IonCol size="6">
-                    <IonItem>
+                  <IonCol size="12" sizeMd="6">
+                    <IonItem className="form-item">
                       <IonInput
                         label="Piso"
                         labelPlacement="stacked"
@@ -791,21 +988,27 @@ const PerfilPage: React.FC = () => {
                       />
                     </IonItem>
                   </IonCol>
-                  <IonCol size="6">
-                    <IonItem>
+                  <IonCol size="12" sizeMd="6">
+                    <IonItem className="form-item">
                       <IonInput
-                        label="Ubicación"
+                        label="Ubicación / Vista"
                         labelPlacement="stacked"
-                        placeholder="Ej: Piso 2 · Frente"
+                        placeholder="Ej: Piso 2 · Vista jardín"
                         value={form.ubicacion}
                         onIonInput={(e: any) => setForm({ ...form, ubicacion: String(e.target.value || '') })}
                       />
                     </IonItem>
                   </IonCol>
                 </IonRow>
+              </IonGrid>
+            </div>
+
+            <div className="modal-section">
+              <div className="modal-section-title"><IonIcon icon={pricetag} /> Estado, capacidad y tarifa</div>
+              <IonGrid>
                 <IonRow>
-                  <IonCol size="6">
-                    <IonItem>
+                  <IonCol size="12" sizeMd="6">
+                    <IonItem className="form-item">
                       <IonSelect
                         label="Estado *"
                         labelPlacement="stacked"
@@ -816,8 +1019,8 @@ const PerfilPage: React.FC = () => {
                       </IonSelect>
                     </IonItem>
                   </IonCol>
-                  <IonCol size="6">
-                    <IonItem>
+                  <IonCol size="12" sizeMd="6">
+                    <IonItem className="form-item">
                       <IonInput
                         label="Precio / noche (S/)"
                         labelPlacement="stacked"
@@ -832,54 +1035,69 @@ const PerfilPage: React.FC = () => {
                   </IonCol>
                 </IonRow>
                 <IonRow>
-                  <IonCol size="6">
-                    <IonItem>
-                      <IonInput
-                        label="Capacidad máxima (pax) *"
-                        labelPlacement="stacked"
-                        type="number"
-                        step="1"
-                        min="1"
-                        max="20"
-                        inputMode="numeric"
-                        placeholder="Ej: 2"
-                        value={form.capacidadMaximaPax}
-                        onIonInput={(e: any) => setForm({ ...form, capacidadMaximaPax: Math.max(1, Number(e.target.value || 1)) })}
-                      />
-                    </IonItem>
+                  <IonCol size="12" sizeMd="6">
+                    <div className="stock-input-card stock-input-success">
+                      <div className="stock-input-label">
+                        <IonIcon icon={people} /> Capacidad máxima (pax) *
+                      </div>
+                      <IonItem lines="none" className="stock-input-item">
+                        <IonInput
+                          type="number"
+                          step="1"
+                          min="1"
+                          max="20"
+                          inputMode="numeric"
+                          placeholder="Ej: 2"
+                          value={form.capacidadMaximaPax}
+                          onIonInput={(e: any) => setForm({ ...form, capacidadMaximaPax: Math.max(1, Number(e.target.value || 1)) })}
+                        />
+                      </IonItem>
+                      <div className="stock-input-hint">Cuántas personas (adultos + niños) pueden ocupar la habitación.</div>
+                    </div>
                   </IonCol>
-                  <IonCol size="6">
-                    <IonItem lines="none">
-                      <IonNote color="medium" className="capacidad-hint">
-                        Indica cuántas personas pueden dormir en esta habitación (adultos + niños).
-                      </IonNote>
-                    </IonItem>
+                  <IonCol size="12" sizeMd="6">
+                    <div className="modal-summary modal-summary-hab">
+                      <div className="summary-row"><span>Tarifa estimada noche:</span> <strong className="summary-value">{fmtSoles(form.precioNoche)}</strong></div>
+                      <div className="summary-row"><span>Ocupación máxima (pax):</span> <strong className="summary-value">{Math.max(1, form.capacidadMaximaPax || 2)}</strong></div>
+                      <div className="summary-row"><span>Estado:</span> <IonBadge color={
+                        form.estado === 'LIBRE' || form.estado === 'DISPONIBLE' ? 'success' :
+                        form.estado === 'OCUPADA' ? 'danger' :
+                        form.estado === 'LIMPIEZA' ? 'warning' :
+                        form.estado === 'MANTENIMIENTO' ? 'medium' : 'primary'
+                      } style={{ marginLeft: 4 }}>{form.estado}</IonBadge></div>
+                    </div>
                   </IonCol>
                 </IonRow>
               </IonGrid>
-              <IonItem lines="none">
+            </div>
+
+            <div className="modal-section">
+              <div className="modal-section-title"><IonIcon icon={documentText} /> Notas internas</div>
+              <IonItem lines="none" className="form-item">
                 <IonTextarea
-                  label={form.estado === 'MANTENIMIENTO' ? 'Motivo mantenimiento / Notas internas' : 'Notas internas'}
+                  label={form.estado === 'MANTENIMIENTO' ? 'Motivo mantenimiento / Notas internas' : 'Notas internas / Observaciones'}
                   labelPlacement="stacked"
                   rows={3}
-                  placeholder={form.estado === 'MANTENIMIENTO' ? 'Ej: Calefón en reparación' : '(opcional)'}
+                  placeholder={form.estado === 'MANTENIMIENTO' ? 'Ej: Calefón en reparación · fecha estimada término' : '(opcional) Información adicional para staff.'}
                   value={form.notasInternas}
                   onIonInput={(e: any) => setForm({ ...form, notasInternas: String(e.target.value || '') })}
                 />
               </IonItem>
-            </IonList>
-            <div className="hab-alert-actions-inline ion-padding-top">
+            </div>
+
+            <div className="modal-actions-footer">
               <IonButton size="default" color="medium" fill="outline" expand="block" onClick={() => setModalAbierto(false)}>
                 <IonIcon slot="start" icon={close} /> Cancelar
               </IonButton>
-              <IonButton size="default" color="success" expand="block" onClick={guardarHab}>
-                <IonIcon slot="start" icon={save} /> Guardar habitación
+              <IonButton size="default" color={editandoId ? 'primary' : 'success'} expand="block" onClick={guardarHab}>
+                <IonIcon slot="start" icon={save} />
+                {editandoId ? 'Guardar cambios' : 'Crear habitación'}
               </IonButton>
             </div>
           </IonContent>
         </IonModal>
 
-        {/* ============ MODAL: Nueva / Editar CATEGORIA ============ */}
+        {/* ============ MODAL: Nueva / Editar CATEGORIA PROFESIONAL ============ */}
         <IonModal isOpen={modalCatAbierto} onDidDismiss={() => setModalCatAbierto(false)} initialBreakpoint={0.7} breakpoints={[0, 0.5, 0.7, 1]}>
           <IonHeader className="ion-no-border">
             <IonToolbar color={editandoCatId ? 'tertiary' : 'primary'}>
@@ -949,239 +1167,412 @@ const PerfilPage: React.FC = () => {
           </IonContent>
         </IonModal>
 
-        {/* ============ MODAL: Nueva / Editar PRODUCTO ============ */}
-        <IonModal isOpen={modalProdAbierto} onDidDismiss={() => setModalProdAbierto(false)} initialBreakpoint={0.95} breakpoints={[0, 0.6, 0.95, 1]}>
+        {/* ============ MODAL: Nueva / Editar PRODUCTO (PROFESIONAL 2 TABS) ============ */}
+        <IonModal isOpen={modalProdAbierto} onDidDismiss={() => setModalProdAbierto(false)} initialBreakpoint={0.98} breakpoints={[0, 0.7, 0.98, 1]}>
           <IonHeader className="ion-no-border">
-            <IonToolbar color={editandoProdId ? 'tertiary' : 'success'}>
-              <IonTitle>{editandoProdId ? 'Editar producto' : 'Nuevo producto'}</IonTitle>
+            <IonToolbar color={editandoProdId ? 'primary' : 'success'}>
               <IonButtons slot="start">
                 <IonButton onClick={() => setModalProdAbierto(false)}>
                   <IonIcon slot="icon-only" icon={close} />
                 </IonButton>
               </IonButtons>
+              <IonTitle>
+                <IonIcon icon={cube} />
+                &nbsp;{editandoProdId ? 'Editar producto' : 'Nuevo producto'}
+              </IonTitle>
               <IonButtons slot="end">
+                <IonButton color="light" onClick={() => setModalProdAbierto(false)}>Cancelar</IonButton>
                 <IonButton strong onClick={guardarProd}>
                   <IonIcon slot="start" icon={save} /> Guardar
                 </IonButton>
               </IonButtons>
             </IonToolbar>
+            <IonToolbar className="modal-subtoolbar">
+              <IonSegment value={prodFormTab} onIonChange={(e: any) => setProdFormTab(e.target.value)} className="modal-inner-segment">
+                <IonSegmentButton value="DATOS" type="button">
+                  <IonIcon icon={documentText} />
+                  <IonLabel>Datos generales</IonLabel>
+                </IonSegmentButton>
+                <IonSegmentButton value="INVENTARIO" type="button">
+                  <IonIcon icon={archive} />
+                  <IonLabel>Inventario &amp; Stock</IonLabel>
+                </IonSegmentButton>
+              </IonSegment>
+            </IonToolbar>
           </IonHeader>
-          <IonContent className="ion-padding">
-            <IonList lines="inset">
-              <IonGrid>
-                <IonRow>
-                  <IonCol size="5">
-                    <IonItem>
-                      <IonInput
-                        label="Código"
-                        labelPlacement="stacked"
-                        placeholder="Ej: CUSQ-01"
-                        value={formProd.codigo}
-                        onIonInput={(e: any) => setFormProd({ ...formProd, codigo: String(e.target.value || '') })}
-                      />
-                    </IonItem>
-                  </IonCol>
-                  <IonCol size="7">
-                    <IonItem>
-                      <IonInput
-                        label="Nombre *"
-                        labelPlacement="stacked"
-                        placeholder="Ej: Cusqueña Trigo 620ml"
-                        value={formProd.nombre}
-                        onIonInput={(e: any) => setFormProd({ ...formProd, nombre: String(e.target.value || '') })}
-                      />
-                    </IonItem>
-                  </IonCol>
-                </IonRow>
-              </IonGrid>
-              <IonItem lines="none">
-                <IonTextarea
-                  label="Descripción"
-                  labelPlacement="stacked"
-                  rows={2}
-                  placeholder="(opcional) Descripción del producto"
-                  value={formProd.descripcion}
-                  onIonInput={(e: any) => setFormProd({ ...formProd, descripcion: String(e.target.value || '') })}
-                />
-              </IonItem>
-              <IonItem>
-                <IonSelect
-                  label="Categoría *"
-                  labelPlacement="stacked"
-                  value={formProd.categoriaId}
-                  placeholder="Selecciona categoría"
-                  onIonChange={(e: any) => setFormProd({ ...formProd, categoriaId: e.target.value })}
-                  interface="action-sheet"
-                >
-                  {(categoriasFB || []).map((c) => (
-                    <IonSelectOption key={c.id} value={c.id}>{c.nombre}</IonSelectOption>
-                  ))}
-                </IonSelect>
-              </IonItem>
-              <IonGrid>
-                <IonRow>
-                  <IonCol size="4">
-                    <IonItem>
-                      <IonInput
-                        label="Precio venta (S/)"
-                        labelPlacement="stacked"
-                        type="number" step="0.01" inputMode="decimal"
-                        placeholder="18.00"
-                        value={formProd.precioVentaBase}
-                        onIonInput={(e: any) => setFormProd({ ...formProd, precioVentaBase: Number(e.target.value || 0) })}
-                      />
-                    </IonItem>
-                  </IonCol>
-                  <IonCol size="4">
-                    <IonItem>
-                      <IonInput
-                        label="Costo aprox (S/)"
-                        labelPlacement="stacked"
-                        type="number" step="0.01" inputMode="decimal"
-                        placeholder="10.50"
-                        value={formProd.costoAproximado}
-                        onIonInput={(e: any) => setFormProd({ ...formProd, costoAproximado: Number(e.target.value || 0) })}
-                      />
-                    </IonItem>
-                  </IonCol>
-                  <IonCol size="4">
-                    <IonItem>
-                      <IonInput
-                        label="Unidad medida"
-                        labelPlacement="stacked"
-                        placeholder="UND / L / KG"
-                        value={formProd.unidadMedida}
-                        onIonInput={(e: any) => setFormProd({ ...formProd, unidadMedida: String(e.target.value || 'UND').toUpperCase() })}
-                      />
-                    </IonItem>
-                  </IonCol>
-                </IonRow>
-              </IonGrid>
-              <IonItem>
-                <IonSelect
-                  label="Estado"
-                  labelPlacement="stacked"
-                  value={formProd.estado}
-                  onIonChange={(e: any) => setFormProd({ ...formProd, estado: e.target.value as any })}
-                >
-                  <IonSelectOption value="ACTIVO">ACTIVO (visible en POS)</IonSelectOption>
-                  <IonSelectOption value="INACTIVO">INACTIVO (oculto)</IonSelectOption>
-                </IonSelect>
-              </IonItem>
+          <IonContent className="ion-padding modal-padding">
+            {prodFormTab === 'DATOS' && (
+              <>
+                <div className="modal-section">
+                  <div className="modal-section-title"><IonIcon icon={barcode} /> Identificación</div>
+                  <IonGrid>
+                    <IonRow>
+                      <IonCol size="12" sizeMd="4">
+                        <IonItem className="form-item">
+                          <IonInput
+                            label="Código"
+                            labelPlacement="stacked"
+                            placeholder="Ej: CER-001"
+                            value={formProd.codigo}
+                            onIonInput={(e: any) => setFormProd({ ...formProd, codigo: String(e.target.value || '') })}
+                          />
+                        </IonItem>
+                      </IonCol>
+                      <IonCol size="12" sizeMd="8">
+                        <IonItem className="form-item">
+                          <IonInput
+                            label="Nombre del producto *"
+                            labelPlacement="stacked"
+                            placeholder="Ej: Cusqueña Trigo 620ml"
+                            value={formProd.nombre}
+                            onIonInput={(e: any) => setFormProd({ ...formProd, nombre: String(e.target.value || '') })}
+                          />
+                        </IonItem>
+                      </IonCol>
+                    </IonRow>
+                  </IonGrid>
+                  <IonItem className="form-item" lines="none">
+                    <IonTextarea
+                      label="Descripción"
+                      labelPlacement="stacked"
+                      rows={2}
+                      placeholder="Descripción visible para carta o POS"
+                      value={formProd.descripcion}
+                      onIonInput={(e: any) => setFormProd({ ...formProd, descripcion: String(e.target.value || '') })}
+                    />
+                  </IonItem>
+                </div>
 
-              {/* ===== Segment Control STOCK ===== */}
-              <IonItem lines="none" className="stock-control-segment-item">
-                <IonLabel className="stock-label-block">¿Controlar stock?</IonLabel>
-                <IonSegment
-                  value={formProd.stockControl ? 'SI' : 'NO'}
-                  onIonChange={(e: any) => setFormProd({ ...formProd, stockControl: e.target.value === 'SI' })}
-                  className="stock-segment"
-                >
-                  <IonSegmentButton value="NO" color="medium">
-                    <IonLabel>NO</IonLabel>
-                  </IonSegmentButton>
-                  <IonSegmentButton value="SI" color="success">
-                    <IonLabel>SÍ</IonLabel>
-                  </IonSegmentButton>
-                </IonSegment>
-              </IonItem>
+                <div className="modal-section">
+                  <div className="modal-section-title"><IonIcon icon={layers} /> Categoría y estado</div>
+                  <IonGrid>
+                    <IonRow>
+                      <IonCol size="12" sizeMd="6">
+                        <IonItem className="form-item">
+                          <IonSelect
+                            label="Categoría *"
+                            labelPlacement="stacked"
+                            value={formProd.categoriaId}
+                            placeholder="Selecciona categoría"
+                            onIonChange={(e: any) => setFormProd({ ...formProd, categoriaId: e.target.value })}
+                            interface="action-sheet"
+                          >
+                            {(categoriasFB || []).map((c) => (
+                              <IonSelectOption key={c.id} value={c.id}>{c.nombre}</IonSelectOption>
+                            ))}
+                          </IonSelect>
+                        </IonItem>
+                      </IonCol>
+                      <IonCol size="12" sizeMd="6">
+                        <IonItem className="form-item">
+                          <IonSelect
+                            label="Estado"
+                            labelPlacement="stacked"
+                            value={formProd.estado}
+                            onIonChange={(e: any) => setFormProd({ ...formProd, estado: e.target.value as any })}
+                          >
+                            <IonSelectOption value="ACTIVO">✅ ACTIVO (visible en POS y carta)</IonSelectOption>
+                            <IonSelectOption value="INACTIVO">⛔ INACTIVO (oculto)</IonSelectOption>
+                          </IonSelect>
+                        </IonItem>
+                      </IonCol>
+                    </IonRow>
+                  </IonGrid>
+                </div>
 
-              {formProd.stockControl && (
-                <IonGrid>
-                  <IonRow>
-                    <IonCol size="6">
-                      <IonItem>
-                        <IonInput
-                          label="Stock actual"
-                          labelPlacement="stacked"
-                          type="number" step="1" min="0" inputMode="numeric"
-                          placeholder="0"
-                          value={formProd.stockActual}
-                          onIonInput={(e: any) => setFormProd({ ...formProd, stockActual: Number(e.target.value || 0) })}
-                        />
-                      </IonItem>
-                    </IonCol>
-                    <IonCol size="6">
-                      <IonItem>
-                        <IonInput
-                          label="Stock mínimo (alerta)"
-                          labelPlacement="stacked"
-                          type="number" step="1" min="0" inputMode="numeric"
-                          placeholder="6"
-                          value={formProd.stockMinimo}
-                          onIonInput={(e: any) => setFormProd({ ...formProd, stockMinimo: Number(e.target.value || 0) })}
-                        />
-                      </IonItem>
-                    </IonCol>
-                  </IonRow>
-                </IonGrid>
-              )}
+                <div className="modal-section">
+                  <div className="modal-section-title"><IonIcon icon={cash} /> Precios y costo</div>
+                  <IonGrid>
+                    <IonRow>
+                      <IonCol size="12" sizeMd="4">
+                        <IonItem className="form-item">
+                          <IonInput
+                            label="Precio venta (S/) *"
+                            labelPlacement="stacked"
+                            type="number" step="0.01" inputMode="decimal"
+                            placeholder="Ej: 18.00"
+                            value={formProd.precioVentaBase}
+                            onIonInput={(e: any) => setFormProd({ ...formProd, precioVentaBase: Number(e.target.value || 0) })}
+                          />
+                        </IonItem>
+                      </IonCol>
+                      <IonCol size="12" sizeMd="4">
+                        <IonItem className="form-item">
+                          <IonInput
+                            label="Costo aproximado (S/)"
+                            labelPlacement="stacked"
+                            type="number" step="0.01" inputMode="decimal"
+                            placeholder="Ej: 9.50"
+                            value={formProd.costoAproximado}
+                            onIonInput={(e: any) => setFormProd({ ...formProd, costoAproximado: Number(e.target.value || 0) })}
+                          />
+                        </IonItem>
+                      </IonCol>
+                      <IonCol size="12" sizeMd="4">
+                        <IonItem className="form-item">
+                          <IonInput
+                            label="Unidad de medida"
+                            labelPlacement="stacked"
+                            placeholder="UND / L / KG / ML"
+                            value={formProd.unidadMedida}
+                            onIonInput={(e: any) => setFormProd({ ...formProd, unidadMedida: String(e.target.value || 'UND').toUpperCase() })}
+                          />
+                        </IonItem>
+                      </IonCol>
+                    </IonRow>
+                  </IonGrid>
+                  {Number(formProd.precioVentaBase || 0) > 0 && (
+                    <div className="modal-summary">
+                      <div className="summary-row">
+                        <span>Margen unitario estimado:</span>
+                        <strong className="summary-value">{fmtSoles(Number(formProd.precioVentaBase || 0) - Number(formProd.costoAproximado || 0))}</strong>
+                      </div>
+                      <div className="summary-row">
+                        <span>% rentabilidad:</span>
+                        <strong className="summary-value" style={{
+                          color: Number(formProd.precioVentaBase || 0) > 0
+                            ? (((Number(formProd.precioVentaBase || 0) - Number(formProd.costoAproximado || 0)) / Number(formProd.precioVentaBase || 1)) * 100) >= 40
+                              ? '#2dd36f'
+                              : (((Number(formProd.precioVentaBase || 0) - Number(formProd.costoAproximado || 0)) / Number(formProd.precioVentaBase || 1)) * 100) >= 20
+                                ? '#ffc409'
+                                : '#eb445a'
+                            : '#999'
+                        }}>
+                          {Number(formProd.precioVentaBase || 0) > 0
+                            ? Math.round(((Number(formProd.precioVentaBase || 0) - Number(formProd.costoAproximado || 0)) / Number(formProd.precioVentaBase || 1)) * 100)
+                            : 0}%
+                        </strong>
+                      </div>
+                    </div>
+                  )}
+                </div>
 
-              <IonItem lines="none">
-                <IonTextarea
-                  label="Observaciones internas"
-                  labelPlacement="stacked"
-                  rows={2}
-                  placeholder="(opcional) Proveedor, códigos internos, etc."
-                  value={formProd.observaciones}
-                  onIonInput={(e: any) => setFormProd({ ...formProd, observaciones: String(e.target.value || '') })}
-                />
-              </IonItem>
-            </IonList>
+                <div className="modal-section">
+                  <div className="modal-section-title"><IonIcon icon={documentText} /> Notas internas</div>
+                  <IonItem lines="none" className="form-item">
+                    <IonTextarea
+                      label="Observaciones"
+                      labelPlacement="stacked"
+                      rows={2}
+                      placeholder="Proveedor, códigos internos, etc. (opcional)"
+                      value={formProd.observaciones}
+                      onIonInput={(e: any) => setFormProd({ ...formProd, observaciones: String(e.target.value || '') })}
+                    />
+                  </IonItem>
+                </div>
+              </>
+            )}
+
+            {prodFormTab === 'INVENTARIO' && (
+              <>
+                <div className="modal-section">
+                  <div className="modal-section-title"><IonIcon icon={cube} /> Control de inventario</div>
+
+                  <div className="stock-control-wrap">
+                    <div className="stock-control-question">¿Controlar stock y alertar mínimo?</div>
+                    <IonSegment
+                      value={formProd.stockControl ? 'SI' : 'NO'}
+                      onIonChange={(e: any) => setFormProd({ ...formProd, stockControl: e.target.value === 'SI' })}
+                      className="stock-segment-big"
+                    >
+                      <IonSegmentButton value="NO" type="button" color="medium">
+                        <IonLabel>NO (platos / bebidas preparación)</IonLabel>
+                      </IonSegmentButton>
+                      <IonSegmentButton value="SI" type="button" color="success">
+                        <IonLabel>SÍ (productos embotellados / insumos)</IonLabel>
+                      </IonSegmentButton>
+                    </IonSegment>
+                  </div>
+                </div>
+
+                {formProd.stockControl ? (
+                  <>
+                    <div className="modal-section">
+                      <div className="modal-section-title"><IonIcon icon={archive} /> Niveles de stock</div>
+                      <IonGrid>
+                        <IonRow>
+                          <IonCol size="12" sizeMd="6">
+                            <div className="stock-input-card stock-input-success">
+                              <div className="stock-input-label">Stock actual</div>
+                              <IonItem lines="none" className="stock-input-item">
+                                <IonInput
+                                  type="number" step="1" min="0" inputMode="numeric"
+                                  placeholder="Ej: 0"
+                                  value={formProd.stockActual}
+                                  onIonInput={(e: any) => setFormProd({ ...formProd, stockActual: Number(e.target.value || 0) })}
+                                />
+                              </IonItem>
+                              <div className="stock-input-hint">Unidades disponibles físicamente.</div>
+                            </div>
+                          </IonCol>
+                          <IonCol size="12" sizeMd="6">
+                            <div className="stock-input-card stock-input-warning">
+                              <div className="stock-input-label">Stock mínimo (alerta)</div>
+                              <IonItem lines="none" className="stock-input-item">
+                                <IonInput
+                                  type="number" step="1" min="0" inputMode="numeric"
+                                  placeholder="Ej: 6"
+                                  value={formProd.stockMinimo}
+                                  onIonInput={(e: any) => setFormProd({ ...formProd, stockMinimo: Number(e.target.value || 0) })}
+                                />
+                              </IonItem>
+                              <div className="stock-input-hint">Si baja de este número se alerta en panel.</div>
+                            </div>
+                          </IonCol>
+                        </IonRow>
+                      </IonGrid>
+
+                      <div className="stock-status-preview">
+                        {editandoProdId && (() => {
+                          const status =
+                            formProd.stockActual < 0 ? { color: 'danger', label: 'Stock NEGATIVO', icon: warning }
+                            : formProd.stockMinimo > 0 && formProd.stockActual < formProd.stockMinimo ? { color: 'warning', label: formProd.stockActual === 0 ? 'Stock CERO' : 'Stock BAJO MÍNIMO', icon: warning }
+                            : { color: 'success', label: 'Stock OK', icon: checkmarkCircle };
+                          return (
+                            <>
+                              <IonBadge color={status.color as any} className="stock-status-badge">
+                                <IonIcon icon={status.icon} />
+                                &nbsp;{status.label}
+                              </IonBadge>
+                              <span className="stock-status-text">
+                                Actual: <strong>{fmtNum(formProd.stockActual)}</strong> · Mínimo: <strong>{fmtNum(formProd.stockMinimo)}</strong>
+                              </span>
+                            </>
+                          );
+                        })()}
+                      </div>
+                    </div>
+
+                    <div className="modal-tip-box modal-tip-info">
+                      <IonIcon icon={informationCircle} />
+                      <div>
+                        <strong>Tip:</strong> Los movimientos de stock se generan automáticamente al vender en POS/RoomService (-1 por unidad) y manualmente con los botones <strong>+Agregar</strong> / <strong>-Quitar</strong>.
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  <div className="modal-tip-box modal-tip-neutral">
+                    <IonIcon icon={informationCircle} />
+                    <div>
+                      Este producto <strong>NO controla stock</strong>. Úsalo para platos, bebidas preparadas, servicios o alimentos que se producen al momento.
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+
+            <div className="modal-actions-footer">
+              <IonButton size="default" color="medium" fill="outline" expand="block" onClick={() => setModalProdAbierto(false)}>
+                <IonIcon slot="start" icon={close} /> Cancelar
+              </IonButton>
+              <IonButton size="default" color={editandoProdId ? 'primary' : 'success'} expand="block" onClick={guardarProd}>
+                <IonIcon slot="start" icon={save} />
+                {editandoProdId ? 'Guardar cambios' : 'Crear producto'}
+              </IonButton>
+            </div>
           </IonContent>
         </IonModal>
 
-        {/* ============ MODAL: Agregar / Quitar Stock ============ */}
-        <IonModal isOpen={modalStockAbierto} onDidDismiss={() => setModalStockAbierto(false)} initialBreakpoint={0.65} breakpoints={[0, 0.5, 0.65, 1]}>
+        {/* ============ MODAL: Agregar / Quitar Stock PROFESIONAL ============ */}
+        <IonModal isOpen={modalStockAbierto} onDidDismiss={() => setModalStockAbierto(false)} initialBreakpoint={0.72} breakpoints={[0, 0.5, 0.72, 1]}>
           <IonHeader className="ion-no-border">
             <IonToolbar color={formStock.modo === 'AGREGAR' ? 'success' : 'warning'}>
-              <IonTitle>
-                <IonIcon slot="start" icon={formStock.modo === 'AGREGAR' ? addCircle : removeCircle} />
-                &nbsp;{formStock.modo === 'AGREGAR' ? 'Agregar stock' : 'Quitar stock'}
-              </IonTitle>
               <IonButtons slot="start">
                 <IonButton onClick={() => setModalStockAbierto(false)}>
                   <IonIcon slot="icon-only" icon={close} />
                 </IonButton>
               </IonButtons>
+              <IonTitle>
+                <IonIcon icon={formStock.modo === 'AGREGAR' ? addCircle : removeCircle} />
+                &nbsp;{formStock.modo === 'AGREGAR' ? 'Ingreso de stock' : 'Egreso de stock'}
+              </IonTitle>
             </IonToolbar>
           </IonHeader>
-          <IonContent className="ion-padding">
+          <IonContent className="ion-padding modal-padding">
             {formStock.productoNombre && (
-              <IonCard className="stock-target-card">
-                <IonCardContent className="ion-no-padding">
-                  <strong>Producto:</strong> {formStock.productoNombre}
+              <IonCard className={`stock-target-card stock-target-${formStock.modo === 'AGREGAR' ? 'success' : 'warning'}`}>
+                <IonCardContent>
+                  <div className="stock-target-lbl">Producto seleccionado</div>
+                  <div className="stock-target-nombre">{formStock.productoNombre}</div>
+                  {(() => {
+                    const pActual = productosFB.find((x: any) => x.id === formStock.productoId);
+                    if (!pActual) return null;
+                    const plano = stockPlanoProd(pActual);
+                    return (
+                      <div className="stock-target-preview">
+                        <IonBadge color={!plano.stockControl ? 'medium' : plano.stockActual < 0 ? 'danger' : plano.stockActual <= (plano.stockMinimo || 0) ? 'warning' : 'success'}>
+                          Actual: {plano.stockControl ? `${fmtNum(plano.stockActual)} uds` : 'Sin control'}
+                        </IonBadge>
+                      </div>
+                    );
+                  })()}
                 </IonCardContent>
               </IonCard>
             )}
-            <IonList lines="inset">
-              <IonItem>
-                <IonInput
-                  label={formStock.modo === 'AGREGAR' ? 'Cantidad a agregar' : 'Cantidad a quitar'}
-                  labelPlacement="stacked"
-                  type="number"
-                  step="1"
-                  min="1"
-                  inputMode="numeric"
-                  placeholder="Ej: 24"
-                  value={formStock.delta > 0 ? formStock.delta : ''}
-                  onIonInput={(e: any) => setFormStock({ ...formStock, delta: Math.max(0, Number(e.target.value || 0)) })}
-                />
-              </IonItem>
-              <IonItem lines="none">
+
+            <div className="modal-section">
+              <div className="modal-section-title"><IonIcon icon={cube} /> Cantidad</div>
+              <div className={`stock-big-input stock-big-input-${formStock.modo === 'AGREGAR' ? 'success' : 'warning'}`}>
+                <IonButton
+                  fill="outline"
+                  color={formStock.modo === 'AGREGAR' ? 'success' : 'warning'}
+                  className="stock-quant-btn"
+                  onClick={() => setFormStock({ ...formStock, delta: Math.max(1, Number(formStock.delta || 0) - 1) })}
+                >
+                  −
+                </IonButton>
+                <IonItem className="stock-input-big-form" lines="none">
+                  <IonInput
+                    type="number"
+                    step="1"
+                    min="1"
+                    inputMode="numeric"
+                    value={formStock.delta > 0 ? formStock.delta : ''}
+                    placeholder="1"
+                    onIonInput={(e: any) => setFormStock({ ...formStock, delta: Math.max(0, Number(e.target.value || 0)) })}
+                  />
+                </IonItem>
+                <IonButton
+                  fill="solid"
+                  color={formStock.modo === 'AGREGAR' ? 'success' : 'warning'}
+                  className="stock-quant-btn stock-quant-btn-plus"
+                  onClick={() => setFormStock({ ...formStock, delta: Math.max(1, Number(formStock.delta || 0) + 1) })}
+                >
+                  +
+                </IonButton>
+              </div>
+              <div className="stock-btns-fast">
+                {[1, 6, 12, 24, 50].map(n => (
+                  <IonChip
+                    key={n}
+                    outline
+                    color={formStock.modo === 'AGREGAR' ? 'success' : 'warning'}
+                    className="stock-chip-fast"
+                    onClick={() => setFormStock({ ...formStock, delta: n })}
+                  >
+                    + {n}
+                  </IonChip>
+                ))}
+              </div>
+            </div>
+
+            <div className="modal-section">
+              <div className="modal-section-title"><IonIcon icon={documentText} /> Motivo</div>
+              <IonItem lines="none" className="form-item">
                 <IonTextarea
                   label="Motivo / Observación"
                   labelPlacement="stacked"
                   rows={3}
                   placeholder={formStock.modo === 'AGREGAR'
                     ? 'Ej: Compra a proveedor XYZ · Factura N° 123'
-                    : 'Ej: Merma · producto vencido o Cajón 3 dañado'}
+                    : 'Ej: Merma · producto vencido / Cajón 3 dañado / Regalo cliente VIP'}
                   value={formStock.motivo}
                   onIonInput={(e: any) => setFormStock({ ...formStock, motivo: String(e.target.value || '') })}
                 />
               </IonItem>
-            </IonList>
-            <div className="hab-alert-actions-inline ion-padding-top">
+            </div>
+
+            <div className="modal-actions-footer">
               <IonButton size="default" color="medium" fill="outline" expand="block" onClick={() => setModalStockAbierto(false)}>
                 Cancelar
               </IonButton>
