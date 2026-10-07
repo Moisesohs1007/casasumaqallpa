@@ -59,6 +59,9 @@ const CARTA_CANDIDATOS = [
   `${BASE_URL}/menu.pdf`,
   `${BASE_URL}/CARTA SUMAQ ALLPA.pdf`,
   `${BASE_URL}/CARTA SUMAQ ALLPA....pdf`,
+  `${BASE_URL}/CARTA SUMAQ ALLPA….pdf`,
+  `${BASE_URL}/CARTA SUMAQ ALLPA ...pdf`,
+  `${BASE_URL}/CARTA SUMAQ ALLPA ….pdf`,
   `${BASE_URL}/CARTA.pdf`,
   `${BASE_URL}/Carta.pdf`,
   `${BASE_URL}/Menu.pdf`,
@@ -82,9 +85,22 @@ async function findFirstAsset(candidatos: string[], checkType: 'image' | 'any'):
   }
   for (const c of candidatos) {
     try {
-      const resp = await fetch(c, { method: 'HEAD' });
-      if (resp.ok) return c;
-    } catch {}
+      const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+      const signal = controller?.signal;
+      const timer = controller ? window.setTimeout(() => controller.abort(), 2500) : 0;
+      const resp = await fetch(c, {
+        method: 'GET',
+        cache: 'no-store',
+        credentials: 'omit',
+        redirect: 'follow',
+        headers: { Range: 'bytes=0-1' },
+        ...(signal ? { signal } : {}),
+      });
+      window.clearTimeout(timer);
+      if (resp.ok || resp.status === 206 || resp.status === 416) return c;
+    } catch {
+      continue;
+    }
   }
   return null;
 }
