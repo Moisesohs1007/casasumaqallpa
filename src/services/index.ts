@@ -7,3 +7,5 @@ export * from './PosService';
 export * from './InventarioService';
 export * from './supabaseClient';
 export * from './__db__';
+export * as pendingSync from './__pending_sync__';
+export * as seedProductos from './__seed_inicial_productos__';

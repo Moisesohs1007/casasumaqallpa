@@ -2,6 +2,24 @@
 import { db, seedUtil, type ProductoFB } from './__db__';
 import { dbRemota } from './__supabase_db__';
 import { CatalogoFBService } from './PosService';
+import * as pendingSync from './__pending_sync__';
+
+const TIMEOUT_REMOTO_MS = 3500;
+const timeoutPromise = (ms: number) => new Promise<never>((_, rej) => setTimeout(() => rej(new Error('TIMEOUT_REMOTO')), ms));
+
+async function _remotoConQueue(method: 'add' | 'update' | 'remove', key: string, matchId: string, payload: any, remotoCallFn: () => Promise<any>): Promise<void> {
+  if (!dbRemota.isOnline()) {
+    pendingSync.enqueue(key, method, matchId, payload);
+    return;
+  }
+  try {
+    const res = await Promise.race([remotoCallFn(), timeoutPromise(TIMEOUT_REMOTO_MS)]);
+    if (!res && method !== 'remove') throw new Error('respuesta remota vacía');
+  } catch (e) {
+    console.warn('[Inventario._remotoConQueue] remoto falló → enqueue. Key=', key, 'm=', method, 'id=', matchId, 'err=', (e as Error)?.message || e);
+    pendingSync.enqueue(key, method, matchId, payload);
+  }
+}
 
 const KEY_PROD = 'productosFB';
 const KEY_PRES = 'presentacionesFB';
@@ -170,9 +188,14 @@ export const InventarioService = {
     };
     const upd = db.update<any>(KEY, idTarget, deltaUpdate);
     if (upd) {
-      dbRemota.updateAsync<any>(KEY, idTarget, deltaUpdate).catch((e) =>
-        console.error('[InventarioService.moverStock] remoto fail KEY=', KEY, 'id=', idTarget, e)
-      );
+      const payloadDelta = { id: idTarget, ...deltaUpdate };
+      (async () => {
+        try {
+          await _remotoConQueue('update', KEY, idTarget, payloadDelta, () =>
+            dbRemota.updateAsync<any>(KEY, idTarget, deltaUpdate)
+          );
+        } catch (_) {}
+      })().catch(() => {});
     }
 
     let advertencia: MoverStockResult['advertencia'] = undefined;

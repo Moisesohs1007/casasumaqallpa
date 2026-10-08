@@ -5,6 +5,24 @@ import { ReservaService } from './ReservaService';
 import { HabitacionService } from './HabitacionService';
 import { HuespedService } from './HuespedService';
 import { ImpuestoService } from './TarifaService';
+import * as pendingSync from './__pending_sync__';
+
+const TIMEOUT_REMOTO_MS = 3500;
+const timeoutPromise = (ms: number) => new Promise<never>((_, rej) => setTimeout(() => rej(new Error('TIMEOUT_REMOTO')), ms));
+
+async function _remotoConQueue(method: 'add' | 'update' | 'remove', key: string, matchId: string, payload: any, remotoCallFn: () => Promise<any>): Promise<void> {
+  if (!dbRemota.isOnline()) {
+    pendingSync.enqueue(key, method, matchId, payload);
+    return;
+  }
+  try {
+    const res = await Promise.race([remotoCallFn(), timeoutPromise(TIMEOUT_REMOTO_MS)]);
+    if (!res && method !== 'remove') throw new Error('respuesta remota vacía');
+  } catch (e) {
+    console.warn('[Folio._remotoConQueue] remoto falló → enqueue. Key=', key, 'm=', method, 'id=', matchId, 'err=', (e as Error)?.message || e);
+    pendingSync.enqueue(key, method, matchId, payload);
+  }
+}
 
 const KEY_FOLIO = 'folios';
 const KEY_CARGO = 'cargosFolio';
@@ -24,7 +42,7 @@ async function _hidratarDesdeSupabaseFolio(force = false): Promise<boolean> {
       FOLIO_KEYS_HIDRATAR.forEach((k, idx) => {
         const rows = resultados[idx];
         if (Array.isArray(rows) && rows.length > 0) {
-          try { db.setAll(k, rows); } catch (e) { console.warn('[FolioService.hidratar] setAll fail key=', k, e); }
+          try { db.upsertAll<any>(k, rows, { matchKey: 'id' }); } catch (e) { console.warn('[FolioService.hidratar] upsertAll fail key=', k, e); }
         }
       });
       _hidratadoFolio = true;
@@ -54,19 +72,38 @@ const siguienteNumeroFolio = (): string => {
 export const CargoFolioService = {
   crear(c: Create<CargoFolio>): CargoFolio {
     const now = seedUtil.nowISO();
-    const payload: any = { createdAt: (c as any).createdAt || now, updatedAt: (c as any).updatedAt || now, createdBy: (c as any).createdBy || 'system-cargo', updatedBy: (c as any).updatedBy || 'system-cargo', ...c };
+    const idUnico = (c as any).id || seedUtil.generateUUID();
+    const usuarioOrigen = (c as any).createdBy || (c as any).usuarioId || 'system-cargo';
+    const payload: any = { id: idUnico, createdAt: (c as any).createdAt || now, updatedAt: (c as any).updatedAt || now, createdBy: usuarioOrigen, updatedBy: (c as any).updatedBy || usuarioOrigen, ...c };
     const nuevo = db.add<CargoFolio>(KEY_CARGO, payload);
-    dbRemota.addAsync<CargoFolio>(KEY_CARGO, { ...payload, id: nuevo.id } as any).catch((e) => console.error('[CargoFolio.crear] remoto fail:', e));
+    const payloadFinal = { ...payload, id: nuevo.id };
+
+    (async () => {
+      try {
+        await _remotoConQueue('add', KEY_CARGO, nuevo.id, payloadFinal, () =>
+          dbRemota.addAsync<CargoFolio>(KEY_CARGO, payloadFinal as any)
+        );
+      } catch (_) {}
+    })().catch(() => {});
+
     const folio = db.getById<Folio>(KEY_FOLIO, nuevo.folioId);
-    if (folio) FolioService.recalcularTotales(nuevo.folioId, (payload as any).updatedBy || 'system-cargo');
+    if (folio) FolioService.recalcularTotales(nuevo.folioId, (payload as any).updatedBy || usuarioOrigen);
     return nuevo;
   },
   actualizar(id: string, changes: Update<CargoFolio>): CargoFolio | undefined {
+    const usuarioOrigen = (changes as any).updatedBy || 'system-cargo';
     const delta: any = { updatedAt: seedUtil.nowISO(), ...changes };
     const act = db.update<CargoFolio>(KEY_CARGO, id, delta);
     if (act) {
-      dbRemota.updateAsync<CargoFolio>(KEY_CARGO, id, delta as any).catch((e) => console.error('[CargoFolio.actualizar] remoto fail:', e));
-      FolioService.recalcularTotales(act.folioId, (changes as any).updatedBy || 'system-cargo');
+      const payloadDelta = { ...delta, id };
+      (async () => {
+        try {
+          await _remotoConQueue('update', KEY_CARGO, id, payloadDelta, () =>
+            dbRemota.updateAsync<CargoFolio>(KEY_CARGO, id, delta as any)
+          );
+        } catch (_) {}
+      })().catch(() => {});
+      FolioService.recalcularTotales(act.folioId, (changes as any).updatedBy || usuarioOrigen);
     }
     return act;
   },
@@ -86,7 +123,14 @@ export const CargoFolioService = {
     } as unknown as Update<CargoFolio>;
     const act = db.update<CargoFolio>(KEY_CARGO, id, delta);
     if (act) {
-      dbRemota.updateAsync<CargoFolio>(KEY_CARGO, id, delta as any).catch((e) => console.error('[CargoFolio.anular] remoto fail:', e));
+      const payloadDelta = { id, ...delta };
+      (async () => {
+        try {
+          await _remotoConQueue('update', KEY_CARGO, id, payloadDelta, () =>
+            dbRemota.updateAsync<CargoFolio>(KEY_CARGO, id, delta as any)
+          );
+        } catch (_) {}
+      })().catch(() => {});
       FolioService.recalcularTotales(act.folioId, usuarioId);
     }
     return act;
@@ -99,21 +143,40 @@ export const CargoFolioService = {
 export const PagoFolioService = {
   crear(p: Create<PagoFolio>): PagoFolio {
     const now = seedUtil.nowISO();
-    const payload: any = { createdAt: (p as any).createdAt || now, updatedAt: (p as any).updatedAt || now, createdBy: (p as any).createdBy || ((p as any).usuarioId || 'system-pago'), updatedBy: (p as any).updatedBy || ((p as any).usuarioId || 'system-pago'), ...p };
+    const idUnico = (p as any).id || seedUtil.generateUUID();
+    const usuarioOrigen = (p as any).createdBy || (p as any).usuarioId || 'system-pago';
+    const payload: any = { id: idUnico, createdAt: (p as any).createdAt || now, updatedAt: (p as any).updatedAt || now, createdBy: usuarioOrigen, updatedBy: (p as any).updatedBy || ((p as any).usuarioId || usuarioOrigen), ...p };
     const nuevo = db.add<PagoFolio>(KEY_PAGO, payload);
-    dbRemota.addAsync<PagoFolio>(KEY_PAGO, { ...payload, id: nuevo.id } as any).catch((e) => console.error('[PagoFolio.crear] remoto fail:', e));
+    const payloadFinal = { ...payload, id: nuevo.id };
+
+    (async () => {
+      try {
+        await _remotoConQueue('add', KEY_PAGO, nuevo.id, payloadFinal, () =>
+          dbRemota.addAsync<PagoFolio>(KEY_PAGO, payloadFinal as any)
+        );
+      } catch (_) {}
+    })().catch(() => {});
+
     if (nuevo.folioId && nuevo.estado !== 'ANULADO') {
-      FolioService.recalcularTotales(nuevo.folioId, (payload as any).usuarioId || 'system-pago');
+      FolioService.recalcularTotales(nuevo.folioId, (payload as any).usuarioId || usuarioOrigen);
     }
     return nuevo;
   },
   actualizar(id: string, changes: Update<PagoFolio>): PagoFolio | undefined {
+    const usuarioOrigen = (changes as any).usuarioId || (changes as any).updatedBy || 'system-pago';
     const delta: any = { updatedAt: seedUtil.nowISO(), ...changes };
     if (delta.monto !== undefined) delta.monto = Number(delta.monto || 0);
     const upd = db.update<PagoFolio>(KEY_PAGO, id, delta);
     if (upd) {
-      dbRemota.updateAsync<PagoFolio>(KEY_PAGO, id, delta as any).catch((e) => console.error('[PagoFolio.actualizar] remoto fail:', e));
-      if (upd.folioId) FolioService.recalcularTotales(upd.folioId, (changes as any).usuarioId || (changes as any).updatedBy || 'system-pago');
+      const payloadDelta = { id, ...delta };
+      (async () => {
+        try {
+          await _remotoConQueue('update', KEY_PAGO, id, payloadDelta, () =>
+            dbRemota.updateAsync<PagoFolio>(KEY_PAGO, id, delta as any)
+          );
+        } catch (_) {}
+      })().catch(() => {});
+      if (upd.folioId) FolioService.recalcularTotales(upd.folioId, usuarioOrigen);
     }
     return upd;
   },
@@ -130,7 +193,14 @@ export const PagoFolioService = {
     } as unknown as Update<PagoFolio>;
     const upd = db.update<PagoFolio>(KEY_PAGO, id, delta);
     if (upd) {
-      dbRemota.updateAsync<PagoFolio>(KEY_PAGO, id, delta as any).catch((e) => console.error('[PagoFolio.anular] remoto fail:', e));
+      const payloadDelta = { id, ...delta };
+      (async () => {
+        try {
+          await _remotoConQueue('update', KEY_PAGO, id, payloadDelta, () =>
+            dbRemota.updateAsync<PagoFolio>(KEY_PAGO, id, delta as any)
+          );
+        } catch (_) {}
+      })().catch(() => {});
       if (upd.folioId) FolioService.recalcularTotales(upd.folioId, usuarioId);
     }
     return upd;
@@ -291,7 +361,16 @@ export const FolioService = {
       updatedAt: seedUtil.nowISO(),
     };
     const upd = db.update<Folio>(KEY_FOLIO, folioId, delta as unknown as Update<Folio>);
-    if (upd) dbRemota.updateAsync<Folio>(KEY_FOLIO, folioId, delta as any).catch((e) => console.error('[Folio.recalc] remoto fail:', e));
+    if (upd) {
+      const payloadDelta = { id: folioId, ...delta };
+      (async () => {
+        try {
+          await _remotoConQueue('update', KEY_FOLIO, folioId, payloadDelta, () =>
+            dbRemota.updateAsync<Folio>(KEY_FOLIO, folioId, delta as any)
+          );
+        } catch (_) {}
+      })().catch(() => {});
+    }
     return upd;
   },
 
@@ -392,7 +471,14 @@ export const FolioService = {
         updatedBy: userId,
       };
       const folioSeed = db.add<Folio>(KEY_FOLIO, folioData as unknown as Create<Folio>);
-      dbRemota.addAsync<Folio>(KEY_FOLIO, { ...folioData, id: folioSeed.id } as any).catch((e) => console.error('[Folio.registrarCheckIn.folio] remoto fail:', e));
+      const folioFinalPayload = { ...folioData, id: folioSeed.id };
+      (async () => {
+        try {
+          await _remotoConQueue('add', KEY_FOLIO, folioSeed.id, folioFinalPayload, () =>
+            dbRemota.addAsync<Folio>(KEY_FOLIO, folioFinalPayload as any)
+          );
+        } catch (_) {}
+      })().catch(() => {});
 
       const montoCargoAlojamiento = Number((rh.totalNoches * (rh.precioBaseAcordadoPorNoche || 0)).toFixed(2));
       const divisor = 1.18;
@@ -442,7 +528,14 @@ export const FolioService = {
         updatedBy: userId,
       };
       const cargoCreado = db.add<CargoFolio>(KEY_CARGO, cargo as Create<CargoFolio>);
-      dbRemota.addAsync<CargoFolio>(KEY_CARGO, { ...cargo, id: cargoCreado.id } as any).catch((e) => console.error('[Folio.registrarCheckIn.cargo] remoto fail:', e));
+      const cargoFinalPayload = { ...cargo, id: cargoCreado.id };
+      (async () => {
+        try {
+          await _remotoConQueue('add', KEY_CARGO, cargoCreado.id, cargoFinalPayload, () =>
+            dbRemota.addAsync<CargoFolio>(KEY_CARGO, cargoFinalPayload as any)
+          );
+        } catch (_) {}
+      })().catch(() => {});
 
       if (params.pagoAdelantado && params.pagoAdelantado.monto && params.pagoAdelantado.monto > 0) {
         const pago: PagoFolio & any = {
@@ -478,7 +571,14 @@ export const FolioService = {
           updatedBy: userId,
         };
         const pagoCreado = db.add<PagoFolio>(KEY_PAGO, pago as Create<PagoFolio>);
-        dbRemota.addAsync<PagoFolio>(KEY_PAGO, { ...pago, id: pagoCreado.id } as any).catch((e) => console.error('[Folio.registrarCheckIn.pago] remoto fail:', e));
+        const pagoFinalPayload = { ...pago, id: pagoCreado.id };
+        (async () => {
+          try {
+            await _remotoConQueue('add', KEY_PAGO, pagoCreado.id, pagoFinalPayload, () =>
+              dbRemota.addAsync<PagoFolio>(KEY_PAGO, pagoFinalPayload as any)
+            );
+          } catch (_) {}
+        })().catch(() => {});
       }
 
       this.recalcularTotales(folioSeed.id, userId);
@@ -494,7 +594,16 @@ export const FolioService = {
           updatedAt: seedUtil.nowISO(),
         };
         const upd = db.update<Folio>(KEY_FOLIO, f.id, delta as unknown as Update<Folio>);
-        if (upd) dbRemota.updateAsync<Folio>(KEY_FOLIO, f.id, delta as any).catch((e) => console.error('[Folio.registrarCheckIn.compartidos] remoto fail:', e));
+        if (upd) {
+          const payloadDelta = { id: f.id, ...delta };
+          (async () => {
+            try {
+              await _remotoConQueue('update', KEY_FOLIO, f.id, payloadDelta, () =>
+                dbRemota.updateAsync<Folio>(KEY_FOLIO, f.id, delta as any)
+              );
+            } catch (_) {}
+          })().catch(() => {});
+        }
       }
     }
 
@@ -587,7 +696,14 @@ export const FolioService = {
       } as unknown as Update<Folio>;
       const cerrado = db.update<Folio>(KEY_FOLIO, f.id, delta);
       if (cerrado) {
-        dbRemota.updateAsync<Folio>(KEY_FOLIO, f.id, delta as any).catch((e) => console.error('[Folio.registrarCheckOut.cerrar] remoto fail:', e));
+        const payloadDelta = { id: f.id, ...delta };
+        (async () => {
+          try {
+            await _remotoConQueue('update', KEY_FOLIO, f.id, payloadDelta, () =>
+              dbRemota.updateAsync<Folio>(KEY_FOLIO, f.id, delta as any)
+            );
+          } catch (_) {}
+        })().catch(() => {});
         cerrados.push(this.buscarPorId(cerrado.id)!);
       } else if (cerrado === undefined && db.getById<Folio>(KEY_FOLIO, f.id)) {
         cerrados.push(this.buscarPorId(f.id)!);
@@ -689,21 +805,47 @@ export const FolioService = {
       updatedBy: userId,
     };
     const nuevo = db.add<Folio>(KEY_FOLIO, data as unknown as Create<Folio>);
-    dbRemota.addAsync<Folio>(KEY_FOLIO, { ...data, id: nuevo.id } as any).catch((e) => console.error('[Folio.abrir] remoto fail:', e));
+    const folioFinalPayload = { ...data, id: nuevo.id };
+    (async () => {
+      try {
+        await _remotoConQueue('add', KEY_FOLIO, nuevo.id, folioFinalPayload, () =>
+          dbRemota.addAsync<Folio>(KEY_FOLIO, folioFinalPayload as any)
+        );
+      } catch (_) {}
+    })().catch(() => {});
     return nuevo;
   },
 
   crear(params: Create<Folio>): Folio {
     const now = seedUtil.nowISO();
-    const payload: any = { createdAt: (params as any).createdAt || now, updatedAt: (params as any).updatedAt || now, createdBy: (params as any).createdBy || 'system-folio', updatedBy: (params as any).updatedBy || 'system-folio', ...params };
+    const idUnico = (params as any).id || seedUtil.generateUUID();
+    const usuarioOrigen = (params as any).createdBy || 'system-folio';
+    const payload: any = { id: idUnico, createdAt: (params as any).createdAt || now, updatedAt: (params as any).updatedAt || now, createdBy: usuarioOrigen, updatedBy: (params as any).updatedBy || usuarioOrigen, ...params };
     const nuevo = db.add<Folio>(KEY_FOLIO, payload);
-    dbRemota.addAsync<Folio>(KEY_FOLIO, { ...payload, id: nuevo.id } as any).catch((e) => console.error('[Folio.crear] remoto fail:', e));
+    const payloadFinal = { ...payload, id: nuevo.id };
+    (async () => {
+      try {
+        await _remotoConQueue('add', KEY_FOLIO, nuevo.id, payloadFinal, () =>
+          dbRemota.addAsync<Folio>(KEY_FOLIO, payloadFinal as any)
+        );
+      } catch (_) {}
+    })().catch(() => {});
     return nuevo;
   },
   actualizar(id: string, changes: Update<Folio>): Folio | undefined {
+    const usuarioOrigen = (changes as any).updatedBy || 'system-folio';
     const delta: any = { updatedAt: seedUtil.nowISO(), ...changes };
     const upd = db.update<Folio>(KEY_FOLIO, id, delta);
-    if (upd) dbRemota.updateAsync<Folio>(KEY_FOLIO, id, delta as any).catch((e) => console.error('[Folio.actualizar] remoto fail:', e));
+    if (upd) {
+      const payloadDelta = { id, ...delta };
+      (async () => {
+        try {
+          await _remotoConQueue('update', KEY_FOLIO, id, payloadDelta, () =>
+            dbRemota.updateAsync<Folio>(KEY_FOLIO, id, delta as any)
+          );
+        } catch (_) {}
+      })().catch(() => {});
+    }
     return upd;
   },
   reiniciarSeed(): void {

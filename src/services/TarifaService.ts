@@ -26,11 +26,11 @@ async function hidratarTarifasGroup(force = false): Promise<boolean> {
         dbRemota.allAsync<CodigoPromocional>(KEY_PROM),
         dbRemota.allAsync<Tarifa>(KEY_TAR),
       ]);
-      if (imps && imps.length) db.setAll<ImpuestoTarifa>(KEY_IMP, imps);
-      if (temps && temps.length) db.setAll<Temporada>(KEY_TEMP, temps);
-      if (pols && pols.length) db.setAll<PoliticaCancelacion>(KEY_POL, pols);
-      if (proms && proms.length) db.setAll<CodigoPromocional>(KEY_PROM, proms);
-      if (tars && tars.length) db.setAll<Tarifa>(KEY_TAR, tars);
+      if (imps && imps.length) db.upsertAll<ImpuestoTarifa>(KEY_IMP, imps);
+      if (temps && temps.length) db.upsertAll<Temporada>(KEY_TEMP, temps);
+      if (pols && pols.length) db.upsertAll<PoliticaCancelacion>(KEY_POL, pols);
+      if (proms && proms.length) db.upsertAll<CodigoPromocional>(KEY_PROM, proms);
+      if (tars && tars.length) db.upsertAll<Tarifa>(KEY_TAR, tars);
       _hidratado = true;
       return true;
     } catch (e) {

@@ -21,7 +21,7 @@ import HabitacionesPage from './pages/Habitaciones/Habitaciones';
 import PosPage from './pages/Pos/Pos';
 import PerfilPage from './pages/Perfil/Perfil';
 import FolioPage from './pages/Folio/Folio';
-import { HabitacionService, ReservaService, TarifaService, PosService, HuespedService, FolioService } from './services';
+import { HabitacionService, ReservaService, TarifaService, PosService, HuespedService, FolioService, pendingSync, seedProductos } from './services';
 
 setupIonicReact({
   mode: 'md',
@@ -175,6 +175,20 @@ const App: React.FC = () => {
       } catch (e) {
         dispatchHidratado('folios', false);
         if (!cancelled) console.warn('[App] Boot hidratación folios-group (no fatal):', (e as any)?.message || e);
+      }
+      // Iniciar worker de reintentos de sync pendiente (30s + listener window online).
+      try { pendingSync.initSyncWorker?.(); } catch (_e) {}
+      // Flush inicial de queue si quedaron ops de sesiones anteriores.
+      try { (async () => { try { const [ok, fail] = await pendingSync.processQueue?.(false) || [0,0,0]; (console.debug || console.log)(`[PendingSync] boot flush: ${ok} OK, ${fail} fallaron`); } catch (_e) {} })(); } catch (_) {}
+      // Seed inicial automático de catálogo productos/categorías/alérgenos si está vacío.
+      try {
+        const seed = seedProductos as any;
+        if (seed?.estaCatalogoVacio?.()) {
+          const res = seed.ensureSeedInicialCompleto?.(false) || {};
+          console.info('[SeedCatalogo] Boot seed inicial automático:', res);
+        }
+      } catch (e) {
+        console.warn('[SeedCatalogo] Seed inicial falló (no fatal):', (e as any)?.message || e);
       }
       dispatchHidratado('todos', true);
     })();

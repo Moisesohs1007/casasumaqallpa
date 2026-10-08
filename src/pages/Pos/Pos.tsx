@@ -12,7 +12,7 @@ import TomarComanda from '../../components/modals/TomarComanda';
 import PagoForm, { PagoFormValue } from '../../components/PagoForm';
 import { METODOS_PAGO_LISTA } from '../../types/etapa2';
 import { Mesa, Comanda, ProductoFB } from '../../types';
-import { MesaService, ComandaService } from '../../services';
+import { MesaService, ComandaService, CatalogoFBService, InventarioService, seedProductos } from '../../services';
 import './Pos.css';
 
 type EstadoMesaLabel = 'libre' | 'ocupada' | 'sucia';
@@ -42,48 +42,16 @@ const estadoComandaToLabel = (e: any): EstadoComandaLabel => {
   return 'abierta';
 };
 
-// ---------- Datos demo ----------
-const PRODUCTOS_STOCK_DEMO: Array<ProductoFB & { _stock?: number; _stockMin?: number; categoriaNombre?: string }> = [
-  { id: 'PROD-AGUA-MINERAL-1L', sku: 'BEB401', nombre: 'Agua Mineral 1L', categoriaId: 'CAT-BEBIDAS-FRIAS', categoriaNombre: 'Bebidas Frías', precioVentaBase: 5, moneda: 'PEN', impuesto: 'IGV', estadoProducto: 'ACTIVO', estado: 'ACTIVO', requierePreparacion: false, permiteInventarioNegativo: false, stockActual: 48, stockMinimo: 6, _stock: 48 } as any,
-  { id: 'PROD-AGUA-MINERAL-500ML', sku: 'BEB401B', nombre: 'Agua Mineral 500ml', categoriaId: 'CAT-BEBIDAS-FRIAS', categoriaNombre: 'Bebidas Frías', precioVentaBase: 3.5, moneda: 'PEN', impuesto: 'IGV', estadoProducto: 'ACTIVO', estado: 'ACTIVO', requierePreparacion: false, permiteInventarioNegativo: false, stockActual: 72, stockMinimo: 12, _stock: 72 } as any,
-  { id: 'PROD-GASEOSA-COCA-500ML', sku: 'BEB402A', nombre: 'Coca Cola 500ml', categoriaId: 'CAT-BEBIDAS-FRIAS', categoriaNombre: 'Bebidas Frías', precioVentaBase: 7, moneda: 'PEN', impuesto: 'IGV', estadoProducto: 'ACTIVO', estado: 'ACTIVO', requierePreparacion: false, permiteInventarioNegativo: false, stockActual: 24, stockMinimo: 6, _stock: 24 } as any,
-  { id: 'PROD-GASEOSA-INKA-500ML', sku: 'BEB402B', nombre: 'Inca Kola 500ml', categoriaId: 'CAT-BEBIDAS-FRIAS', categoriaNombre: 'Bebidas Frías', precioVentaBase: 7, moneda: 'PEN', impuesto: 'IGV', estadoProducto: 'ACTIVO', estado: 'ACTIVO', requierePreparacion: false, permiteInventarioNegativo: false, stockActual: 24, stockMinimo: 6, _stock: 24 } as any,
-  { id: 'PROD-GASEOSA-SPRITE-500ML', sku: 'BEB402C', nombre: 'Sprite 500ml', categoriaId: 'CAT-BEBIDAS-FRIAS', categoriaNombre: 'Bebidas Frías', precioVentaBase: 7, moneda: 'PEN', impuesto: 'IGV', estadoProducto: 'ACTIVO', estado: 'ACTIVO', requierePreparacion: false, permiteInventarioNegativo: false, stockActual: 12, stockMinimo: 4, _stock: 12 } as any,
-  { id: 'PROD-GATORADE', sku: 'BEB403', nombre: 'Gatorade 1L', categoriaId: 'CAT-BEBIDAS-FRIAS', categoriaNombre: 'Bebidas Frías', precioVentaBase: 8, moneda: 'PEN', impuesto: 'IGV', estadoProducto: 'ACTIVO', estado: 'ACTIVO', requierePreparacion: false, permiteInventarioNegativo: false, stockActual: 18, stockMinimo: 4, _stock: 18 } as any,
-  { id: 'PROD-CERVEZA-PILSEN-620ML', sku: 'BAR601A', nombre: 'Pilsen 620ml', categoriaId: 'CAT-BEBIDAS-ALCOHOL', categoriaNombre: 'Bar / Alcohol', precioVentaBase: 8, moneda: 'PEN', impuesto: 'IGV', estadoProducto: 'ACTIVO', estado: 'ACTIVO', requierePreparacion: false, permiteInventarioNegativo: false, stockActual: 36, stockMinimo: 6, _stock: 36 } as any,
-  { id: 'PROD-CERVEZA-CUSQUENA-620ML', sku: 'BAR601B', nombre: 'Cusqueña 620ml', categoriaId: 'CAT-BEBIDAS-ALCOHOL', categoriaNombre: 'Bar / Alcohol', precioVentaBase: 9, moneda: 'PEN', impuesto: 'IGV', estadoProducto: 'ACTIVO', estado: 'ACTIVO', requierePreparacion: false, permiteInventarioNegativo: false, stockActual: 24, stockMinimo: 6, _stock: 24 } as any,
-  { id: 'PROD-SNACK-GALLETA', sku: 'SNK-001', nombre: 'Snack / Galleta', categoriaId: 'CAT-BEBIDAS-FRIAS', categoriaNombre: 'Snacks / Extras', precioVentaBase: 3, moneda: 'PEN', impuesto: 'IGV', estadoProducto: 'ACTIVO', estado: 'ACTIVO', requierePreparacion: false, permiteInventarioNegativo: false, stockActual: 48, stockMinimo: 12, _stock: 48 } as any,
-  { id: 'PROD-EXTRA-TOALLA', sku: 'EXT-001', nombre: 'Toalla Extra', categoriaId: 'CAT-BEBIDAS-FRIAS', categoriaNombre: 'Snacks / Extras', precioVentaBase: 15, moneda: 'PEN', impuesto: 'IGV', estadoProducto: 'ACTIVO', estado: 'ACTIVO', requierePreparacion: false, permiteInventarioNegativo: false, stockActual: 20, stockMinimo: 5, _stock: 20 } as any,
-];
-
-// Carta alimentos preparados (sin stock estricto)
-const PRODUCTOS_CARTA_DEMO: any[] = [
-  { id: 'C-DESAY-AMER', nombre: 'Desayuno Americano', categoria: 'Desayunos', precio: 15, icon: '🥞' },
-  { id: 'C-DESAY-CONTI', nombre: 'Desayuno Continental', categoria: 'Desayunos', precio: 20, icon: '🍳' },
-  { id: 'C-DESAY-YUNGA', nombre: 'Desayuno Regional Yungaino', categoria: 'Desayunos', precio: 20, icon: '🌽' },
-  { id: 'C-JUG-PAPAYA', nombre: 'Jugo de Papaya', categoria: 'Jugos', precio: 6, icon: '🧃' },
-  { id: 'C-JUG-NARANJA', nombre: 'Jugo de Naranja', categoria: 'Jugos', precio: 7, icon: '🍊' },
-  { id: 'C-CAFE', nombre: 'Café Tostado', categoria: 'Bebidas Calientes', precio: 5, icon: '☕' },
-  { id: 'C-CAPPUCCINO', nombre: 'Cappuccino', categoria: 'Bebidas Calientes', precio: 8.5, icon: '☕' },
-  { id: 'C-INFUSION', nombre: 'Infusión (7 variedades)', categoria: 'Bebidas Calientes', precio: 3, icon: '🍵' },
-  { id: 'C-SW-QUESO', nombre: 'Sándwich Queso', categoria: 'Sándwiches', precio: 5, icon: '🥪' },
-  { id: 'C-SW-POLLO', nombre: 'Sándwich Pollo a la Plancha', categoria: 'Sándwiches', precio: 12, icon: '🥪' },
-  { id: 'C-ENS-PRINCESA', nombre: 'Ensalada Fresca (Palta)', categoria: 'Entradas', precio: 15, icon: '🥗' },
-  { id: 'C-PAPA-HUANCAINA', nombre: 'Papa a la Huancaína', categoria: 'Entradas', precio: 12, icon: '🥔' },
-  { id: 'C-PLATO-LOMO-SALTADO', nombre: 'Lomo Saltado', categoria: 'Platos Principales', precio: 30, icon: '🍲' },
-  { id: 'C-PLATO-TRUCHA-PLANCHA', nombre: 'Trucha a la Plancha', categoria: 'Platos Principales', precio: 30, icon: '🐟' },
-  { id: 'C-PLATO-POLLO-PLANCHA', nombre: 'Pollo a la Plancha', categoria: 'Platos Principales', precio: 28, icon: '🍗' },
-  { id: 'C-PIZZA-AMERICANA', nombre: 'Pizza Americana (Personal)', categoria: 'Pizzas', precio: 29, icon: '🍕' },
-  { id: 'C-POSTRE-ENSALADA-FRUTAS', nombre: 'Ensalada de Frutas', categoria: 'Postres', precio: 15, icon: '🍓' },
-  { id: 'C-POSTRE-HELADO', nombre: 'Helado 1 bola', categoria: 'Postres', precio: 7, icon: '🍨' },
-];
-
-const CATEGORIAS_CARTA = ['Desayunos', 'Jugos', 'Bebidas Calientes', 'Sándwiches', 'Entradas', 'Platos Principales', 'Pizzas', 'Postres'];
-
 // Helpers
 const fmtSoles = (n: number) => `S/ ${Number(n || 0).toFixed(2)}`;
 const uid = () => Math.random().toString(36).slice(2, 10).toUpperCase();
 const fechaHoy = () => new Date().toLocaleString('es-PE');
+const _planoStockProducto = (p: any): { stockControl: boolean; stockActual: number; stockMinimo: number } => {
+  const sC = typeof p?.stockControl === 'boolean' ? p.stockControl : (p?.payload?.stockControl ?? false);
+  const sA = typeof p?.stockActual === 'number' ? p.stockActual : Number(p?.payload?.stockActual ?? 0);
+  const sM = typeof p?.stockMinimo === 'number' ? p.stockMinimo : Number(p?.payload?.stockMinimo ?? 0);
+  return { stockControl: !!sC, stockActual: sA, stockMinimo: sM };
+};
 
 interface LineaVenta {
   id: string;
@@ -118,11 +86,11 @@ const PosPage: React.FC = () => {
   const [preHabitacionId, setPreHabitacionId] = useState<string | undefined>(undefined);
   const [preTipoConsumo, setPreTipoConsumo] = useState<'MESA' | 'CARGO_A_HABITACION' | undefined>(undefined);
   const [comandaAEditarId, setComandaAEditarId] = useState<string | undefined>(undefined);
+  const [refreshTick, setRefreshTick] = useState<number>(0);
 
   // ============== WALK-IN ==============
   const [categoriaCartaSel, setCategoriaCartaSel] = useState<string>('Todos');
   const [carrito, setCarrito] = useState<LineaVenta[]>([]);
-  const [prodStockLocal, setProdStockLocal] = useState(PRODUCTOS_STOCK_DEMO);
   const [clienteForm, setClienteForm] = useState({ nombre: 'Cliente Eventual', dni: '', telefono: '' });
   const [servExtraForm, setServExtraForm] = useState({ nombre: '', precio: 0, cantidad: 1, observaciones: '' });
   const [modalServExtra, setModalServExtra] = useState(false);
@@ -133,6 +101,101 @@ const PosPage: React.FC = () => {
   const [historial, setHistorial] = useState<VentaHistorialItem[]>([]);
   const [toast, setToast] = useState('');
   const mostrarToast = (t: string) => { setToast(t); setTimeout(() => setToast(''), 2200); };
+
+  // ===== DATOS DESDE CATÁLOGO OFICIAL (seed o Supabase) =====
+  const categoriasCartaList = useMemo(() => {
+    try {
+      const cats = (CatalogoFBService.listarCategorias?.() || []).filter(x => x.estado === 'ACTIVO' || x.estado === undefined).sort((a, b) => (a.orden ?? 0) - (b.orden ?? 0));
+      const nombres = cats.map(c => c.nombre);
+      const unicos = ['Todos', ...Array.from(new Set(nombres))];
+      return unicos;
+    } catch {
+      return ['Todos', 'Desayunos', 'Jugos', 'Bebidas Calientes', 'Sándwiches', 'Entradas', 'Platos Principales', 'Pizzas', 'Postres'];
+    }
+  }, [refreshTick]);
+
+  const catMapById = useMemo(() => {
+    try {
+      const cats = CatalogoFBService.listarCategorias?.() || [];
+      const map = new Map<string, any>();
+      for (const c of cats) map.set(c.id, c);
+      return map;
+    } catch { return new Map<string, any>(); }
+  }, [refreshTick]);
+
+  const productosTodos = useMemo(() => {
+    try {
+      let lista = (CatalogoFBService.listarProductos?.({ soloActivos: true }) || []) as any[];
+      if (!lista || lista.length === 0) {
+        const seed = seedProductos as any;
+        if (seed?.ensureSeedInicialCompleto) seed.ensureSeedInicialCompleto(false);
+        lista = (CatalogoFBService.listarProductos?.({ soloActivos: true }) || []) as any[];
+      }
+      return lista.map((p: any) => {
+        const plano = _planoStockProducto(p);
+        const cat = catMapById.get(p.categoriaId);
+        return {
+          id: p.id,
+          sku: p.codigo,
+          nombre: p.nombre,
+          descripcion: p.descripcion || '',
+          categoriaId: p.categoriaId,
+          categoriaNombre: cat?.nombre || 'Sin categoría',
+          precioVentaBase: Number(p.precioVentaBase || 0),
+          moneda: 'PEN',
+          impuesto: 'IGV',
+          estadoProducto: p.estado || 'ACTIVO',
+          estado: p.estado || 'ACTIVO',
+          requierePreparacion: !plano.stockControl,
+          permiteInventarioNegativo: false,
+          stockActual: plano.stockActual,
+          stockMinimo: plano.stockMinimo,
+          stockControl: plano.stockControl,
+          orden: p.orden ?? 0,
+          _stock: plano.stockActual,
+          _stockMin: plano.stockMinimo,
+        } as unknown as (ProductoFB & { _stock?: number; _stockMin?: number; categoriaNombre?: string; stockControl?: boolean; orden?: number });
+      }).sort((a, b) => ((a as any).orden ?? 0) - ((b as any).orden ?? 0));
+    } catch {
+      return [] as any[];
+    }
+  }, [refreshTick, catMapById]);
+
+  const productosConStock = useMemo(
+    () => productosTodos.filter(p => !!p.stockControl && (p as any).estado !== 'INACTIVO'),
+    [productosTodos]
+  );
+
+  const productosCarta = useMemo(
+    () => productosTodos.filter(p => !p.stockControl && (p as any).estado !== 'INACTIVO'),
+    [productosTodos]
+  );
+
+  const cantidadesCarritoPorProducto = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const l of carrito) {
+      if (l.tipo === 'STOCK' && l.productoId) {
+        map.set(l.productoId, (map.get(l.productoId) || 0) + Number(l.cantidad || 0));
+      }
+    }
+    return map;
+  }, [carrito]);
+
+  const productosConStockFiltradosVisual = useMemo(() => {
+    return productosConStock.map(p => {
+      const reservado = cantidadesCarritoPorProducto.get(p.id) || 0;
+      return {
+        ...p,
+        _stock: Math.max(0, Number((p as any)._stock ?? 0) - reservado),
+        _reservadoEnCarrito: reservado,
+      };
+    });
+  }, [productosConStock, cantidadesCarritoPorProducto]);
+
+  const productosCartaFiltradosPorCat = useMemo(() => {
+    if (categoriaCartaSel === 'Todos') return productosCarta;
+    return productosCarta.filter(p => (p as any).categoriaNombre === categoriaCartaSel);
+  }, [productosCarta, categoriaCartaSel]);
 
   const openNuevoRoomService = () => {
     setPreMesaId(undefined); setPreHabitacionId(undefined); setPreTipoConsumo('MESA');
@@ -179,19 +242,19 @@ const PosPage: React.FC = () => {
   useIonViewWillEnter(() => { cargar(); });
 
   // --- Cart helpers ---
-  const agregarCarta = (p: typeof PRODUCTOS_CARTA_DEMO[number]) => {
+  const agregarCarta = (p: any) => {
     setCarrito(c => {
       const existente = c.find(l => l.productoId === p.id);
       if (existente) return c.map(l => l.id === existente.id ? { ...l, cantidad: l.cantidad + 1 } : l);
-      return [...c, { id: uid(), tipo: 'CARTA', productoId: p.id, nombre: p.nombre, cantidad: 1, precioUnit: p.precio, icon: p.icon }];
+      const icono = p.stockControl ? '🥤' : '🍽️';
+      return [...c, { id: uid(), tipo: 'CARTA', productoId: p.id, nombre: p.nombre, cantidad: 1, precioUnit: Number(p.precioVentaBase || p.precio || 0), icon: icono }];
     });
   };
-  const agregarStock = (p: typeof PRODUCTOS_STOCK_DEMO[number]) => {
-    const stk = Number(p._stock ?? 0);
-    if (stk <= 0 && !p.permiteInventarioNegativo) { mostrarToast(`${p.nombre}: sin stock disponible`); return; }
-    setProdStockLocal(ps => ps.map(x => x.id === p.id ? { ...x, _stock: Math.max(0, Number(x._stock ?? 0) - 1) } : x));
+  const agregarStock = (p: any) => {
+    const stkReal = Number((p as any)._stock ?? 0);
+    if (stkReal <= 0 && !(p as any).permiteInventarioNegativo) { mostrarToast(`${p.nombre}: sin stock disponible`); return; }
     setCarrito(c => {
-      const existente = c.find(l => l.productoId === p.id);
+      const existente = c.find(l => l.productoId === p.id && l.tipo === 'STOCK');
       if (existente) return c.map(l => l.id === existente.id ? { ...l, cantidad: l.cantidad + 1 } : l);
       return [...c, { id: uid(), tipo: 'STOCK', productoId: p.id, nombre: p.nombre, cantidad: 1, precioUnit: Number(p.precioVentaBase || 0) }];
     });
@@ -202,20 +265,14 @@ const PosPage: React.FC = () => {
       if (!linea) return c;
       const nuevaCant = linea.cantidad + delta;
       if (nuevaCant <= 0) {
-        // si era stock, devolvemos el stock
-        if (linea.tipo === 'STOCK' && linea.productoId) {
-          setProdStockLocal(ps => ps.map(p => p.id === linea.productoId ? { ...p, _stock: Number(p._stock ?? 0) + linea.cantidad } : p));
-        }
         return c.filter(l => l.id !== id);
       }
-      // si es stock y aumentamos, validar
+      // Validar stock si es stock + delta > 0 (pedimos más)
       if (delta > 0 && linea.tipo === 'STOCK' && linea.productoId) {
-        const p = prodStockLocal.find(pp => pp.id === linea.productoId);
-        if (p && !p.permiteInventarioNegativo && Number(p._stock ?? 0) <= 0) { mostrarToast(`${p.nombre}: sin stock`); return c; }
-        if (p && !p.permiteInventarioNegativo) setProdStockLocal(ps => ps.map(pp => pp.id === linea.productoId ? { ...pp, _stock: Math.max(0, Number(pp._stock ?? 0) - 1) } : pp));
-      }
-      if (delta < 0 && linea.tipo === 'STOCK' && linea.productoId) {
-        setProdStockLocal(ps => ps.map(pp => pp.id === linea.productoId ? { ...pp, _stock: Number(pp._stock ?? 0) + 1 } : pp));
+        const p = productosConStockFiltradosVisual.find(pp => pp.id === linea.productoId);
+        if (p && !p.permiteInventarioNegativo && Number((p as any)._stock ?? 0) <= 0) {
+          mostrarToast(`${p.nombre}: sin stock`); return c;
+        }
       }
       return c.map(l => l.id === id ? { ...l, cantidad: nuevaCant } : l);
     });
@@ -254,8 +311,29 @@ const PosPage: React.FC = () => {
 
   const confirmarVenta = () => {
     if (!pagoForm || Number(pagoForm.monto) <= 0) { mostrarToast('Monto inválido'); return; }
+    const idVenta = 'V-' + Date.now().toString().slice(-6);
+    // PACK D: Aplicar movimiento de inventario real (no cancelable después de cobrar)
+    try {
+      for (const l of carrito) {
+        if (l.tipo === 'STOCK' && l.productoId && Number(l.cantidad || 0) > 0) {
+          InventarioService.moverStockProducto(
+            l.productoId,
+            -Number(l.cantidad || 0),
+            `Venta walk-in cobrada ${idVenta}`,
+            'usr-walkin',
+            {
+              referenciaId: idVenta,
+              referenciaTipo: 'VENTA_WALKIN_COBRADA',
+              bloquearNegativo: false,
+            }
+          );
+        }
+      }
+    } catch (e) {
+      console.warn('[Pos.walkin.confirmarVenta] moverStock warn (no bloquea cobro):', (e as Error).message || e);
+    }
     const nuevaVenta: VentaHistorialItem = {
-      id: 'V-' + Date.now().toString().slice(-6),
+      id: idVenta,
       fecha: fechaHoy(),
       cliente: clienteForm.nombre?.trim() || 'Cliente Eventual',
       lineas: JSON.parse(JSON.stringify(carrito)),
@@ -270,6 +348,7 @@ const PosPage: React.FC = () => {
     setCarrito([]);
     setClienteForm({ ...clienteForm, dni: '', telefono: '' });
     setModalCobrar(false);
+    setRefreshTick(t => t + 1);
     mostrarToast('✅ Venta cobrada exitosamente');
     setTimeout(() => { setModalNotaVenta(nuevaVenta); }, 300);
   };
@@ -282,7 +361,7 @@ const PosPage: React.FC = () => {
   };
 
   // ========== Categorias memo ==========
-  const categoriasCartaFull = useMemo(() => ['Todos', ...CATEGORIAS_CARTA], []);
+  const categoriasCartaFull = useMemo(() => categoriasCartaList, [categoriasCartaList]);
 
   // ============ RENDER ============
   return (
@@ -345,19 +424,19 @@ const PosPage: React.FC = () => {
                 <div className="seccion-prod">
                   <h4 className="tit-seccion">🥤 Productos con Stock (bebidas / snacks / extras)</h4>
                   <div className="grid-prod-sm">
-                    {prodStockLocal.filter(p => p.estadoProducto !== 'INACTIVO' && p.estadoProducto !== 'DESCONTINUADO').map(p => {
-                      const stk = Number(p._stock ?? 0);
-                      const min = Number(p._stockMin ?? p.stockMinimo ?? 0);
+                    {productosConStockFiltradosVisual.filter(p => (p as any).estadoProducto !== 'INACTIVO' && (p as any).estadoProducto !== 'DESCONTINUADO').map(p => {
+                      const stk = Number((p as any)._stock ?? 0);
+                      const min = Number((p as any)._stockMin ?? (p as any).stockMinimo ?? 0);
                       const agotado = stk <= 0;
                       const bajo = stk <= min;
                       return (
                         <IonCard className={`prod-card ${agotado ? 'prod-agotado' : ''}`} key={p.id} button onClick={() => agregarStock(p)}>
                           <IonCardContent style={{ padding: '10px 10px 12px 10px' }}>
                             <div style={{ fontWeight: 700, fontSize: 14, lineHeight: 1.1, minHeight: 36 }}>{p.nombre}</div>
-                            <div style={{ fontSize: 11, opacity: 0.85, margin: '3px 0 8px 0' }}>{p.categoriaNombre || 'General'} · Disp: <b>{stk}</b></div>
+                            <div style={{ fontSize: 11, opacity: 0.85, margin: '3px 0 8px 0' }}>{(p as any).categoriaNombre || 'General'} · Disp: <b>{stk}</b></div>
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
                               <div style={{ fontSize: 11, color: agotado ? '#dc2626' : (bajo ? '#d97706' : 'inherit') }}>{agotado ? '⛔ AGOTADO' : (bajo ? '⚠️ STOCK BAJO' : '')}</div>
-                              <div style={{ fontWeight: 900, fontSize: 17 }}>{fmtSoles(Number(p.precioVentaBase || 0))}</div>
+                              <div style={{ fontWeight: 900, fontSize: 17 }}>{fmtSoles(Number((p as any).precioVentaBase || 0))}</div>
                             </div>
                           </IonCardContent>
                         </IonCard>
@@ -370,21 +449,20 @@ const PosPage: React.FC = () => {
                 <div className="seccion-prod">
                   <h4 className="tit-seccion">🍽️ Carta · Alimentos preparados</h4>
                   {(() => {
-                    const lista = categoriaCartaSel === 'Todos'
-                      ? PRODUCTOS_CARTA_DEMO
-                      : PRODUCTOS_CARTA_DEMO.filter(p => p.categoria === categoriaCartaSel);
+                    const lista = productosCartaFiltradosPorCat;
+                    if (!lista || lista.length === 0) return <IonNote color="warning" style={{padding:'12px', display:'block'}}>No hay productos en esta categoría.</IonNote>;
                     return (
                       <div className="grid-prod-md">
                         {lista.map(p => (
                           <IonCard className="prod-card" key={p.id} button onClick={() => agregarCarta(p)}>
                             <IonCardContent style={{ padding: '10px 10px 12px 10px' }}>
                               <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
-                                <div style={{ fontSize: 24 }}>{p.icon || '🍴'}</div>
+                                <div style={{ fontSize: 24 }}>{(p as any).requierePreparacion === false ? '🥤' : '🍴'}</div>
                                 <div style={{ flex: 1, minWidth: 0 }}>
                                   <div style={{ fontWeight: 800, fontSize: 14 }}>{p.nombre}</div>
-                                  <div style={{ fontSize: 11, opacity: 0.8, marginTop: 2 }}>{p.categoria}</div>
+                                  <div style={{ fontSize: 11, opacity: 0.8, marginTop: 2 }}>{(p as any).categoriaNombre || 'Carta'}</div>
                                 </div>
-                                <div style={{ fontWeight: 900, fontSize: 17, whiteSpace: 'nowrap' }}>{fmtSoles(p.precio)}</div>
+                                <div style={{ fontWeight: 900, fontSize: 17, whiteSpace: 'nowrap' }}>{fmtSoles(Number((p as any).precioVentaBase || 0))}</div>
                               </div>
                             </IonCardContent>
                           </IonCard>

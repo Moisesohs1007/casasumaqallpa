@@ -1,17 +1,18 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import {
   IonBackButton, IonButton, IonButtons, IonCard, IonCardContent, IonCardHeader, IonCardSubtitle,
   IonCardTitle, IonCol, IonContent, IonDatetime, IonGrid, IonHeader, IonIcon, IonInput,
   IonItem, IonLabel, IonList, IonNote, IonPage, IonRow, IonSelect, IonSelectOption,
-  IonTitle, IonToolbar, IonAlert, IonTextarea, IonChip, IonBadge, useIonViewWillEnter,
+  IonTitle, IonToolbar, IonAlert, IonTextarea, IonChip, IonBadge, IonToast, useIonViewWillEnter,
 } from '@ionic/react';
-import { addCircle, addCircleOutline, arrowForwardOutline, checkmark, closeOutline, bed, checkmarkDone, person, cash, ticket, calendar, time, documentText, pricetags, checkmarkCircle, alertCircle, arrowBackOutline } from 'ionicons/icons';
+import { addCircle, addCircleOutline, arrowForwardOutline, checkmark, closeOutline, bed, checkmarkDone, person, cash, ticket, calendar, time, documentText, pricetags, checkmarkCircle, alertCircle, arrowBackOutline, cloudOfflineOutline, cloudOutline, cloudDoneOutline } from 'ionicons/icons';
 
 import {
   HuespedService,
   HabitacionService,
   ReservaService,
   TarifaService,
+  pendingSync,
 } from '../../services';
 
 import type {
@@ -207,6 +208,30 @@ const NuevaReserva: React.FC = () => {
   const [reservaCreada, setReservaCreada] = useState<Reserva | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [creandoReserva, setCreandoReserva] = useState(false);
+  type SyncStatus = 'IDLE' | 'SAVING_CLOUD' | 'SYNCED' | 'PENDING';
+  const [syncStatus, setSyncStatus] = useState<SyncStatus>('IDLE');
+  const [syncErrorMsg, setSyncErrorMsg] = useState<string | null>(null);
+  const [toastVisible, setToastVisible] = useState(false);
+  const [toastMsg, setToastMsg] = useState('');
+  const [toastColor, setToastColor] = useState<'success' | 'warning' | 'danger' | 'primary'>('primary');
+
+  // Evitar salir/cerrar pestaña si hay reservas pendientes de sincronizar
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const handler = (ev: BeforeUnloadEvent): string | undefined => {
+      const pendientes = pendingSync.countPendientes?.() || 0;
+      if (syncStatus === 'SAVING_CLOUD' || pendientes > 0) {
+        const m = pendientes > 0
+          ? `Hay ${pendientes} cambios SIN SINCRONIZAR con la nube. Si cierras ahora, se reintentará en la próxima apertura. ¿Continuar?`
+          : 'Se está guardando la reserva en la nube en este momento. Si cierras ahora podría no guardarse. ¿Continuar?';
+        try { (ev as any).returnValue = m; } catch (_) {}
+        return m;
+      }
+      return undefined;
+    };
+    window.addEventListener('beforeunload', handler);
+    return () => { window.removeEventListener('beforeunload', handler); };
+  }, [syncStatus]);
 
   // ===== Acciones Paso 1 =====
   const doBuscarPorDoc = () => {
@@ -333,17 +358,19 @@ const NuevaReserva: React.FC = () => {
   };
 
   // ===== Paso 4: Crear =====
-  const doCrearReserva = () => {
+  const doCrearReserva = async () => {
     setErrorMsg(null);
-    if (creandoReserva) { return; } // Protección doble submit
-    if (!!reservaCreada) { return; } // Ya se creó, evitar re-crear si clickea otra vez
+    if (creandoReserva) { return; }
+    if (!!reservaCreada) { return; }
     if (!huespedFinal) { setErrorMsg('Paso 1: Selecciona o crea un huésped.'); return; }
     if (!habitacionSeleccionada || noches < 1) { setErrorMsg('Paso 2: Selecciona fechas válidas y una habitación.'); return; }
     if (!resumenTarifa) { setErrorMsg('Paso 3: Calcula tarifa antes de confirmar.'); return; }
+    setSyncStatus('SAVING_CLOUD');
+    setSyncErrorMsg(null);
     setCreandoReserva(true);
     const tipoHabitacion = HabitacionService.listarTipos().find((t) => t.id === habitacionSeleccionada.tipoHabitacionId)!;
     try {
-      const nueva = ReservaService.crear({
+      const payloadCreacion = {
         codigoReserva: '',
         huespedId: huespedFinal.id,
         huesped: huespedFinal,
@@ -449,12 +476,28 @@ const NuevaReserva: React.FC = () => {
         createdAt: seedUtil.nowISO(),
         updatedAt: seedUtil.nowISO(),
         usuarioResponsableId: 'USR-MOISES-0001',
-      } as any);
-      setReservaCreada(nueva);
-      // Dejar disabled un rato para evitar doble click lento (aunque idempotency ya lo protege)
-      window.setTimeout(() => setCreandoReserva(false), 1500);
+      } as any;
+
+      // ReservaService.crear() REMOTO PRIMERO (await, timeout 4s) → retorna syncStatus _syncStatus: 'SYNCED' | 'PENDING'
+      const nuevaResult: any = await ReservaService.crear(payloadCreacion);
+      const finalSync: 'SYNCED' | 'PENDING' = (nuevaResult?._syncStatus === 'SYNCED' ? 'SYNCED' : 'PENDING');
+      setSyncStatus(finalSync);
+      if (nuevaResult?._syncErrorMsg && finalSync === 'PENDING') setSyncErrorMsg(nuevaResult._syncErrorMsg);
+      setReservaCreada(nuevaResult);
+      setToastColor(finalSync === 'SYNCED' ? 'success' : 'warning');
+      setToastMsg(
+        finalSync === 'SYNCED'
+          ? `✅ Reserva ${nuevaResult?.codigoReserva || ''} creada y sincronizada correctamente.`
+          : `⚠️ Reserva creada LOCALMENTE. Se reintentará sincronizar cada 30s (error: ${nuevaResult?._syncErrorMsg || 'sin conexión'}).`
+      );
+      setToastVisible(true);
+      setTimeout(() => setCreandoReserva(false), 2000);
     } catch (e: any) {
       setErrorMsg(e.message || 'Error al crear la reserva.');
+      setSyncStatus('IDLE');
+      setToastColor('danger');
+      setToastMsg(`❌ Error al crear la reserva: ${e?.message || 'Error desconocido'}`);
+      setToastVisible(true);
       setCreandoReserva(false);
     }
   };
@@ -993,10 +1036,34 @@ const NuevaReserva: React.FC = () => {
                           <IonItem><IonLabel>Origen</IonLabel><IonLabel slot="end"><IonBadge>{origen}</IonBadge></IonLabel></IonItem>
                           <IonItem lines="none"><IonLabel style={{ fontSize: 20 }}><b>TOTAL</b></IonLabel><IonLabel slot="end" color="primary" style={{ fontSize: 22 }}><b>S/ {Number(resumenTarifa?.totalFinal || 0).toFixed(2)}</b></IonLabel></IonItem>
                         </IonList>
-                        <IonButton expand="block" color="primary" size="large" onClick={doCrearReserva} disabled={creandoReserva || !!reservaCreada} style={{ marginTop: 12 }}>
-                          <IonIcon icon={checkmarkDone} slot="start" />
-                          {creandoReserva ? 'CREANDO...' : !!reservaCreada ? 'RESERVA CREADA ✓' : 'CREAR RESERVA'}
+                        <IonButton
+                          expand="block"
+                          color={syncStatus === 'SYNCED' ? 'success' : syncStatus === 'PENDING' ? 'warning' : syncStatus === 'SAVING_CLOUD' ? 'primary' : 'primary'}
+                          size="large"
+                          onClick={doCrearReserva as any}
+                          disabled={creandoReserva || !!reservaCreada}
+                          style={{ marginTop: 12 }}
+                        >
+                          <IonIcon
+                            slot="start"
+                            icon={syncStatus === 'SYNCED' ? cloudDoneOutline : syncStatus === 'PENDING' ? cloudOfflineOutline : syncStatus === 'SAVING_CLOUD' ? cloudOutline : checkmarkDone}
+                          />
+                          {syncStatus === 'SAVING_CLOUD'
+                            ? '💾 GUARDANDO EN NUBE...'
+                            : (!!reservaCreada && syncStatus === 'SYNCED')
+                            ? '✅ RESERVA CREADA Y SINCRONIZADA'
+                            : (!!reservaCreada && syncStatus === 'PENDING')
+                            ? '⚠️ CREADA (SINCRONIZACIÓN PENDIENTE)'
+                            : 'CREAR RESERVA'}
                         </IonButton>
+                        {(syncStatus === 'PENDING' || (reservaCreada && (reservaCreada as any)._syncStatus === 'PENDING')) && (
+                          <IonChip color="warning" outline style={{ marginTop: 8 }}>
+                            <IonIcon icon={cloudOfflineOutline} />
+                            <IonLabel>
+                              Pendiente sincronización (cada 30s) — {syncErrorMsg || (reservaCreada as any)?._syncErrorMsg || 'reintentando...'}
+                            </IonLabel>
+                          </IonChip>
+                        )}
                       </IonCardContent>
                     </IonCard>
                   </IonCol>
@@ -1032,6 +1099,13 @@ const NuevaReserva: React.FC = () => {
           </>
         )}
       </IonContent>
+      <IonToast
+        isOpen={toastVisible}
+        message={toastMsg}
+        color={toastColor}
+        duration={4000}
+        onDidDismiss={() => setToastVisible(false)}
+      />
     </IonPage>
   );
 };

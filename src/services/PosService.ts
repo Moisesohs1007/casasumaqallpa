@@ -28,7 +28,7 @@ async function _hidratarDesdeSupabasePos(force = false): Promise<boolean> {
       POS_KEYS_HIDRATAR.forEach((k, idx) => {
         const rows = resultados[idx];
         if (Array.isArray(rows) && rows.length > 0) {
-          try { db.setAll(k, rows); } catch (e) { console.warn('[PosService.hidratar] setAll fail key=', k, e); }
+          try { db.upsertAll<any>(k, rows, { matchKey: 'id' }); } catch (e) { console.warn('[PosService.hidratar] upsertAll fail key=', k, e); }
         }
       });
       _hidratadoPos = true;

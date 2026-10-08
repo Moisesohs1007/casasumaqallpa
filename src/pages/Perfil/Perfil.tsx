@@ -40,7 +40,7 @@ import {
   informationCircle, documentText, barcode, cash, people,
 } from 'ionicons/icons';
 import { Usuario, Rol, RolUsuario, ModuloPermiso, Moneda, AuditFields, Habitacion, TipoHabitacion, EstadoHabitacion } from '../../types';
-import { HabitacionService, CatalogoFBService, InventarioService, type MoverStockResult } from '../../services';
+import { HabitacionService, CatalogoFBService, InventarioService, seedProductos, type MoverStockResult } from '../../services';
 import './Perfil.css';
 
 const nowIso = new Date().toISOString();
@@ -247,6 +247,20 @@ const PerfilPage: React.FC = () => {
   };
 
   // ==================== STOCK / PRODUCTOS FUNCIONES ====================
+  const cargarSeedInicial = async (forzar = false) => {
+    try {
+      mostrarToast('🤖 Cargando catálogo oficial Casa Sumaq Allpa (120 productos)...');
+      const res = await (seedProductos as any).ensureSeedInicialCompleto?.(forzar);
+      cargarCatProd();
+      if (res?.total) {
+        mostrarToast(`✅ Catálogo cargado: ${res.categoriasCreadas || 0} categorías · ${res.productosCreados || 0} productos · ${res.alergenosCreados || 0} alérgenos`);
+      } else {
+        mostrarToast('✅ Catálogo listo.');
+      }
+    } catch (e: any) {
+      mostrarToast(e?.message || 'Error al cargar el catálogo inicial.');
+    }
+  };
   const cargarCatProd = () => {
     try { setCategoriasFB(CatalogoFBService.listarCategorias() || []); } catch { setCategoriasFB([]); }
     try { setProductosFB(CatalogoFBService.listarProductos({ soloActivos: false }) || []); } catch { setProductosFB([]); }
@@ -779,17 +793,32 @@ const PerfilPage: React.FC = () => {
                       {busqProd || filtroCatId ? 'Sin resultados' : 'No hay productos'}
                     </div>
                     <div className="empty-state-text">
-                      {categoriasFB.length === 0
-                        ? 'Crea primero una categoría y luego productos.'
-                        : busqProd || filtroCatId
-                          ? 'Cambia los filtros o limpia la búsqueda.'
-                          : 'Usa el botón "+ Producto" para agregar el primero.'}
+                      {categoriasFB.length === 0 && !busqProd && !filtroCatId
+                        ? 'El catálogo se encuentra vacío. Puedes cargar el menú oficial de Casa Sumaq Allpa (120 productos, 12 categorías) o crear productos manualmente.'
+                        : categoriasFB.length === 0
+                          ? 'Crea primero una categoría y luego productos.'
+                          : busqProd || filtroCatId
+                            ? 'Cambia los filtros o limpia la búsqueda.'
+                            : 'Usa el botón "+ Producto" para agregar el primero.'}
                     </div>
-                    {categoriasFB.length > 0 && !busqProd && !filtroCatId && (
-                      <IonButton color="success" className="mt-xl" onClick={abrirNuevoProd}>
-                        <IonIcon slot="start" icon={add} />
-                        Crear primer producto
-                      </IonButton>
+                    {!busqProd && !filtroCatId && (
+                      categoriasFB.length === 0 && productosFB.length === 0 ? (
+                        <div style={{display:'flex', gap:8, flexWrap:'wrap', justifyContent:'center', marginTop:8}}>
+                          <IonButton color="tertiary" className="mt-xl" onClick={() => cargarSeedInicial(false)}>
+                            <IonIcon slot="start" icon={restaurant} />
+                            🤖 Cargar menú oficial · 120 productos
+                          </IonButton>
+                          <IonButton color="medium" fill="outline" className="mt-xl" onClick={abrirNuevoProd}>
+                            <IonIcon slot="start" icon={add} />
+                            Crear manualmente
+                          </IonButton>
+                        </div>
+                      ) : categoriasFB.length > 0 ? (
+                        <IonButton color="success" className="mt-xl" onClick={abrirNuevoProd}>
+                          <IonIcon slot="start" icon={add} />
+                          Crear primer producto
+                        </IonButton>
+                      ) : null
                     )}
                   </div>
                 ) : (
@@ -1697,7 +1726,19 @@ const PerfilPage: React.FC = () => {
                   <div className="empty-state">
                     <IonIcon icon={fileTray} className="empty-state-icon" />
                     <div className="empty-state-title">No hay productos creados</div>
-                    <div className="empty-state-text">Crea primero productos desde el botón "+ Producto".</div>
+                    <div className="empty-state-text">
+                      {categoriasFB.length === 0
+                        ? 'El catálogo se encuentra vacío. Carga el menú oficial Casa Sumaq Allpa (120 productos) o crea productos manualmente.'
+                        : 'Crea primero productos desde el botón "+ Producto" en la sección de Gestión.'}
+                    </div>
+                    {categoriasFB.length === 0 && (
+                      <div style={{display:'flex', gap:8, flexWrap:'wrap', justifyContent:'center', marginTop:8}}>
+                        <IonButton color="tertiary" className="mt-xl" onClick={() => { setModalStockGlobalAbierto(false); cargarSeedInicial(false); window.setTimeout(()=>setModalStockGlobalAbierto(true), 600); }}>
+                          <IonIcon slot="start" icon={restaurant} />
+                          🤖 Cargar menú oficial · 120 productos
+                        </IonButton>
+                      </div>
+                    )}
                   </div>
                 );
               }

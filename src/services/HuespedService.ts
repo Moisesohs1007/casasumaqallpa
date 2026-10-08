@@ -1,6 +1,7 @@
 // @ts-nocheck
-import { db, type Create, type Update, type Huesped } from './__db__';
+import { db, seedUtil, type Create, type Update, type Huesped } from './__db__';
 import { db as dbRemota } from './__supabase_db__';
+import * as pendingSync from './__pending_sync__';
 
 const KEY = 'huespedes' as const;
 
@@ -16,7 +17,8 @@ export const HuespedService = {
       try {
         const rows = await dbRemota.allAsync<Huesped>(KEY);
         if (rows && rows.length) {
-          db.setAll<Huesped>(KEY, rows);
+          const [ins, upd] = db.upsertAll<Huesped>(KEY, rows, { matchKey: 'id' });
+          (console.debug || console.log)(`[HuespedService] hidratar upsert: +${ins} nuevos / ~${upd} actualizados. [preserva pendientes]`);
         }
         _hidratado = true;
         return true;
@@ -64,18 +66,38 @@ export const HuespedService = {
       (data.nombreCompleto || '').trim() || `${data.nombres || ''} ${data.apellidos || ''}`.trim();
     const params: any = {
       ...payload,
+      id: (payload as any).id || seedUtil ? (seedUtil as any).generateUUID() : (payload as any).id,
       nombreCompleto,
       totalVisitas: (data.totalVisitas ?? 0) + 1,
       fechaPrimeraEstadia: data.fechaPrimeraEstadia || new Date().toISOString(),
       fechaUltimaEstadia: data.fechaUltimaEstadia || new Date().toISOString(),
     };
-    const nueva = db.add<Huesped>(KEY, params);
-    dbRemota.addAsync<Huesped>(KEY, params).then((remota: any) => {
-      if (remota && remota.id && remota.id !== nueva.id) {
-        try { db.update(KEY, nueva.id, { ...remota }); } catch (_e) {}
-      }
-    }).catch((e) => console.error('[HuespedService] crear remoto:', e));
-    return nueva;
+    if (!params.id) {
+      try { params.id = ((globalThis as any).crypto ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`); } catch (_) { params.id = `huesped-${Date.now()}-${Math.floor(Math.random() * 9999)}`; }
+    }
+
+    // Remoto primero await (timeout 3.5s) + fallback queue persistente
+    if (dbRemota && typeof (dbRemota as any).isOnline === 'function' && (dbRemota as any).isOnline()) {
+      (async () => {
+        try {
+          const remotoPromise = (dbRemota as any).addAsync<Huesped>(KEY, { ...params });
+          const timeout = new Promise<any>((_, rj) => setTimeout(() => rj(new Error('TIMEOUT_3500')), 3500));
+          const remota = await Promise.race([remotoPromise, timeout]);
+          if (remota && remota.id && remota.id !== params.id) {
+            try { db.update(KEY, params.id, { ...remota }); } catch (_e) {}
+          }
+          try { pendingSync.getPendientes(KEY).filter(o => o.matchId === params.id).forEach(o => pendingSync.removerOp(o.id)); } catch (_) {}
+        } catch (e: any) {
+          pendingSync.enqueue(KEY, 'add', params.id, { ...params });
+        }
+      })();
+    } else {
+      pendingSync.enqueue(KEY, 'add', params.id, { ...params });
+    }
+
+    const existente = db.getById<Huesped>(KEY, params.id);
+    const nueva: Huesped = existente || db.add<Huesped>(KEY, params as unknown as Create<Huesped>);
+    return (nueva as any);
   },
 
   actualizar(id: string, changes: Update<Huesped>): Huesped | undefined {
@@ -88,7 +110,21 @@ export const HuespedService = {
     }
     const actualizado = db.update<Huesped>(KEY, id, changes);
     if (actualizado) {
-      dbRemota.updateAsync<Huesped>(KEY, id, changes).catch((e) => console.error('[HuespedService] actualizar remoto:', e));
+      // Remoto non-blocking + queue persistente si falla
+      (async () => {
+        try {
+          if (!dbRemota || !((dbRemota as any)?.isOnline?.())) {
+            pendingSync.enqueue(KEY, 'update', id, changes as any);
+            return;
+          }
+          const prom = (dbRemota as any).updateAsync<Huesped>(KEY, id, changes);
+          const to = new Promise<any>((_, rj) => setTimeout(() => rj(new Error('TIMEOUT_UPDATE_3500')), 3500));
+          await Promise.race([prom, to]);
+          try { pendingSync.getPendientes(KEY).filter(o => o.matchId === id && o.method === 'update').forEach(o => pendingSync.removerOp(o.id)); } catch (_) {}
+        } catch (e: any) {
+          pendingSync.enqueue(KEY, 'update', id, changes as any);
+        }
+      })();
     }
     return actualizado;
   },

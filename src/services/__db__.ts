@@ -139,6 +139,60 @@ class InMemoryDB {
     return 0;
   }
 
+  /**
+   * Merge NON-DESTRUCTIVE (upsert) rows remotas dentro del InMemoryDB.
+   * - Actualiza fila existente si `matchKey` coincide, eligiendo la que tenga updatedAt MAYOR (más actual).
+   * - Inserta filas nuevas que NO existan en local.
+   * - PRESERVA 100% filas locales que NO existen en rows[] (pendientes de sync / offline first).
+   * Retorna tupla [insertados, actualizados, preservadosLocales].
+   */
+  upsertAll<T extends { id?: string; updatedAt?: string; [k: string]: any }>(
+    key: CollectionKey,
+    rows: T[],
+    opts?: { matchKey?: keyof T & string; preferRemoteIfSameTs?: boolean }
+  ): [number, number, number] {
+    if (!Array.isArray(rows)) return [0, 0, 0];
+    const matchKey: string = (opts?.matchKey as string) || 'id';
+    const preferRemote = opts?.preferRemoteIfSameTs !== false;
+    const arr = this.data[key] as T[];
+    const existingBy = new Map<string, T>();
+    for (const it of arr) {
+      const k = (it as any)[matchKey];
+      if (k) existingBy.set(String(k), it);
+    }
+    let inserted = 0;
+    let updated = 0;
+    const clonedRows = CLONE(rows) as T[];
+    for (const remote of clonedRows) {
+      const k = (remote as any)[matchKey];
+      if (!k) continue;
+      const local = existingBy.get(String(k));
+      if (!local) {
+        arr.push(remote as any);
+        inserted++;
+        continue;
+      }
+      const tsRem = (remote.updatedAt || remote.updated_at || remote.updatedAtTimestamp || '') as string;
+      const tsLoc = (local.updatedAt || (local as any).updated_at || '') as string;
+      const remEsMasActual = tsRem && tsLoc ? tsRem > tsLoc : (preferRemote ? true : !!tsLoc);
+      if (remEsMasActual || preferRemote) {
+        const idx = arr.findIndex((x: any) => String(x[matchKey]) === String(k));
+        if (idx >= 0) {
+          const merged: any = { ...(arr[idx] as any), ...(remote as any) };
+          if (!merged.updatedAt) merged.updatedAt = tsRem || tsLoc || seedUtil.nowISO();
+          if (!merged.id) merged.id = (local as any).id || (remote as any).id;
+          arr[idx] = merged;
+          updated++;
+        } else {
+          arr.push(remote as any);
+          inserted++;
+        }
+      }
+    }
+    existingBy.clear();
+    return [inserted, updated, arr.length - (inserted + (rows.length - (inserted > 0 ? 0 : 0)))];
+  }
+
   findOne<T extends { [k: string]: any }>(
     key: CollectionKey,
     predicate: (x: T) => boolean

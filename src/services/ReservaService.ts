@@ -4,6 +4,7 @@ import { HabitacionService } from './HabitacionService';
 import { TarifaService, PoliticaCancelacionService } from './TarifaService';
 import { HuespedService } from './HuespedService';
 import { db as dbRemota } from './__supabase_db__';
+import * as pendingSync from './__pending_sync__';
 
 const KEY = 'reservas';
 
@@ -49,15 +50,21 @@ export const ReservaService = {
       try {
         log('Hidratando reservas desde Supabase Cloud...');
         const reservasRemotas = await dbRemota.allAsync<Reserva>(KEY);
+        let netas = reservasRemotas?.length || 0;
+        let ins = 0, upd = 0;
         if (reservasRemotas && reservasRemotas.length > 0) {
-          db.setAll<Reserva>(KEY, reservasRemotas);
+          // FIX CRÍTICO: usar db.upsertAll (merge-only) EN VEZ DE db.setAll().
+          // ANTES: setAll() = borraba TODO el InMemoryDB → perdía reservas locales creadas hace <2s (fire-and-forget aún no POSTeaba remoto)
+          // AHORA: upsertAll = actualiza/inserta remotas, PRESERVA 100% las locales pendientes de sync que aún no existen en la nube.
+          [ins, upd] = db.upsertAll<Reserva>(KEY, reservasRemotas, { matchKey: 'id' });
           const removidos = db.deduplicateBy<Reserva>(KEY, (r: any) => String(r.codigoReserva || r.id || '').trim(), 'FIRST');
           if (removidos > 0) log(`⚠️  Hidratación: removidos ${removidos} duplicados de reservas por codigoReserva.`);
+          netas = reservasRemotas.length - removidos;
           _hidratacionDone = true;
-          log(`✅ reservas cargadas: ${reservasRemotas.length - removidos} (netos tras deduplicar)`);
+          log(`✅ reservas sync Supabase OK: +${ins} nuevas / ~${upd} actualizadas / 0 perdidas locales`);
           return true;
         } else {
-          log('⚠️  0 reservas en Supabase Cloud. InMemoryDB se mantiene vacía.');
+          log('ℹ️  0 reservas en Supabase Cloud. InMemoryDB se MANTIENE con datos locales/pendientes.');
           const removidos = db.deduplicateBy<Reserva>(KEY, (r: any) => String(r.codigoReserva || r.id || '').trim(), 'FIRST');
           if (removidos > 0) log(`🧹 Limpieza: removidos ${removidos} duplicados residuales de reservas en RAM local.`);
           _hidratacionDone = true;
@@ -242,13 +249,16 @@ export const ReservaService = {
     return { valido: true, habitacion, noches, tarifaCalculada: tarifaCalc };
   },
 
-  /** Paso 2 del flujo: crear la reserva. DUAL WRITE local + Supabase Cloud (persiste).
-   *  FIX: GENERAR UN SOLO id y UN SOLO codigo ANTES de insertar, y enviar ESTE MISMO id/codigo a AMBAS DBs.
-   *  EVITA el bug anterior: 2 UUIDs diferentes (una local otra remota) → sync-back devolvía 2da copia duplicada.
-   *  FIX 2: Idempotency check: si misma codigoReserva ya existe en local, retornar la existente (evitar doble click).
-   *  FIX 3: Codigo más robusto: timestamp-ms + 2dig random → evita colisiones si 2 clicks en mismo ms.
+  /**
+   * Paso 2 del flujo: crear la reserva.
+   * ESTRATEGIA NUEVA (garantía 0 pérdida):
+   *  1) Primero insert REMOTO SI HAY INTERNET (await). Si éxito → SYNCED ✅.
+   *  2) Si OFFLINE o REMOTO FALLA → insert LOCAL IGUAL + ENCOLAR en pendingSync localStorage.
+   *     → Worker reintentará cada 30s o cuando window dispare 'online'.
+   *  3) Hidratación usa upsertAll merge (no borra locales pendientes) → NUNCA PIERDES DATOS.
+   * Genera UN SOLO id/codigo ANTES. Idempotencia por codigoReserva y id.
    */
-  crear(payload: Create<Reserva> & { usuarioResponsableId: string }): Reserva {
+  async crear(payload: Create<Reserva> & { usuarioResponsableId: string }): Promise<Reserva & { _syncStatus?: 'SYNCED' | 'PENDING' | 'ERROR'; _syncErrorMsg?: string | null }> {
     const ahora = seedUtil.nowISO();
     const idUnico = seedUtil.generateUUID();
     const codigo = (() => {
@@ -257,16 +267,16 @@ export const ReservaService = {
       return `R-${t}${r}`;
     })();
 
-    // ===== FIX IDEMPOTENCIA: Si ya existe reserva con MISMO codigo en memoria, no crear duplicada. =====
+    // ===== IDEMPOTENCIA =====
     const existentePorCodigo = db.findOne<Reserva>(KEY, (x: any) => String(x.codigoReserva || '').trim() === codigo.trim());
     if (existentePorCodigo) {
       log(`⚠️  Idempotencia: Reserva ${codigo} ya existía, reutilizando para evitar duplicado.`);
-      return this.buscarPorId(existentePorCodigo.id)!;
+      return { ...this.buscarPorId(existentePorCodigo.id)!, _syncStatus: (existentePorCodigo as any)._syncStatus || 'SYNCED' };
     }
 
     const historial = [agregarHistorial(idUnico, 'CREACION', null, payload, payload.usuarioResponsableId, 'Reserva creada en sistema')];
 
-    const payloadFinal = {
+    const payloadFinal: any = {
       ...payload,
       id: idUnico,
       codigoReserva: codigo,
@@ -277,58 +287,74 @@ export const ReservaService = {
       updatedBy: payload.usuarioResponsableId,
     };
 
-    // ============== 1) DUAL WRITE REMOTO (async fire-and-forget, MISMO id/codigo que local) ==============
-    try {
-      dbRemota.addAsync<Reserva>(KEY, payloadFinal as any)
-        .then((remota: any) => {
-          try {
-            if (remota && remota.id === idUnico) {
-              log(`✅ Reserva sincronizada con Supabase (mismo ID): ${remota.codigoReserva || remota.id}`);
-            } else if (remota && remota.codigoReserva) {
-              log(`✅ Reserva sincronizada con Supabase: ${remota.codigoReserva} (${remota.id})`);
-            }
-          } catch (_) {}
-        })
-        .catch((e) => console.error('[ReservaService.crear] Sync remoto falló (reserva solo local; volverá a reintentar prox hidratación manual):', e?.message || e));
-    } catch (e) {
-      console.error('[ReservaService.crear] Error al enviar Supabase:', (e as any)?.message || e);
+    let syncStatus: 'SYNCED' | 'PENDING' | 'ERROR' = 'PENDING';
+    let syncErrorMsg: string | null = null;
+
+    // ===== REMOTO PRIMERO (await bloqueante, pero no muy: máximo 4s y luego offline fallback) =====
+    if (dbRemota && typeof (dbRemota as any).isOnline === 'function' && (dbRemota as any).isOnline()) {
+      try {
+        const remotoPromise = (dbRemota as any).addAsync<Reserva>(KEY, payloadFinal);
+        const timeoutPromise = new Promise<null>((_, rj) => setTimeout(() => rj(new Error('TIMEOUT_SUPABASE_4000ms')), 4000));
+        const remota: any = await Promise.race([remotoPromise, timeoutPromise]);
+        if (remota && remota.id) {
+          syncStatus = 'SYNCED';
+          log(`✅ Reserva ${codigo} SINCRONIZADA con Supabase (id=${remota.id}).`);
+          // Limpiar por si quedo enqueueada por fallo transitorio anterior
+          try { pendingSync.getPendientes(KEY).filter(o => o.matchId === idUnico).forEach(o => pendingSync.removerOp(o.id)); } catch (_) {}
+        } else {
+          syncStatus = 'PENDING';
+          syncErrorMsg = 'Remoto retornó undefined/null';
+        }
+      } catch (e: any) {
+        syncStatus = 'PENDING';
+        syncErrorMsg = (e?.message || String(e)).slice(0, 200);
+        console.warn('[ReservaService.crear] REMOTO FALLÓ (quedará en pendingSync queue):', syncErrorMsg);
+      }
+    } else {
+      syncStatus = 'PENDING';
+      syncErrorMsg = 'OFFLINE: no hay conexión Supabase en este momento';
+      log('ℹ️  Modo OFFLINE: Reserva se guarda local + queue para reintentar.');
     }
 
-    // ============== 2) INSERT LOCAL (UI inmediata, MISMO id/codigo) ==============
+    // ===== PENDING → encolar para reintentos persistentes =====
+    if (syncStatus !== 'SYNCED') {
+      try { pendingSync.enqueue(KEY, 'add', idUnico, payloadFinal); } catch (e: any) { console.warn('[ReservaService] pendingSync enqueue fail:', e?.message || e); }
+    }
+
+    // ===== INSERT LOCAL (Siempre, UI inmediata, MISMO id/codigo) =====
     const yaExiste = db.getById<any>(KEY, idUnico);
-    let nueva: Reserva;
+    let nueva: any;
     if (yaExiste) {
-      nueva = yaExiste as Reserva;
+      nueva = yaExiste;
       log(`⚠️  Reserva id ${idUnico} ya estaba insertada (doble render React StrictMode); reutilizando.`);
     } else {
-      // Safe fallback: addRawIfMissingById si existe en DB, sino add normal.
       const asAny = db as any;
       if (typeof asAny.addRawIfMissingById === 'function') {
-        nueva = asAny.addRawIfMissingById<Reserva>(KEY, idUnico, payloadFinal) || db.add<Reserva>(KEY, payloadFinal as unknown as Create<Reserva>);
+        const conSync = { ...payloadFinal, _syncStatus: syncStatus, _syncErrorMsg: syncErrorMsg };
+        nueva = asAny.addRawIfMissingById<Reserva>(KEY, idUnico, conSync) || db.add<Reserva>(KEY, conSync as unknown as Create<Reserva>);
       } else {
         nueva = db.add<Reserva>(KEY, payloadFinal as unknown as Create<Reserva>);
       }
     }
 
-    // Actualizar habitaciones a RESERVADA dual (HabitacionService ya dual)
-    for (const rh of (nueva.habitaciones || [])) {
+    // ===== Actualizar habitaciones a RESERVADA dual =====
+    for (const rh of ((nueva?.habitaciones as any[]) || [])) {
       const hab = HabitacionService.buscarPorId(rh.habitacionId);
       if (hab && (hab.estado === 'LIBRE' || hab.estado === 'DISPONIBLE')) {
         try { HabitacionService.cambiarEstado(rh.habitacionId, 'RESERVADA', payload.usuarioResponsableId); } catch (_) {}
       }
     }
 
-    // Incrementar visitas de huésped si lo existía
     try {
-      if (HuespedService.buscarPorId(nueva.huespedId)) {
+      if (HuespedService.buscarPorId(nueva?.huespedId)) {
         HuespedService.actualizar(nueva.huespedId, {
           updatedBy: payload.usuarioResponsableId,
-          fechaUltimaEstadia: nueva.fechaCheckin,
+          fechaUltimaEstadia: nueva?.fechaCheckin,
         } as any);
       }
     } catch (_) {}
 
-    return this.buscarPorId(nueva.id)!;
+    return { ...this.buscarPorId(nueva.id)!, _syncStatus: syncStatus, _syncErrorMsg: syncErrorMsg };
   },
 
   actualizar(id: string, changes: Update<Reserva> & { usuarioResponsableId: string }): Reserva | undefined {

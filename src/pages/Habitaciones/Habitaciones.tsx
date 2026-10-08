@@ -9,7 +9,7 @@ import {
 import type { Color } from '@ionic/core';
 import { add, remove, trash, close, save, receiptOutline, wallet, cart, person, restaurant, bed, cash, pricetag } from 'ionicons/icons';
 import { Habitacion, EstadoHabitacion, ProductoFB } from '../../types';
-import { HabitacionService, ReservaService } from '../../services';
+import { HabitacionService, ReservaService, CatalogoFBService, InventarioService, seedProductos } from '../../services';
 import CheckinModal from '../../components/modals/CheckinModal';
 import CheckoutModal from '../../components/modals/CheckoutModal';
 import TomarComanda from '../../components/modals/TomarComanda';
@@ -59,17 +59,6 @@ interface RegistroPago {
   moneda: string;
   referencia?: string;
 }
-const PRODUCTOS_STOCK_DEMO: Array<ProductoFB & { _stock?: number; _stockMin?: number }> = [
-  { id: 'PROD-AGUA-MINERAL-1L', sku: 'BEB401', nombre: 'Agua Mineral 1L', categoriaId: 'CAT-BEBIDAS-FRIAS', precioVentaBase: 5, moneda: 'PEN', impuesto: 'IGV', estadoProducto: 'ACTIVO', estado: 'ACTIVO', requierePreparacion: false, permiteInventarioNegativo: false, stockActual: 48, stockMinimo: 6, _stock: 48, _stockMin: 6 } as any,
-  { id: 'PROD-AGUA-MINERAL-500ML', sku: 'BEB401B', nombre: 'Agua Mineral 500ml', categoriaId: 'CAT-BEBIDAS-FRIAS', precioVentaBase: 3.5, moneda: 'PEN', impuesto: 'IGV', estadoProducto: 'ACTIVO', estado: 'ACTIVO', requierePreparacion: false, permiteInventarioNegativo: false, stockActual: 72, stockMinimo: 12, _stock: 72, _stockMin: 12 } as any,
-  { id: 'PROD-GASEOSA-COCA-500ML', sku: 'BEB402A', nombre: 'Coca Cola 500ml', categoriaId: 'CAT-BEBIDAS-FRIAS', precioVentaBase: 7, moneda: 'PEN', impuesto: 'IGV', estadoProducto: 'ACTIVO', estado: 'ACTIVO', requierePreparacion: false, permiteInventarioNegativo: false, stockActual: 24, stockMinimo: 6, _stock: 24, _stockMin: 6 } as any,
-  { id: 'PROD-GASEOSA-INKA-500ML', sku: 'BEB402B', nombre: 'Inca Kola 500ml', categoriaId: 'CAT-BEBIDAS-FRIAS', precioVentaBase: 7, moneda: 'PEN', impuesto: 'IGV', estadoProducto: 'ACTIVO', estado: 'ACTIVO', requierePreparacion: false, permiteInventarioNegativo: false, stockActual: 24, stockMinimo: 6, _stock: 24, _stockMin: 6 } as any,
-  { id: 'PROD-GASEOSA-SPRITE-500ML', sku: 'BEB402C', nombre: 'Sprite 500ml', categoriaId: 'CAT-BEBIDAS-FRIAS', precioVentaBase: 7, moneda: 'PEN', impuesto: 'IGV', estadoProducto: 'ACTIVO', estado: 'ACTIVO', requierePreparacion: false, permiteInventarioNegativo: false, stockActual: 12, stockMinimo: 4, _stock: 12, _stockMin: 4 } as any,
-  { id: 'PROD-CERVEZA-PILSEN-620ML', sku: 'BAR601A', nombre: 'Pilsen 620ml', categoriaId: 'CAT-BEBIDAS-ALCOHOL', precioVentaBase: 8, moneda: 'PEN', impuesto: 'IGV', estadoProducto: 'ACTIVO', estado: 'ACTIVO', requierePreparacion: false, permiteInventarioNegativo: false, stockActual: 36, stockMinimo: 6, _stock: 36, _stockMin: 6 } as any,
-  { id: 'PROD-CERVEZA-CUSQUENA-620ML', sku: 'BAR601B', nombre: 'Cusqueña 620ml', categoriaId: 'CAT-BEBIDAS-ALCOHOL', precioVentaBase: 9, moneda: 'PEN', impuesto: 'IGV', estadoProducto: 'ACTIVO', estado: 'ACTIVO', requierePreparacion: false, permiteInventarioNegativo: false, stockActual: 24, stockMinimo: 6, _stock: 24, _stockMin: 6 } as any,
-  { id: 'PROD-SNACK-GALLETA', sku: 'SNK-001', nombre: 'Snack / Galleta', categoriaId: 'CAT-BEBIDAS-FRIAS', precioVentaBase: 3, moneda: 'PEN', impuesto: 'IGV', estadoProducto: 'ACTIVO', estado: 'ACTIVO', requierePreparacion: false, permiteInventarioNegativo: false, stockActual: 48, stockMinimo: 12, _stock: 48, _stockMin: 12 } as any,
-  { id: 'PROD-EXTRA-TOALLA', sku: 'EXT-001', nombre: 'Toalla Extra', categoriaId: 'CAT-BEBIDAS-FRIAS', precioVentaBase: 15, moneda: 'PEN', impuesto: 'IGV', estadoProducto: 'ACTIVO', estado: 'ACTIVO', requierePreparacion: false, permiteInventarioNegativo: false, stockActual: 20, stockMinimo: 5, _stock: 20, _stockMin: 5 } as any,
-];
 // Demo: H202 = habitación ocupada con huésped Jorge Perez, folio 700 (3 noches * 180) + desayuno2pax (60) + 1 agua500
 const FOLIOS_MOCK: Record<string, {
   huesped: { nombres: string; apellidos: string; dni: string; telefono?: string; email?: string };
@@ -95,6 +84,12 @@ const fechaHoy = () => {
   return d.toLocaleString('es-PE');
 };
 const uid = () => Math.random().toString(36).slice(2, 10).toUpperCase();
+const _planoStockProducto = (p: any): { stockControl: boolean; stockActual: number; stockMinimo: number } => {
+  const sC = typeof p?.stockControl === 'boolean' ? p.stockControl : (p?.payload?.stockControl ?? false);
+  const sA = typeof p?.stockActual === 'number' ? p.stockActual : Number(p?.payload?.stockActual ?? 0);
+  const sM = typeof p?.stockMinimo === 'number' ? p.stockMinimo : Number(p?.payload?.stockMinimo ?? 0);
+  return { stockControl: !!sC, stockActual: sA, stockMinimo: sM };
+};
 
 // =============== COMPONENTE ===============
 const HabitacionesPage: React.FC = () => {
@@ -122,12 +117,66 @@ const HabitacionesPage: React.FC = () => {
   const [modalServicioExtra, setModalServicioExtra] = useState(false);
   const [modalRegistrarPago, setModalRegistrarPago] = useState(false);
   const [notaVentaCheckout, setNotaVentaCheckout] = useState<{ folio: any; habId: string } | null>(null);
-  const [productosStockGlobal, setProductosStockGlobal] = useState(PRODUCTOS_STOCK_DEMO);
+  const [refreshTick, setRefreshTick] = useState<number>(0);
 
   // Estado de lineas/pagos del folio
   const [foliosLocal, setFoliosLocal] = useState<typeof FOLIOS_MOCK>(JSON.parse(JSON.stringify(FOLIOS_MOCK)));
-  // Cantidades seleccionadas para vender stock
+  // Cantidades seleccionadas para vender stock (DECLARADO ANTES para dep useMemo que lo usa
   const [cantidadesVenta, setCantidadesVenta] = useState<Record<string, number>>({});
+
+  // ===== DATOS STOCK DESDE CATÁLOGO OFICIAL (seed o Supabase) =====
+  const catMapByIdHab = useMemo(() => {
+    try {
+      const cats = CatalogoFBService.listarCategorias?.() || [];
+      const map = new Map<string, any>();
+      for (const c of cats) map.set(c.id, c);
+      return map;
+    } catch { return new Map<string, any>(); }
+  }, [refreshTick]);
+
+  const productosStockGlobal = useMemo(() => {
+    try {
+      let lista = (CatalogoFBService.listarProductos?.({ soloActivos: true }) || []) as any[];
+      if (!lista || lista.length === 0) {
+        const seed = seedProductos as any;
+        if (seed?.ensureSeedInicialCompleto) seed.ensureSeedInicialCompleto(false);
+        lista = (CatalogoFBService.listarProductos?.({ soloActivos: true }) || []) as any[];
+      }
+      const prods = lista.map((p: any) => {
+        const plano = _planoStockProducto(p);
+        const cat = catMapByIdHab.get(p.categoriaId);
+        return {
+          id: p.id,
+          sku: p.codigo,
+          nombre: p.nombre,
+          descripcion: p.descripcion || '',
+          categoriaId: p.categoriaId,
+          categoriaNombre: cat?.nombre || 'Sin categoría',
+          precioVentaBase: Number(p.precioVentaBase || 0),
+          moneda: 'PEN',
+          impuesto: 'IGV',
+          estadoProducto: p.estado || 'ACTIVO',
+          estado: p.estado || 'ACTIVO',
+          requierePreparacion: !plano.stockControl,
+          permiteInventarioNegativo: false,
+          stockActual: plano.stockActual,
+          stockMinimo: plano.stockMinimo,
+          stockControl: plano.stockControl,
+          orden: p.orden ?? 0,
+          _stock: plano.stockActual,
+          _stockMin: plano.stockMinimo,
+        } as unknown as (ProductoFB & { _stock?: number; _stockMin?: number; categoriaNombre?: string; stockControl?: boolean; orden?: number });
+      }).filter((p: any) => !!p.stockControl && p.estado !== 'INACTIVO')
+        .sort((a, b) => ((a as any).orden ?? 0) - ((b as any).orden ?? 0));
+      // Aplicar cantidades seleccionadas en venta como "reservado" visual
+      return prods.map(p => {
+        const sel = Number(cantidadesVenta[p.id] || 0);
+        return { ...p, _stock: Math.max(0, Number((p as any)._stock ?? 0) - sel) };
+      });
+    } catch {
+      return [] as any[];
+    }
+  }, [refreshTick, catMapByIdHab, cantidadesVenta]);
   // Servicio extra form
   const [servExtraForm, setServExtraForm] = useState({ nombre: '', precio: 0, cantidad: 1, observaciones: '' });
   // Pago form
@@ -328,20 +377,32 @@ const HabitacionesPage: React.FC = () => {
       .map(([pid, c]) => { const prod = productosStockGlobal.find(p => p.id === pid); return prod && c > 0 ? { prod, cantidad: c } : null; })
       .filter(Boolean) as Array<{ prod: typeof productosStockGlobal[number]; cantidad: number }>;
     if (items.length === 0) { mostrarAlerta('Selecciona productos', 'Agrega al menos 1 producto para vender.'); return; }
-    // Validar stock
+    // Validar stock (real DB antes de cantidadesVenta)
     for (const it of items) {
-      if (!it.prod.permiteInventarioNegativo && it.cantidad > Number(it.prod._stock ?? 0)) {
-        mostrarAlerta('Stock insuficiente', `${it.prod.nombre}: solo hay ${it.prod._stock} disponibles.`);
+      const stkReal = Number(it.prod.stockActual ?? 0);
+      if (!it.prod.permiteInventarioNegativo && it.cantidad > stkReal) {
+        mostrarAlerta('Stock insuficiente', `${it.prod.nombre}: solo hay ${stkReal} disponibles.`);
         return;
       }
     }
-    // Actualizar stocks globales
-    setProductosStockGlobal(ps => ps.map(p => {
-      const it = items.find(x => x.prod.id === p.id);
-      if (!it) return p;
-      const nuevoStock = Math.max(0, Number(p._stock ?? 0) - it.cantidad);
-      return { ...p, _stock: nuevoStock, stockActual: nuevoStock, estadoProducto: (nuevoStock <= 0 ? 'AGOTADO_TEMPORAL' : p.estadoProducto) };
-    }));
+    // PACK D: Aplicar movimiento de inventario real (no cancelable después de confirmar)
+    try {
+      for (const it of items) {
+        InventarioService.moverStockProducto(
+          it.prod.id,
+          -Number(it.cantidad || 0),
+          `Venta cargo a habitación ${habSeleccionada.codigo}`,
+          USUARIO_ACTUAL.id,
+          {
+            referenciaId: habSeleccionada.id,
+            referenciaTipo: 'CARGO_HAB_STOCK',
+            bloquearNegativo: false,
+          }
+        );
+      }
+    } catch (e) {
+      console.warn('[Habitaciones.confirmarVentaStock] moverStock warn (no bloquea venta):', (e as Error).message || e);
+    }
     // Agregar líneas al folio
     setFoliosLocal(fs => {
       const folio = fs[habSeleccionada!.id] as any;
@@ -366,6 +427,7 @@ const HabitacionesPage: React.FC = () => {
     });
     setModalVenderStock(false);
     setCantidadesVenta({});
+    setRefreshTick(t => t + 1);
     const montoTotal = items.reduce((s, it) => s + it.cantidad * Number(it.prod.precioVentaBase || 0), 0);
     mostrarToast(`✅ Vendido ${items.length} item(s) · ${fmtSoles(montoTotal)} cargo a habitación`);
   };

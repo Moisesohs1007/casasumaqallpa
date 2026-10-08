@@ -1,6 +1,7 @@
 // @ts-nocheck
 import { db, seedUtil, type Create, type Update, type Habitacion, type TipoHabitacion, type EstadoHabitacion } from './__db__';
 import SupabaseDB, { db as dbRemota } from './__supabase_db__';
+import * as pendingSync from './__pending_sync__';
 
 const KEY_HAB = 'habitaciones' as const;
 const KEY_TIPO = 'tiposHabitacion' as const;
@@ -31,10 +32,22 @@ export const HabitacionService = {
         ]);
 
         let ok = false;
-        if (tiposRem && tiposRem.length > 0) { db.setAll(KEY_TIPO, tiposRem); ok = true; log(`→ tiposHabitacion cargados: ${tiposRem.length}`); }
-        if (tarifasRem && tarifasRem.length > 0) { db.setAll(KEY_TAR, tarifasRem); ok = true; log(`→ tarifas cargadas: ${tarifasRem.length}`); }
-        if (polsRem && polsRem.length > 0)     { db.setAll(KEY_POL, polsRem);   ok = true; log(`→ politicasCancelacion: ${polsRem.length}`); }
-        if (habsRem && habsRem.length > 0)      { db.setAll(KEY_HAB, habsRem);   ok = true; log(`→ habitaciones cargadas: ${habsRem.length}`); }
+        if (tiposRem && tiposRem.length > 0) {
+          const [ins, upd] = db.upsertAll(KEY_TIPO, tiposRem);
+          ok = true; log(`→ tiposHabitacion upsert OK: +${ins} nuevos / ~${upd} actualizados`);
+        }
+        if (tarifasRem && tarifasRem.length > 0) {
+          const [ins, upd] = db.upsertAll(KEY_TAR, tarifasRem);
+          ok = true; log(`→ tarifas upsert OK: +${ins} nuevas / ~${upd} actualizadas`);
+        }
+        if (polsRem && polsRem.length > 0) {
+          const [ins, upd] = db.upsertAll(KEY_POL, polsRem);
+          ok = true; log(`→ politicasCancelacion upsert OK: +${ins} nuevas / ~${upd} actualizadas`);
+        }
+        if (habsRem && habsRem.length > 0) {
+          const [ins, upd] = db.upsertAll(KEY_HAB, habsRem);
+          ok = true; log(`→ habitaciones upsert OK: +${ins} nuevas / ~${upd} actualizadas. [NO BORRA locales pendientes sync]`);
+        }
 
         _hidratacionDone = ok;
         if (ok) log('✅ Hidratación OK. Ahora InMemoryDB sincronizado con Supabase Cloud.');
@@ -175,7 +188,21 @@ export const HabitacionService = {
     if (estado === 'MANTENIMIENTO') cambios.estadoLimpieza = 'PENDIENTE' as any;
     const local = db.update<Habitacion>(KEY_HAB, id, cambios as unknown as Update<Habitacion>);
     if (local) {
-      dbRemota.updateAsync<Habitacion>(KEY_HAB, id, cambios as any).catch((e) => console.error('[HabitacionService] cambiarEstado sync remoto falló:', e?.message || e));
+      // Remoto non-blocking + queue persistente si falla
+      (async () => {
+        try {
+          if (!dbRemota || !((dbRemota as any)?.isOnline?.())) {
+            pendingSync.enqueue(KEY_HAB, 'update', id, cambios as any);
+            return;
+          }
+          const prom = (dbRemota as any).updateAsync<Habitacion>(KEY_HAB, id, cambios as any);
+          const to = new Promise<any>((_, rj) => setTimeout(() => rj(new Error('TIMEOUT_HAB_UPDATE_3500')), 3500));
+          await Promise.race([prom, to]);
+          try { pendingSync.getPendientes(KEY_HAB).filter(o => o.matchId === id && o.method === 'update').forEach(o => pendingSync.removerOp(o.id)); } catch (_) {}
+        } catch (e: any) {
+          pendingSync.enqueue(KEY_HAB, 'update', id, cambios as any);
+        }
+      })();
     }
     return local;
   },
@@ -191,7 +218,20 @@ export const HabitacionService = {
     if (actual.estado === 'LIMPIEZA') patch.estado = 'LIBRE';
     const local = db.update<Habitacion>(KEY_HAB, id, patch);
     if (local) {
-      dbRemota.updateAsync<Habitacion>(KEY_HAB, id, patch).catch((e) => console.error('[HabitacionService] marcarLimpia sync remoto falló:', e?.message || e));
+      (async () => {
+        try {
+          if (!dbRemota || !((dbRemota as any)?.isOnline?.())) {
+            pendingSync.enqueue(KEY_HAB, 'update', id, patch);
+            return;
+          }
+          const prom = (dbRemota as any).updateAsync<Habitacion>(KEY_HAB, id, patch);
+          const to = new Promise<any>((_, rj) => setTimeout(() => rj(new Error('TIMEOUT_HAB_LIMPIA_3500')), 3500));
+          await Promise.race([prom, to]);
+          try { pendingSync.getPendientes(KEY_HAB).filter(o => o.matchId === id && o.method === 'update').forEach(o => pendingSync.removerOp(o.id)); } catch (_) {}
+        } catch (e: any) {
+          pendingSync.enqueue(KEY_HAB, 'update', id, patch);
+        }
+      })();
     }
     return local;
   },
