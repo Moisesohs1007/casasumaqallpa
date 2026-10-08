@@ -260,6 +260,30 @@ export const PuntoVentaService = {
     if (upd) dbRemota.updateAsync<PuntoVenta>(KEY_PV, id, delta as any).catch((e) => console.error('[PuntoVenta.actualizar] remoto fail:', e));
     return upd;
   },
+  ensureDefault(puntoVentaIdDefault = 'PV-RESTAURANTE-01'): PuntoVenta {
+    const existente = PuntoVentaService.buscarPorId(puntoVentaIdDefault);
+    if (existente) return existente;
+    const pv = PuntoVentaService.crear(
+      {
+        id: puntoVentaIdDefault,
+        nombre: 'Restaurante POS · Casa Sumaq Allpa',
+        codigo: 'PV-REST-01',
+        zona: 'GENERAL',
+        permiteRoomService: true,
+        permiteDelivery: false,
+        permiteLlevar: true,
+        estado: 'ACTIVO',
+        configuracion: {
+          impuestoPorDefecto: 'IGV',
+          porcentajeImpuesto: 18,
+          monedaPorDefecto: 'PEN',
+          ticketAnchoMm: 80,
+        },
+      },
+      'system-pv'
+    );
+    return pv;
+  },
 };
 
 export const MesaService = {
@@ -533,9 +557,11 @@ export const ComandaService = {
     modoAnulacionDescuentos?: any;
   }): { comanda: Comanda; cargosFolio?: CargoFolio[]; error?: string } {
     const mesa = MesaService.buscarPorId(params.mesaId);
-    if (!mesa) return { comanda: null as any, error: 'Mesa no encontrada' };
-    const puntoVenta = PuntoVentaService.buscarPorId(params.puntoVentaId);
-    if (!puntoVenta) return { comanda: null as any, error: 'Punto de venta no encontrado' };
+    if (!mesa) return { comanda: null as any, error: 'Mesa no encontrada (verifica PuntoVenta.Mesas seed o MesaService.crearRoomServiceSiNoExiste).' };
+    const puntoVentaId = params.puntoVentaId || 'PV-RESTAURANTE-01';
+    let puntoVenta = PuntoVentaService.buscarPorId(puntoVentaId);
+    if (!puntoVenta) puntoVenta = PuntoVentaService.ensureDefault(puntoVentaId);
+    if (!puntoVenta) return { comanda: null as any, error: 'Punto de venta no encontrado (seed automático falló, recarga F5).' };
 
     const esRoomService =
       params.tipoComanda === 'ROOM_SERVICE' ||

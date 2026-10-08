@@ -8,8 +8,8 @@ import {
 } from '@ionic/react';
 import type { Color } from '@ionic/core';
 import { add, remove, trash, close, save, receiptOutline, wallet, cart, person, restaurant, bed, cash, pricetag } from 'ionicons/icons';
-import { Habitacion, EstadoHabitacion, ProductoFB } from '../../types';
-import { HabitacionService, ReservaService, CatalogoFBService, InventarioService, seedProductos } from '../../services';
+import { Habitacion, EstadoHabitacion, ProductoFB, Reserva } from '../../types';
+import { HabitacionService, ReservaService, CatalogoFBService, InventarioService, seedProductos, FolioService } from '../../services';
 import CheckinModal from '../../components/modals/CheckinModal';
 import CheckoutModal from '../../components/modals/CheckoutModal';
 import TomarComanda from '../../components/modals/TomarComanda';
@@ -109,6 +109,10 @@ const HabitacionesPage: React.FC = () => {
   const [tomarComandaOpen, setTomarComandaOpen] = useState(false);
   const [habPedidoId, setHabPedidoId] = useState<string>('');
 
+  // Props precargadas para TomarComanda (POS unificado)
+  const [preHabSeleccionadaId, setPreHabSeleccionadaId] = useState<string>('');
+  const [preTipoConsumoHab, setPreTipoConsumo] = useState<'MESA' | 'CARGO_A_HABITACION'>('CARGO_A_HABITACION');
+
   // Nuevos modals gestion huésped
   const [habSeleccionada, setHabSeleccionada] = useState<Habitacion | null>(null);
   const [modalVerFolio, setModalVerFolio] = useState(false);
@@ -119,7 +123,7 @@ const HabitacionesPage: React.FC = () => {
   const [notaVentaCheckout, setNotaVentaCheckout] = useState<{ folio: any; habId: string } | null>(null);
   const [refreshTick, setRefreshTick] = useState<number>(0);
 
-  // Estado de lineas/pagos del folio
+  // Estado de lineas/pagos del folio (DEPRECATED legacy para compatibilidad con modals antiguos. La fuente ÚNICA = obtenerFolioHab())
   const [foliosLocal, setFoliosLocal] = useState<typeof FOLIOS_MOCK>(JSON.parse(JSON.stringify(FOLIOS_MOCK)));
   // Cantidades seleccionadas para vender stock (DECLARADO ANTES para dep useMemo que lo usa
   const [cantidadesVenta, setCantidadesVenta] = useState<Record<string, number>>({});
@@ -291,23 +295,37 @@ const HabitacionesPage: React.FC = () => {
       }
       setCantidadesVenta({});
 
-      // OPCIONES 7
-      opciones.push({ text: '👥 Datos del Huésped', handler: () => { const f = foliosLocal[h.id] || { huesped: { nombres: '', apellidos: '', dni: '' } }; setEditHuesped({ ...f.huesped }); setModalDatosHuesped(true); } });
+      // OPCIONES 5 (3 anteriores fusionados en uno: POS unificado)
+      opciones.push({ text: '👥 Datos del Huésped', handler: () => { const f = obtenerFolioHab(h); setEditHuesped({ ...(f?.huesped || { nombres: '', apellidos: '', dni: '' }) }); setModalDatosHuesped(true); } });
       opciones.push({ text: '💰 Ver Folio / Resumen Cuenta', handler: () => setModalVerFolio(true) });
-      opciones.push({ text: '🍽️ Room Service · Carta', handler: () => { setHabPedidoId(h.id); setTomarComandaOpen(true); } });
-      opciones.push({ text: '🥤 Vender Productos (Stock)', handler: () => { setCantidadesVenta({}); setModalVenderStock(true); } });
-      opciones.push({ text: '🚕 + Servicio Extra (manual)', handler: () => { setServExtraForm({ nombre: '', precio: 0, cantidad: 1, observaciones: '' }); setModalServicioExtra(true); } });
+      opciones.push({
+        text: '🛒 POS · Agregar Consumo al Folio',
+        handler: () => {
+          setHabPedidoId(h.id);
+          setCantidadesVenta({});
+          // Se pasan props preseleccionadas a TomarComanda via state
+          setPreHabSeleccionadaId(h.id);
+          setPreTipoConsumo('CARGO_A_HABITACION');
+          setTomarComandaOpen(true);
+        },
+      });
       opciones.push({ text: '💳 Registrar Pago', handler: () => {
-        const f = foliosLocal[h.id];
-        const saldo = calcularTotales(f?.lineas || []).total - calcularTotalPagos(f?.pagos || []);
+        const f = obtenerFolioHab(h);
+        const totales = calcularTotales(f?.lineas || []);
+        const totalPagos = calcularTotalPagos(f?.pagos || []);
+        const saldo = totales.total - totalPagos;
         setPagoForm({ metodoPago: 'EFECTIVO_PEN', monto: Math.max(0, saldo), moneda: 'PEN', referencia: '', observaciones: '', codigoAutorizacion: '' });
         setModalRegistrarPago(true);
       } });
       opciones.push({
         text: '🧾 CHECK-OUT · Imprimir Nota',
         handler: async () => {
+          if (String(h.estado || '').toUpperCase() !== 'OCUPADA') {
+            mostrarAlerta('Habitación libre', 'No puedes hacer check-out de una habitación que no tiene huésped. Primero haz el check-in.');
+            return;
+          }
           const reservaId = await buscarReservaActivaHab(h.id);
-          const f = foliosLocal[h.id];
+          const f = obtenerFolioHab(h);
           const totales = calcularTotales(f?.lineas || []);
           const totalPagos = calcularTotalPagos(f?.pagos || []);
           const saldo = totales.total - totalPagos;
@@ -345,14 +363,104 @@ const HabitacionesPage: React.FC = () => {
 
     present({
       header: headerAccion,
-      subHeader: est === 'OCUPADA' ? '7 opciones disponibles' : 'Selecciona una acción',
+      subHeader: est === 'OCUPADA' ? '5 opciones disponibles' : 'Selecciona una acción',
       buttons: opciones,
       animated: true,
       backdropDismiss: true,
     });
   };
 
-  // Helpers cálculos
+  // ========== FUENTE ÚNICA FOLIOS (eliminado foliosLocal useState demo) ==========
+  function obtenerFolioHab(h: Habitacion | null): (typeof FOLIOS_MOCK)[string] | null {
+    if (!h) return null;
+    try {
+      // 1) Buscar folio ABIERTO oficial (FolioService)
+      const folioOficial = FolioService.buscarPorHabitacionAbierta(h.id);
+      const reservaActiva = (ReservaService.listarTodas() as Reserva[]).find(r => {
+        const habs = (r?.habitaciones || []) as any[];
+        const e = String(r.estado || '').toUpperCase().replace(/[^A-Z]/g, '');
+        return (e.includes('CHECKIN') || e.includes('CHECKEDIN')) && habs.some((hh: any) => (hh.habitacionId || hh.habitacion?.id) === h.id);
+      });
+      // Cargar datos de huesped desde RESERVA
+      const reservaData = reservaActiva ?? (folioOficial as any)?.reserva ?? null;
+      const huespedTitular = (reservaData as any)?.huespedTitular ?? (reservaData as any)?.huesped ?? null;
+      const nombresHuesped = huespedTitular ? `${huespedTitular.nombres ?? ''} ${huespedTitular.apellidos ?? ''}`.trim() || 'Huésped' : 'Huésped';
+      const apellidosHuesped = huespedTitular?.apellidos ?? '';
+      const dni = huespedTitular?.numeroDocumento ?? '';
+      const telefono = huespedTitular?.telefono ?? '';
+      const email = huespedTitular?.email ?? '';
+      // Cargar lineas de CARGO al folio
+      const folioId = folioOficial?.id;
+      const cargos = folioId ? (FolioService as any)?.listarCargos?.(folioId) ?? [] : [];
+      const pagos = folioId ? (FolioService as any)?.listarPagos?.(folioId) ?? [] : [];
+      const lineasF: LineaCargo[] = [];
+      // Alojamiento: si no hay cargo alojamiento específico, usar noches de la reserva
+      let lineas = lineasF;
+      if (reservaData && (!lineas.some(l => l.tipo === 'ALOJAMIENTO'))) {
+        const ci = reservaData.fechaCheckin || (reservaData as any).fecha_entrada || (reservaData as any).checkin;
+        const co = reservaData.fechaCheckout || (reservaData as any).fecha_salida || (reservaData as any).checkout;
+        const noches = (co && ci) ? Math.max(1, Math.ceil((new Date(co).getTime() - new Date(ci).getTime()) / 86400000)) : 1;
+        const precioNoche = Number(folioOficial?.totalAlojamiento ?? (reservaData as any).tarifaTotal ?? (reservaData as any).precioTotal ?? 180) / noches;
+        lineas = lineas.concat([{
+          id: `ALOJ-${h.id}-${noches}`,
+          tipo: 'ALOJAMIENTO',
+          nombre: `Alojamiento ${noches} noches · ${h.codigo} ${(h as any).tipoHabitacion?.nombre || 'Habitación'}`,
+          cantidad: noches,
+          precioUnit: Number(precioNoche || 180),
+          fecha: ci ? new Date(ci).toLocaleString('es-PE') : fechaHoy(),
+        } as LineaCargo]);
+      }
+      // Cargos del folio oficial a LineaCargo compat
+      for (const c of cargos) {
+        const cAny = c as any;
+        const tipo = cAny.tipoLinea === 'PRODUCTO_STOCK' || cAny.tipo === 'STOCK' ? 'PRODUCTO_STOCK'
+          : cAny.tipoLinea === 'SERVICIO_EXTRA' ? 'SERVICIO_EXTRA'
+          : cAny.tipoLinea === 'ALOJAMIENTO' ? 'ALOJAMIENTO'
+          : 'ROOM_SERVICE';
+        if (tipo === 'ALOJAMIENTO' && lineas.some(x => x.tipo === 'ALOJAMIENTO')) continue;
+        lineas.push({
+          id: cAny.id || `CRG-${Math.random()}`,
+          tipo,
+          nombre: cAny.nombre || cAny.concepto || `Cargo ${cAny.id}`,
+          cantidad: Number(cAny.cantidad || 1),
+          precioUnit: Number(cAny.precioUnitario ?? cAny.montoUnitario ?? cAny.precioUnit ?? 0),
+          fecha: cAny.createdAt || cAny.fecha || fechaHoy(),
+          observaciones: cAny.observaciones || undefined,
+        });
+      }
+      // Pagos a RegistroPago compat
+      const pagosCompat: RegistroPago[] = pagos.map((p: any) => ({
+        id: p.id ?? uid(),
+        fecha: p.createdAt || p.fecha || fechaHoy(),
+        metodoPago: p.metodoPago || p.formaPago || 'EFECTIVO_PEN',
+        monto: Number(p.monto || p.importe || 0),
+        moneda: p.moneda || 'PEN',
+        referencia: p.referencia || p.nroOperacion || undefined,
+      }));
+      return {
+        huesped: {
+          nombres: nombresHuesped,
+          apellidos: apellidosHuesped,
+          dni: dni,
+          telefono,
+          email,
+        },
+        reserva: {
+          id: reservaData?.id || folioId || '',
+          checkin: reservaData?.fechaCheckin || (reservaData as any)?.fecha_entrada || '',
+          checkout: reservaData?.fechaCheckout || (reservaData as any)?.fecha_salida || '',
+          noches: Number(reservaData?.noches || 1),
+          precioNoche: Number((h as any).tipoHabitacion?.precioBaseNoche ?? 180),
+          totalAlojamiento: Number(folioOficial?.totalAlojamiento ?? (reservaData as any)?.tarifaTotal ?? 0),
+        },
+        lineas,
+        pagos: pagosCompat,
+      };
+    } catch (e) {
+      console.warn('[obtenerFolioHab] fallback a vacío:', e);
+      return null;
+    }
+  }
   function calcularTotales(lineas: LineaCargo[]) {
     let subtotal = 0;
     const detalle = lineas.filter(l => l.tipo !== 'PAGO').map(l => { const s = l.cantidad * l.precioUnit; subtotal += s; return { ...l, subtotal: s }; });
@@ -490,10 +598,10 @@ const HabitacionesPage: React.FC = () => {
     mostrarToast(`✅ Pago registrado · ${metodo} · ${fmtSoles(Number(pagoForm.monto))}`);
   };
 
-  const folioActivo = habSeleccionada ? (foliosLocal[habSeleccionada.id] as any) : null;
+  const folioActivo = obtenerFolioHab(habSeleccionada);
   const totalesFolio = calcularTotales(folioActivo?.lineas || []);
-  const totalPagos = calcularTotalPagos(folioActivo?.pagos || []);
-  const saldoPendiente = Math.max(0, totalesFolio.total - totalPagos);
+  const totalPagosF = calcularTotalPagos(folioActivo?.pagos || []);
+  const saldoPendiente = Math.max(0, totalesFolio.total - totalPagosF);
 
   // ============ RENDER ============
   return (
@@ -509,7 +617,12 @@ const HabitacionesPage: React.FC = () => {
 
         <CheckinModal isOpen={checkinOpen} onDidDismiss={() => { setCheckinOpen(false); setCheckinReservaId(null); cargar(); }} reservaId={checkinReservaId} usuarioActual={USUARIO_ACTUAL} />
         <CheckoutModal isOpen={checkoutOpen} onDismiss={() => { setCheckoutOpen(false); setCheckoutReservaId(''); cargar(); }} reservaId={checkoutReservaId} />
-        <TomarComanda isOpen={tomarComandaOpen} onDismiss={() => { setTomarComandaOpen(false); setHabPedidoId(''); cargar(); }} preHabitacionId={habPedidoId || undefined} preTipoConsumo="CARGO_A_HABITACION" />
+        <TomarComanda
+          isOpen={tomarComandaOpen}
+          onDismiss={() => { setTomarComandaOpen(false); setHabPedidoId(''); setPreHabSeleccionadaId(''); setRefreshTick(t => t + 1); cargar(); }}
+          preHabitacionId={(preHabSeleccionadaId || habPedidoId) || undefined}
+          preTipoConsumo={preTipoConsumoHab || 'CARGO_A_HABITACION'}
+        />
 
         <IonGrid className="table-grid hab-grid">
           <IonRow>
@@ -642,7 +755,7 @@ const HabitacionesPage: React.FC = () => {
                       <IonCol size="6" style={{ padding: '2px 6px', textAlign: 'right' }}>
                         <div>{fmtSoles(totalesFolio.subtotal)}</div>
                         <div>{fmtSoles(totalesFolio.igv)}</div>
-                        <div style={{ marginTop: 6, color: '#bbf7d0' }}><b>- {fmtSoles(totalPagos)}</b></div>
+                        <div style={{ marginTop: 6, color: '#bbf7d0' }}><b>- {fmtSoles(totalPagosF)}</b></div>
                       </IonCol>
                     </IonRow>
                   </IonGrid>

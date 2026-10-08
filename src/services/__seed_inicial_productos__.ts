@@ -25,7 +25,7 @@ const USR = 'seed-inicial';
 export const SEED_CATEGORIAS = [
   { id: 'CAT-DESAYUNOS', nombre: 'Desayunos', descripcion: 'Carta de desayunos continental y criollo', tipo: 'ALIMENTO', usaStock: false, orden: 10, color: '#FFE4B5' },
   { id: 'CAT-JUGOS', nombre: 'Jugos', descripcion: 'Jugos naturales, batidos y refrescos fríos', tipo: 'BEBIDA', usaStock: false, orden: 20, color: '#D4EFDF' },
-  { id: 'CAT-BEBIDAS-CALIENTES', nombre: 'Bebidas Calientes', descripcion: 'Café, chocolate, té, infusiones', tipo: 'BEBIDA', usaStock: true, orden: 30, color: '#F6DDCC' },
+  { id: 'CAT-BEBIDAS-CALIENTES', nombre: 'Bebidas Calientes', descripcion: 'Café, chocolate, té, infusiones (preparados al momento, sin stock físico)', tipo: 'BEBIDA', usaStock: false, orden: 30, color: '#F6DDCC' },
   { id: 'CAT-SANDWICHES', nombre: 'Sándwiches', descripcion: 'Sándwiches, tostadas y bocadillos', tipo: 'ALIMENTO', usaStock: false, orden: 40, color: '#FADBD8' },
   { id: 'CAT-ENTRADAS', nombre: 'Entradas', descripcion: 'Aperitivos, ensaladas y entradas', tipo: 'ALIMENTO', usaStock: false, orden: 50, color: '#D5F5E3' },
   { id: 'CAT-PLATOS-PRINCIPALES', nombre: 'Platos Principales', descripcion: 'Carta principal criolla, regional y cordero', tipo: 'ALIMENTO', usaStock: false, orden: 60, color: '#EBDEF0' },
@@ -71,14 +71,14 @@ export const SEED_PRODUCTOS_CARTA = [
   { id: 'PROD-JUG-007', codigo: codigoCat('JUG', 7), categoriaId: 'CAT-JUGOS', nombre: 'Jugo Detox Verde', descripcion: 'Espinaca, apio, piña, manzana 500ml', precioVentaBase: 10.00, stockControl: false, orden: 7 },
 
   // ========== CAT-BEBIDAS-CALIENTES ==========
-  { id: 'PROD-BC-001', codigo: codigoCat('BC', 1), categoriaId: 'CAT-BEBIDAS-CALIENTES', nombre: 'Café Americano', descripcion: 'Café de grano exportación 300ml', precioVentaBase: 6.00, stockControl: true, stockActual: 120, stockMinimo: 20, orden: 1 },
-  { id: 'PROD-BC-002', codigo: codigoCat('BC', 2), categoriaId: 'CAT-BEBIDAS-CALIENTES', nombre: 'Café con Leche', descripcion: 'Café + leche 350ml', precioVentaBase: 7.00, stockControl: true, stockActual: 120, stockMinimo: 20, orden: 2 },
-  { id: 'PROD-BC-003', codigo: codigoCat('BC', 3), categoriaId: 'CAT-BEBIDAS-CALIENTES', nombre: 'Café Capuccino', descripcion: 'Café + espuma + canela 350ml', precioVentaBase: 8.00, stockControl: true, stockActual: 80, stockMinimo: 15, orden: 3 },
-  { id: 'PROD-BC-004', codigo: codigoCat('BC', 4), categoriaId: 'CAT-BEBIDAS-CALIENTES', nombre: 'Café Espresso Doble', descripcion: '2 shots espresso 60ml', precioVentaBase: 6.00, stockControl: true, stockActual: 100, stockMinimo: 20, orden: 4 },
-  { id: 'PROD-BC-005', codigo: codigoCat('BC', 5), categoriaId: 'CAT-BEBIDAS-CALIENTES', nombre: 'Chocolate Caliente', descripcion: 'Chocolate 70% cacao + leche 400ml', precioVentaBase: 8.00, stockControl: true, stockActual: 80, stockMinimo: 15, orden: 5 },
-  { id: 'PROD-BC-006', codigo: codigoCat('BC', 6), categoriaId: 'CAT-BEBIDAS-CALIENTES', nombre: 'Té de Hierbas', descripcion: 'Infusión anís/manzzanilla/limón', precioVentaBase: 5.00, stockControl: true, stockActual: 100, stockMinimo: 20, orden: 6 },
-  { id: 'PROD-BC-007', codigo: codigoCat('BC', 7), categoriaId: 'CAT-BEBIDAS-CALIENTES', nombre: 'Café Doble Kinkao', descripcion: 'Kinkao de la región, doble filtración', precioVentaBase: 7.00, stockControl: true, stockActual: 80, stockMinimo: 15, orden: 7 },
-  { id: 'PROD-BC-008', codigo: codigoCat('BC', 8), categoriaId: 'CAT-BEBIDAS-CALIENTES', nombre: 'Té Negro Inglés', descripcion: 'Tetley con leche opcional', precioVentaBase: 5.00, stockControl: true, stockActual: 100, stockMinimo: 20, orden: 8 },
+  { id: 'PROD-BC-001', codigo: codigoCat('BC', 1), categoriaId: 'CAT-BEBIDAS-CALIENTES', nombre: 'Café Americano', descripcion: 'Café de grano exportación 300ml', precioVentaBase: 6.00, stockControl: false, orden: 1 },
+  { id: 'PROD-BC-002', codigo: codigoCat('BC', 2), categoriaId: 'CAT-BEBIDAS-CALIENTES', nombre: 'Café con Leche', descripcion: 'Café + leche 350ml', precioVentaBase: 7.00, stockControl: false, orden: 2 },
+  { id: 'PROD-BC-003', codigo: codigoCat('BC', 3), categoriaId: 'CAT-BEBIDAS-CALIENTES', nombre: 'Café Capuccino', descripcion: 'Café + espuma + canela 350ml', precioVentaBase: 8.00, stockControl: false, orden: 3 },
+  { id: 'PROD-BC-004', codigo: codigoCat('BC', 4), categoriaId: 'CAT-BEBIDAS-CALIENTES', nombre: 'Café Espresso Doble', descripcion: '2 shots espresso 60ml', precioVentaBase: 6.00, stockControl: false, orden: 4 },
+  { id: 'PROD-BC-005', codigo: codigoCat('BC', 5), categoriaId: 'CAT-BEBIDAS-CALIENTES', nombre: 'Chocolate Caliente', descripcion: 'Chocolate 70% cacao + leche 400ml', precioVentaBase: 8.00, stockControl: false, orden: 5 },
+  { id: 'PROD-BC-006', codigo: codigoCat('BC', 6), categoriaId: 'CAT-BEBIDAS-CALIENTES', nombre: 'Té de Hierbas', descripcion: 'Infusión anís/manzzanilla/limón', precioVentaBase: 5.00, stockControl: false, orden: 6 },
+  { id: 'PROD-BC-007', codigo: codigoCat('BC', 7), categoriaId: 'CAT-BEBIDAS-CALIENTES', nombre: 'Café Doble Kinkao', descripcion: 'Kinkao de la región, doble filtración', precioVentaBase: 7.00, stockControl: false, orden: 7 },
+  { id: 'PROD-BC-008', codigo: codigoCat('BC', 8), categoriaId: 'CAT-BEBIDAS-CALIENTES', nombre: 'Té Negro Inglés', descripcion: 'Tetley con leche opcional', precioVentaBase: 5.00, stockControl: false, orden: 8 },
 
   // ========== CAT-SANDWICHES ==========
   { id: 'PROD-SAN-001', codigo: codigoCat('SAN', 1), categoriaId: 'CAT-SANDWICHES', nombre: 'Sándwich de Jamón y Queso', descripcion: 'Pan bimbo + jamón americana + queso edam + lechuga tomate + papas', precioVentaBase: 14.00, stockControl: false, orden: 1 },

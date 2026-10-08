@@ -52,7 +52,7 @@ const emojiCategoria = (catId: string) => {
   return '🍴';
 };
 
-const TomarComanda: React.FC<Props> = ({ isOpen, onDismiss }) => {
+const TomarComanda: React.FC<Props> = ({ isOpen, onDismiss, preHabitacionId, preTipoConsumo, preMesaId, comandaAEditarId }) => {
   const [paso, setPaso] = useState<'orden' | 'exito'>('orden');
   const [procesando, setProcesando] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -73,11 +73,15 @@ const TomarComanda: React.FC<Props> = ({ isOpen, onDismiss }) => {
     setErrorMsg(null);
     setUltimaComanda(null);
     setFolioCodigoCreado('');
-    setTipoConsumo('CARGO_A_HABITACION');
+    const defaultTipo: TipoConsumo =
+      preTipoConsumo === 'MESA' ? 'MESA' :
+      preTipoConsumo === 'CARGO_A_HABITACION' || preHabitacionId ? 'CARGO_A_HABITACION' :
+      'CARGO_A_HABITACION';
+    setTipoConsumo(defaultTipo);
     setBusqueda('');
     setCategoriaFiltroId('TODOS');
-    setHabitacionSeleccionadaId('');
-    setMesaSeleccionadaId('');
+    setHabitacionSeleccionadaId(preHabitacionId && defaultTipo === 'CARGO_A_HABITACION' ? preHabitacionId : '');
+    setMesaSeleccionadaId(preMesaId && defaultTipo === 'MESA' ? preMesaId : '');
     setCarrito([]);
     setRefreshTick((t) => t + 1);
   };
@@ -88,7 +92,7 @@ const TomarComanda: React.FC<Props> = ({ isOpen, onDismiss }) => {
       reset();
       setRefreshTick((t) => t + 2);
     }, 50);
-  }, [isOpen]);
+  }, [isOpen, preHabitacionId, preTipoConsumo, preMesaId, comandaAEditarId]);
 
   const categorias = useMemo(() => {
     return [{ id: 'TODOS', nombre: '🧺 Todos los productos', orden: 0 } as any].concat(
@@ -108,7 +112,6 @@ const TomarComanda: React.FC<Props> = ({ isOpen, onDismiss }) => {
   const habitacionesCheckedIn = useMemo(() => {
     const reservas = (ReservaService.listarTodas() as Reserva[]).filter((r) => {
       const e = String(r.estado || '').toUpperCase().replace(/[^A-Z]/g, '');
-      // Cualquier variante (CHECKED_IN / CHECKIN / CHECK_IN / YAENCHECKIN) → se considera check-in activo
       return e.includes('CHECKIN') || e.includes('CHECKEDIN');
     });
     const lista: Array<{ reserva: Reserva; habitacion: Habitacion; huespedNombre: string }> = [];
@@ -126,6 +129,16 @@ const TomarComanda: React.FC<Props> = ({ isOpen, onDismiss }) => {
     }
     return lista;
   }, [isOpen, refreshTick]);
+
+  const habitacionPrecargadaInfo = useMemo(() => {
+    if (!preHabitacionId) return null;
+    const info = habitacionesCheckedIn.find(
+      (x) => x.habitacion?.id === preHabitacionId || (x.habitacion as any)?.habitacionId === preHabitacionId
+    );
+    return info ?? null;
+  }, [preHabitacionId, habitacionesCheckedIn]);
+
+  const modoPrecargadoFolio = Boolean(preHabitacionId && habitacionPrecargadaInfo);
 
   const mesasLibres = useMemo(() => {
     return MesaService.listarTodas({ puntoVentaId: PUNTO_VENTA_ID }).filter((m) => m.zona !== 'ROOM_SERVICE');
@@ -361,112 +374,164 @@ const TomarComanda: React.FC<Props> = ({ isOpen, onDismiss }) => {
         <div className="tomar-comanda-scroll-wrapper" style={{ flex: 1, overflowY: 'auto', background: '#f7f7f7', padding: 16 }}>
           {paso === 'orden' && (
             <>
-              <IonCard style={{ marginBottom: 14 }}>
-                <IonCardHeader>
-                  <IonCardTitle>📍 Tipo de consumo</IonCardTitle>
-                  <IonCardSubtitle>Selecciona cómo se registrará este pedido.</IonCardSubtitle>
-                </IonCardHeader>
-                <IonCardContent>
-                  <IonRow>
-                    <IonCol size="12" sizeMd="6">
-                      <IonChip
-                        color={tipoConsumo === 'MESA' ? 'primary' : 'medium'}
-                        outline={tipoConsumo !== 'MESA'}
-                        onClick={() => setTipoConsumo('MESA')}
-                        style={{
-                          padding: '14px 16px',
-                          cursor: 'pointer',
-                          width: '100%',
-                          justifyContent: 'center',
-                          fontSize: 14,
-                          fontWeight: tipoConsumo === 'MESA' ? 800 : 600,
-                          minHeight: 50,
-                        }}
-                      >
-                        <IonIcon icon={restaurantOutline} slot="start" />
-                        MESA / PARA LLEVAR · Cobro directo
-                      </IonChip>
-                    </IonCol>
-                    <IonCol size="12" sizeMd="6">
-                      <IonChip
-                        color={tipoConsumo === 'CARGO_A_HABITACION' ? 'success' : 'medium'}
-                        outline={tipoConsumo !== 'CARGO_A_HABITACION'}
-                        onClick={() => setTipoConsumo('CARGO_A_HABITACION')}
-                        style={{
-                          padding: '14px 16px',
-                          cursor: 'pointer',
-                          width: '100%',
-                          justifyContent: 'center',
-                          fontSize: 14,
-                          fontWeight: tipoConsumo === 'CARGO_A_HABITACION' ? 800 : 600,
-                          minHeight: 50,
-                        }}
-                      >
-                        <IonIcon icon={bed} slot="start" />
-                        🚀 CARGO A FOLIO · Habitación
-                      </IonChip>
-                    </IonCol>
-                  </IonRow>
-
-                  <IonRow style={{ marginTop: 12 }}>
-                    {tipoConsumo === 'CARGO_A_HABITACION' && (
-                      <IonCol size="12" sizeMd="12">
-                        <IonItem>
-                          <IonIcon icon={bed} slot="start" color="success" />
-                          <IonSelect
-                            label="Selecciona habitación CHECKED-IN *"
-                            labelPlacement="stacked"
-                            placeholder="— Selecciona habitación ocupada —"
-                            interface="popover"
-                            value={habitacionSeleccionadaId}
-                            onIonChange={(e) => setHabitacionSeleccionadaId(e.detail.value)}
-                          >
-                            {habitacionesCheckedIn.length === 0 && (
-                              <IonSelectOption value="" disabled>
-                                (No hay reservas CHECKED_IN. Primero haz Check-in de una reserva.)
-                              </IonSelectOption>
-                            )}
-                            {habitacionesCheckedIn.map((h) => {
-                              const hab = h.habitacion as any;
-                              const habId = hab.id || hab.habitacionId;
-                              return (
-                                <IonSelectOption key={habId} value={habId}>
-                                  {hab.codigo || habId} · {h.huespedNombre} · R#{h.reserva.codigoReserva}
-                                </IonSelectOption>
-                              );
-                            })}
-                          </IonSelect>
-                        </IonItem>
-                        <IonNote color="success" style={{ display: 'block', padding: '6px 12px' }}>
-                          <IonIcon icon={informationCircle} /> El pedido se cargará <strong>AUTOMÁTICAMENTE al Folio abierto</strong> del huésped durante su estadía.
-                        </IonNote>
-                      </IonCol>
-                    )}
-
-                    {tipoConsumo === 'MESA' && (
-                      <IonCol size="12" sizeMd="12">
-                        <IonItem>
+              {modoPrecargadoFolio && habitacionPrecargadaInfo ? (
+                <IonCard style={{ marginBottom: 14, background: '#059669', color: '#fff', border: '2px solid #10b981' }}>
+                  <IonCardHeader style={{ paddingTop: 14, paddingBottom: 10 }}>
+                    <IonCardTitle style={{ color: '#fff', fontSize: 18, fontWeight: 900 }}>
+                      <IonIcon icon={bed} style={{ marginRight: 6 }} /> 🚀 CARGO AUTOMÁTICO A FOLIO
+                    </IonCardTitle>
+                    <IonCardSubtitle style={{ color: '#ecfccb', fontSize: 13, fontWeight: 700, marginTop: 4 }}>
+                      <strong style={{ fontSize: 17, color: '#fff' }}>
+                        {(habitacionPrecargadaInfo.habitacion as any).codigo || (habitacionPrecargadaInfo.habitacion as any).habitacionId}
+                      </strong>
+                      {habitacionPrecargadaInfo.habitacion?.estado && (
+                        <span style={{ marginLeft: 8, padding: '2px 8px', borderRadius: 6, background: '#166534', color: '#fff', fontSize: 11, fontWeight: 800 }}>
+                          {String((habitacionPrecargadaInfo.habitacion as any).estado || 'OCUPADA').toUpperCase()}
+                        </span>
+                      )}
+                    </IonCardSubtitle>
+                  </IonCardHeader>
+                  <IonCardContent style={{ paddingTop: 0 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 6 }}>
+                      <div>
+                        <IonText style={{ color: '#dcfce7', fontSize: 12, fontWeight: 600 }}>
+                          <IonIcon icon={person} style={{ marginRight: 4 }} /> Huésped:
+                        </IonText>
+                        <div style={{ fontSize: 15, fontWeight: 900, color: '#fff' }}>
+                          {habitacionPrecargadaInfo.huespedNombre || 'Titular de la reserva'}
+                        </div>
+                      </div>
+                      <div>
+                        <IonText style={{ color: '#dcfce7', fontSize: 12, fontWeight: 600 }}>
+                          <IonIcon icon={documentText} style={{ marginRight: 4 }} /> Reserva:
+                        </IonText>
+                        <div style={{ fontSize: 15, fontWeight: 900, color: '#fff' }}>
+                          R#{(habitacionPrecargadaInfo.reserva as any).codigoReserva || String(habitacionPrecargadaInfo.reserva.id || '').slice(0, 7)}
+                        </div>
+                      </div>
+                      <div>
+                        <IonText style={{ color: '#dcfce7', fontSize: 12, fontWeight: 600 }}>
+                          <IonIcon icon={cash} style={{ marginRight: 4 }} /> Pago:
+                        </IonText>
+                        <div style={{ fontSize: 15, fontWeight: 900, color: '#fff' }}>
+                          Al CHECK-OUT
+                        </div>
+                      </div>
+                    </div>
+                    <div style={{ marginTop: 10, padding: '8px 10px', background: '#14532d', borderRadius: 8, color: '#bbf7d0', fontSize: 12, fontWeight: 600 }}>
+                      <IonIcon icon={informationCircle} style={{ marginRight: 5 }} />
+                      ⚠️ Selección <strong>BLOQUEADA</strong>. Este pedido se cargará AUTOMÁTICAMENTE al folio abierto de esta habitación. Si te equivocaste, cierra y vuelve a abrir desde la habitación correcta.
+                    </div>
+                  </IonCardContent>
+                </IonCard>
+              ) : (
+                <IonCard style={{ marginBottom: 14 }}>
+                  <IonCardHeader>
+                    <IonCardTitle>📍 Tipo de consumo</IonCardTitle>
+                    <IonCardSubtitle>Selecciona cómo se registrará este pedido.</IonCardSubtitle>
+                  </IonCardHeader>
+                  <IonCardContent>
+                    <IonRow>
+                      <IonCol size="12" sizeMd="6">
+                        <IonChip
+                          color={tipoConsumo === 'MESA' ? 'primary' : 'medium'}
+                          outline={tipoConsumo !== 'MESA'}
+                          onClick={() => setTipoConsumo('MESA')}
+                          style={{
+                            padding: '14px 16px',
+                            cursor: 'pointer',
+                            width: '100%',
+                            justifyContent: 'center',
+                            fontSize: 14,
+                            fontWeight: tipoConsumo === 'MESA' ? 800 : 600,
+                            minHeight: 50,
+                          }}
+                        >
                           <IonIcon icon={restaurantOutline} slot="start" />
-                          <IonSelect
-                            label="Selecciona mesa *"
-                            labelPlacement="stacked"
-                            placeholder="— Escoge mesa libre / ocupada —"
-                            interface="popover"
-                            value={mesaSeleccionadaId}
-                            onIonChange={(e) => setMesaSeleccionadaId(e.detail.value)}
-                          >
-                            {mesasLibres.map((m) => (
-                              <IonSelectOption key={m.id} value={m.id}>
-                                {m.codigo} - {m.nombreVisible} ({m.zona}) · {m.estado} · {m.capacidadActualUsada}/{m.capacidadMaxPax} pax
-                              </IonSelectOption>
-                            ))}
-                          </IonSelect>
-                        </IonItem>
+                          MESA / PARA LLEVAR · Cobro directo
+                        </IonChip>
                       </IonCol>
-                    )}
-                  </IonRow>
-                </IonCardContent>
-              </IonCard>
+                      <IonCol size="12" sizeMd="6">
+                        <IonChip
+                          color={tipoConsumo === 'CARGO_A_HABITACION' ? 'success' : 'medium'}
+                          outline={tipoConsumo !== 'CARGO_A_HABITACION'}
+                          onClick={() => setTipoConsumo('CARGO_A_HABITACION')}
+                          style={{
+                            padding: '14px 16px',
+                            cursor: 'pointer',
+                            width: '100%',
+                            justifyContent: 'center',
+                            fontSize: 14,
+                            fontWeight: tipoConsumo === 'CARGO_A_HABITACION' ? 800 : 600,
+                            minHeight: 50,
+                          }}
+                        >
+                          <IonIcon icon={bed} slot="start" />
+                          🚀 CARGO A FOLIO · Habitación
+                        </IonChip>
+                      </IonCol>
+                    </IonRow>
+
+                    <IonRow style={{ marginTop: 12 }}>
+                      {tipoConsumo === 'CARGO_A_HABITACION' && (
+                        <IonCol size="12" sizeMd="12">
+                          <IonItem>
+                            <IonIcon icon={bed} slot="start" color="success" />
+                            <IonSelect
+                              label="Selecciona habitación CHECKED-IN *"
+                              labelPlacement="stacked"
+                              placeholder="— Selecciona habitación ocupada —"
+                              interface="popover"
+                              value={habitacionSeleccionadaId}
+                              onIonChange={(e) => setHabitacionSeleccionadaId(e.detail.value)}
+                            >
+                              {habitacionesCheckedIn.length === 0 && (
+                                <IonSelectOption value="" disabled>
+                                  (No hay reservas CHECKED_IN. Primero haz Check-in de una reserva.)
+                                </IonSelectOption>
+                              )}
+                              {habitacionesCheckedIn.map((h) => {
+                                const hab = h.habitacion as any;
+                                const habId = hab.id || hab.habitacionId;
+                                return (
+                                  <IonSelectOption key={habId} value={habId}>
+                                    {hab.codigo || habId} · {h.huespedNombre} · R#{h.reserva.codigoReserva}
+                                  </IonSelectOption>
+                                );
+                              })}
+                            </IonSelect>
+                          </IonItem>
+                          <IonNote color="success" style={{ display: 'block', padding: '6px 12px' }}>
+                            <IonIcon icon={informationCircle} /> El pedido se cargará <strong>AUTOMÁTICAMENTE al Folio abierto</strong> del huésped durante su estadía.
+                          </IonNote>
+                        </IonCol>
+                      )}
+
+                      {tipoConsumo === 'MESA' && (
+                        <IonCol size="12" sizeMd="12">
+                          <IonItem>
+                            <IonIcon icon={restaurantOutline} slot="start" />
+                            <IonSelect
+                              label="Selecciona mesa *"
+                              labelPlacement="stacked"
+                              placeholder="— Escoge mesa libre / ocupada —"
+                              interface="popover"
+                              value={mesaSeleccionadaId}
+                              onIonChange={(e) => setMesaSeleccionadaId(e.detail.value)}
+                            >
+                              {mesasLibres.map((m) => (
+                                <IonSelectOption key={m.id} value={m.id}>
+                                  {m.codigo} - {m.nombreVisible} ({m.zona}) · {m.estado} · {m.capacidadActualUsada}/{m.capacidadMaxPax} pax
+                                </IonSelectOption>
+                              ))}
+                            </IonSelect>
+                          </IonItem>
+                        </IonCol>
+                      )}
+                    </IonRow>
+                  </IonCardContent>
+                </IonCard>
+              )}
 
               {errorMsg && (
                 <IonItem color="danger" style={{ marginBottom: 12 }}>
@@ -514,43 +579,65 @@ const TomarComanda: React.FC<Props> = ({ isOpen, onDismiss }) => {
                               </IonItem>
                             </IonCol>
                           )}
-                          {productos.map((prod) => (
-                            <IonCol key={prod.id} size="6" sizeMd="4" sizeLg="3">
-                              <IonCard style={{ height: '100%', position: 'relative', overflow: 'hidden' }}>
-                                <div style={{
-                                  background: '#ecfccb',
-                                  padding: 22,
-                                  fontSize: 44,
-                                  textAlign: 'center',
-                                  borderTopLeftRadius: 12,
-                                  borderTopRightRadius: 12,
-                                }}>
-                                  <span style={{ fontSize: 44 }}>{emojiCategoria(prod.categoriaId)}</span>
-                                </div>
-                                <IonCardContent style={{ padding: 12 }}>
-                                  <IonCardTitle style={{ fontSize: 15, margin: 0, fontWeight: 800, lineHeight: 1.2 }}>
-                                    {prod.nombre}
-                                  </IonCardTitle>
-                                  <IonCardSubtitle style={{ marginTop: 4, fontSize: 12, minHeight: 34 }}>
-                                    {(prod as any).descripcion || ''}
-                                  </IonCardSubtitle>
-                                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 8 }}>
-                                    <IonText color="primary" style={{ fontSize: 16, fontWeight: 900 }}>
-                                      S/ {Number(prod.precioVentaBase || 0).toFixed(2)}
-                                    </IonText>
-                                    <IonButton color="success" size="small" onClick={() => agregarProducto(prod)}>
-                                      <IonIcon slot="icon-only" icon={add} />
-                                    </IonButton>
+                          {productos.map((prod) => {
+                            const stockControl = Boolean((prod as any).stockControl);
+                            const stockActual = Number((prod as any).stockActual ?? ((prod as any).payload?.stockActual ?? 0));
+                            const stockMin = Number((prod as any).stockMinimo ?? ((prod as any).payload?.stockMinimo ?? 0));
+                            const estaAgotado = stockControl && stockActual <= 0;
+                            const stockBajo = stockControl && !estaAgotado && stockActual <= Math.max(1, stockMin, 3);
+                            return (
+                              <IonCol key={prod.id} size="6" sizeMd="4" sizeLg="3">
+                                <IonCard style={{ height: '100%', position: 'relative', overflow: 'hidden', opacity: estaAgotado ? 0.58 : 1 }}>
+                                  <div style={{
+                                    background: stockControl ? '#dbeafe' : '#ecfccb',
+                                    padding: 22,
+                                    fontSize: 44,
+                                    textAlign: 'center',
+                                    borderTopLeftRadius: 12,
+                                    borderTopRightRadius: 12,
+                                  }}>
+                                    <span style={{ fontSize: 44 }}>{emojiCategoria(prod.categoriaId)}</span>
+                                    {stockControl && (
+                                      <IonBadge
+                                        color={estaAgotado ? 'danger' : stockBajo ? 'warning' : 'primary'}
+                                        style={{ position: 'absolute', top: 8, right: 8, fontSize: 11, fontWeight: 900 }}
+                                      >
+                                        {estaAgotado ? 'AGOTADO' : stockBajo ? `DISP: ${stockActual}` : `Stock: ${stockActual}`}
+                                      </IonBadge>
+                                    )}
                                   </div>
-                                  {(prod as any).estadoProducto && (prod as any).estadoProducto !== 'ACTIVO' && (
-                                    <IonBadge color="warning" style={{ marginTop: 6 }}>
-                                      {(prod as any).estadoProducto}
-                                    </IonBadge>
-                                  )}
-                                </IonCardContent>
-                              </IonCard>
-                            </IonCol>
-                          ))}
+                                  <IonCardContent style={{ padding: 12 }}>
+                                    <IonCardTitle style={{ fontSize: 15, margin: 0, fontWeight: 800, lineHeight: 1.2 }}>
+                                      {prod.nombre}
+                                    </IonCardTitle>
+                                    <IonCardSubtitle style={{ marginTop: 4, fontSize: 12, minHeight: 34 }}>
+                                      {stockControl
+                                        ? `${(prod as any).sku || (prod as any).codigo || ''}  ${(prod as any).descripcion || ''}`.trim()
+                                        : `${(prod as any).descripcion || ''}`.trim()}
+                                    </IonCardSubtitle>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 8 }}>
+                                      <IonText color="primary" style={{ fontSize: 16, fontWeight: 900 }}>
+                                        S/ {Number(prod.precioVentaBase || 0).toFixed(2)}
+                                      </IonText>
+                                      <IonButton
+                                        color={estaAgotado ? 'medium' : 'success'}
+                                        size="small"
+                                        onClick={() => !estaAgotado && agregarProducto(prod)}
+                                        disabled={estaAgotado}
+                                      >
+                                        <IonIcon slot="icon-only" icon={add} />
+                                      </IonButton>
+                                    </div>
+                                    {(prod as any).estadoProducto && (prod as any).estadoProducto !== 'ACTIVO' && (
+                                      <IonBadge color="warning" style={{ marginTop: 6 }}>
+                                        {(prod as any).estadoProducto}
+                                      </IonBadge>
+                                    )}
+                                  </IonCardContent>
+                                </IonCard>
+                              </IonCol>
+                            );
+                          })}
                         </IonRow>
                       </IonGrid>
                     </IonCardContent>

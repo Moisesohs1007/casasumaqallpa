@@ -190,6 +190,12 @@ const App: React.FC = () => {
       } catch (e) {
         console.warn('[SeedCatalogo] Seed inicial falló (no fatal):', (e as any)?.message || e);
       }
+      // Seed punto venta default (restaurante + POS). Elimina error "Punto de venta no encontrado".
+      try {
+        const { PuntoVentaService } = await import('./services');
+        const pv = PuntoVentaService?.ensureDefault?.('PV-RESTAURANTE-01');
+        if (pv) (console.debug || console.log)(`[SeedPuntoVenta] Default PV OK: ${pv.id} ${pv.nombre}`);
+      } catch (_e) { /* noop */ }
       dispatchHidratado('todos', true);
     })();
     return () => { cancelled = true; };

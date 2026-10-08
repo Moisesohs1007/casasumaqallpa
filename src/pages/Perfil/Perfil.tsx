@@ -702,12 +702,24 @@ const PerfilPage: React.FC = () => {
                 {categoriasFB.length === 0 ? (
                   <div className="empty-state">
                     <IonIcon icon={layers} className="empty-state-icon" />
-                    <div className="empty-state-title">No hay categorías</div>
-                    <div className="empty-state-text">Crea categorías como "Cervezas", "Bebidas", "Platos", etc.</div>
-                    <IonButton color="primary" className="mt-xl" onClick={abrirNuevoCat}>
-                      <IonIcon slot="start" icon={add} />
-                      Crear primera categoría
-                    </IonButton>
+                    <div className="empty-state-title">Catálogo vacío</div>
+                    <div className="empty-state-text">Usa el seed oficial del menú Casa Sumaq Allpa (12 categorías · ~120 productos reales) o crea categorías manualmente.</div>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 16, justifyContent: 'center' }}>
+                      <IonButton color="success" className="mt-xl" onClick={() => {
+                        try {
+                          const r = (seedProductos as any).ensureSeedInicialCompleto?.(true);
+                          mostrarToast(`✅ Seed cargado: ${(r as any)?.total || 0} elementos`);
+                          cargarCatProd();
+                        } catch (e: any) { mostrarToast('⚠️ Seed falló: ' + (e.message || e)); }
+                      }}>
+                        <IonIcon slot="start" icon={restaurant} />
+                        🤖 Cargar menú oficial · 120 productos
+                      </IonButton>
+                      <IonButton color="primary" fill="outline" className="mt-xl" onClick={abrirNuevoCat}>
+                        <IonIcon slot="start" icon={add} />
+                        Crear categoría manual
+                      </IonButton>
+                    </div>
                   </div>
                 ) : (
                   <IonGrid>
