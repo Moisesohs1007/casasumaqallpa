@@ -295,10 +295,14 @@ const PosPage: React.FC = () => {
   };
 
   const { subtotal, igv, total } = useMemo(() => {
-    let s = 0;
-    carrito.forEach(l => { s += l.cantidad * l.precioUnit; });
-    const igvCalc = Number((s * 18 / 118).toFixed(2));
-    return { subtotal: s, igv: igvCalc, total: s };
+    let totalCalc = 0;
+    carrito.forEach(l => { totalCalc += l.cantidad * l.precioUnit; });
+    totalCalc = Number(totalCalc.toFixed(2));
+    const igvCalc = Number((totalCalc * 18 / 118).toFixed(2));
+    const subtotalCalc = Number((totalCalc - igvCalc).toFixed(2));
+    const diff = totalCalc - Number((subtotalCalc + igvCalc).toFixed(2));
+    const subtotalFinal = Number((subtotalCalc + diff).toFixed(2));
+    return { subtotal: subtotalFinal, igv: igvCalc, total: totalCalc };
   }, [carrito]);
 
   const totalItems = useMemo(() => carrito.reduce((ac, l) => ac + l.cantidad, 0), [carrito]);

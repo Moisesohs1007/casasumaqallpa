@@ -462,11 +462,14 @@ const HabitacionesPage: React.FC = () => {
     }
   }
   function calcularTotales(lineas: LineaCargo[]) {
-    let subtotal = 0;
-    const detalle = lineas.filter(l => l.tipo !== 'PAGO').map(l => { const s = l.cantidad * l.precioUnit; subtotal += s; return { ...l, subtotal: s }; });
-    const igv = Number((subtotal * 18 / 118).toFixed(2));
-    const total = subtotal;
-    return { detalle, subtotal, igv, total };
+    let totalCalc = 0;
+    const detalle = lineas.filter(l => l.tipo !== 'PAGO').map(l => { const s = l.cantidad * l.precioUnit; totalCalc += s; return { ...l, subtotal: s }; });
+    totalCalc = Number(totalCalc.toFixed(2));
+    const igv = Number((totalCalc * 18 / 118).toFixed(2));
+    const subtotalCalc = Number((totalCalc - igv).toFixed(2));
+    const diff = totalCalc - Number((subtotalCalc + igv).toFixed(2));
+    const subtotal = Number((subtotalCalc + diff).toFixed(2));
+    return { detalle, subtotal, igv, total: totalCalc };
   }
   const calcularTotalPagos = (pagos: RegistroPago[]) => pagos.reduce((s, p) => s + Number(p.monto || 0), 0);
 
