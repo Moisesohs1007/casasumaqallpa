@@ -925,30 +925,32 @@ const PerfilPage: React.FC = () => {
                                   )}
                                 </div>
 
-                                {/* ACCIONES GRID 4 BOTONES */}
+                                {/* ACCIONES GRID 4 BOTONES (solo stockControl=true muestra Agregar/Quitar) */}
                                 <div className="prod-actions-grid">
-                                  <IonButton
-                                    size="default"
-                                    color="success"
-                                    fill="outline"
-                                    expand="block"
-                                    disabled={!plano.stockControl}
-                                    onClick={() => abrirStockAgregar(p)}
-                                  >
-                                    <IonIcon slot="start" icon={addCircle} />
-                                    Agregar
-                                  </IonButton>
-                                  <IonButton
-                                    size="default"
-                                    color="warning"
-                                    fill="outline"
-                                    expand="block"
-                                    disabled={!plano.stockControl}
-                                    onClick={() => abrirStockQuitar(p)}
-                                  >
-                                    <IonIcon slot="start" icon={removeCircle} />
-                                    Quitar
-                                  </IonButton>
+                                  {plano.stockControl && (
+                                    <IonButton
+                                      size="default"
+                                      color="success"
+                                      fill="outline"
+                                      expand="block"
+                                      onClick={() => abrirStockAgregar(p)}
+                                    >
+                                      <IonIcon slot="start" icon={addCircle} />
+                                      Agregar
+                                    </IonButton>
+                                  )}
+                                  {plano.stockControl && (
+                                    <IonButton
+                                      size="default"
+                                      color="warning"
+                                      fill="outline"
+                                      expand="block"
+                                      onClick={() => abrirStockQuitar(p)}
+                                    >
+                                      <IonIcon slot="start" icon={removeCircle} />
+                                      Quitar
+                                    </IonButton>
+                                  )}
                                   <IonButton size="default" color="primary" fill="outline" expand="block" onClick={() => abrirEditarProd(p)}>
                                     <IonIcon slot="start" icon={create} />
                                     Editar
