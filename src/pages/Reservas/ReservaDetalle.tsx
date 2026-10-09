@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useParams } from 'react-router-dom';
 import {
   IonBackButton, IonButton, IonButtons, IonCard, IonCardContent, IonCardHeader,
@@ -169,6 +169,19 @@ const ReservaDetalle: React.FC = () => {
   const checkin = (r?.fechaCheckin || r?.fechaCheckIn || '').slice(0, 10);
   const checkout = (r?.fechaCheckout || r?.fechaCheckOut || '').slice(0, 10);
 
+  const rangosTarifariosDetalle = useMemo(() => {
+    const tAplicadas = Array.isArray(r?.tarifasAplicadas) ? (r.tarifasAplicadas as any[]) : [];
+    const bloquesRango = tAplicadas.filter((t: any) =>
+      String(t.tarifaId || '').startsWith('RANGO-')
+    );
+    if (bloquesRango.length > 0) return bloquesRango;
+    if (tAplicadas.length > 1) return tAplicadas.slice(1);
+    return [];
+  }, [r?.tarifasAplicadas]);
+  const sumaBloquesRangos = useMemo(() => Number(
+    rangosTarifariosDetalle.reduce((s: number, t: any) => s + Number(t.subtotalAplicable || t.subtotal || 0), 0).toFixed(2)
+  ), [rangosTarifariosDetalle]);
+
   const puedeCheckearse = ['PENDIENTE', 'CONFIRMADA', 'MODIFICADA'].includes(estado);
   const puedeCheckoutarse = ['CHECKED_IN', 'CHECKIN'].includes(estado);
   const puedeCancelarse = ['PENDIENTE', 'CONFIRMADA', 'MODIFICADA', 'EN_ESPERA'].includes(estado);
@@ -310,6 +323,41 @@ const ReservaDetalle: React.FC = () => {
                       <IonCol size="12" sizeMd="6">
                         <IonCard color="light">
                           <IonCardContent>
+                            {rangosTarifariosDetalle.length > 0 && (
+                              <div style={{ marginBottom: 14, paddingBottom: 12, borderBottom: '1px solid #e5e7eb' }}>
+                                <h4 style={{ margin: '0 0 10px 0', color: '#374151', fontWeight: 700 }}>
+                                  📅 Desglose rangos tarifarios · {rangosTarifariosDetalle.length} bloque{rangosTarifariosDetalle.length > 1 ? 's' : ''}
+                                </h4>
+                                <IonList style={{ margin: 0 }} lines="inset">
+                                  {rangosTarifariosDetalle.map((t: any, i: number) => {
+                                    const nochesAplicables = Number(t.nochesAplicables || t.noches || 0);
+                                    const subtotal = Number(t.subtotalAplicable || t.subtotal || 0);
+                                    const fi = String(t.fechaInicio || '').slice(0, 10);
+                                    const ff = String(t.fechaFin || '').slice(0, 10);
+                                    return (
+                                      <IonItem key={i} lines="inset" style={{ '--padding-start': 0, '--inner-padding-end': 0, minHeight: 40 }}>
+                                        <IonLabel>
+                                          <h3 style={{ margin: '2px 0', fontSize: 14 }}>
+                                            <IonBadge color="tertiary" style={{ marginRight: 6 }}>B{i + 1}</IonBadge>
+                                            {fi} → {ff} · {nochesAplicables} noche{nochesAplicables === 1 ? '' : 's'}
+                                          </h3>
+                                          <p style={{ margin: '2px 0', color: '#6b7280', fontSize: 12 }}>
+                                            {String(t.nombreTarifa || '').split('·')[0]?.trim() || `Rango dinámico`}
+                                          </p>
+                                        </IonLabel>
+                                        <h4 slot="end" style={{ margin: 0, fontSize: 14 }}>S/ {subtotal.toFixed(2)}</h4>
+                                      </IonItem>
+                                    );
+                                  })}
+                                  <IonItem lines="none" style={{ '--padding-start': 0, '--inner-padding-end': 0, fontWeight: 700, background: '#eef2ff', borderRadius: 6, marginTop: 6 }}>
+                                    <IonLabel><strong style={{ color: '#4338ca' }}>Σ Suma bloques</strong></IonLabel>
+                                    <strong slot="end" style={{ color: '#4338ca' }}>
+                                      S/ {sumaBloquesRangos.toFixed(2)}
+                                    </strong>
+                                  </IonItem>
+                                </IonList>
+                              </div>
+                            )}
                             <h3 style={{ marginTop: 0 }}>
                               <IonIcon icon={pricetags} /> Resumen económico
                             </h3>

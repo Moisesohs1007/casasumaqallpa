@@ -5,7 +5,7 @@ import {
   IonItem, IonLabel, IonList, IonNote, IonPage, IonRow, IonSelect, IonSelectOption,
   IonTitle, IonToolbar, IonAlert, IonTextarea, IonChip, IonBadge, IonToast, useIonViewWillEnter,
 } from '@ionic/react';
-import { addCircle, addCircleOutline, arrowForwardOutline, checkmark, closeOutline, bed, checkmarkDone, person, cash, ticket, calendar, time, documentText, pricetags, checkmarkCircle, alertCircle, arrowBackOutline, cloudOfflineOutline, cloudOutline, cloudDoneOutline } from 'ionicons/icons';
+import { addCircle, addCircleOutline, arrowForwardOutline, checkmark, closeOutline, bed, checkmarkDone, person, cash, ticket, calendar, time, documentText, pricetags, checkmarkCircle, alertCircle, arrowBackOutline, cloudOfflineOutline, cloudOutline, cloudDoneOutline, trash } from 'ionicons/icons';
 
 import {
   HuespedService,
@@ -48,18 +48,6 @@ const NuevaReserva: React.FC = () => {
   ] as const;
   type PasoId = typeof PASOS[number]['id'];
   const [paso, setPaso] = useState<PasoId>(1);
-  const avanzarPaso = (sig: PasoId) => {
-    if (paso === 1 && !huespedFinal) {
-      setErrorMsg('Selecciona o crea un huésped antes de continuar.'); return;
-    }
-    if (paso === 2 && (!habitacionSeleccionada || noches < 1)) {
-      setErrorMsg('Selecciona fechas y una habitación disponible.'); return;
-    }
-    if (paso === 3 && !resumenTarifa) {
-      setErrorMsg('Calcula la tarifa antes de continuar.'); return;
-    }
-    setPaso(sig);
-  };
   const retrocederPaso = (ant: PasoId) => setPaso(ant);
 
   // ====== Paso 1: Huésped ======
@@ -94,10 +82,186 @@ const NuevaReserva: React.FC = () => {
     ));
   }, [checkin, checkout]);
 
-  // ====== Paso 3: Tarifa + Promo (con lista seleccionable + override manual) ======
+  // ====== Paso 3: Rangos Tarifarios DINÁMICOS (core: Σ precio/noche × rango.noches) ======
+  type RangoTarifario = {
+    id: string;
+    fechaInicio: string;
+    fechaFin: string;
+    precioPorNoche: number;
+  };
+  const [rangosTarifarios, setRangosTarifarios] = useState<RangoTarifario[]>([]);
+
+  const calcularPrecioBaseSugerido = (fechaRefISO?: string): number => {
+    if (!habitacionSeleccionada) return 0;
+    const tipoHab = HabitacionService.listarTipos().find((t) => t.id === habitacionSeleccionada.tipoHabitacionId);
+    let precioBase = Number(tipoHab?.precioBaseNoche) || 0;
+    const baseTarifas = (TarifaService as any).listarTodas?.({
+      tipoHabitacionId: habitacionSeleccionada.tipoHabitacionId,
+      estado: 'ACTIVO',
+      vigentesEnFecha: fechaRefISO || `${checkin}T15:00:00.000Z`,
+    }) ?? [];
+    if (Array.isArray(baseTarifas) && baseTarifas.length > 0) {
+      const tPreferida = baseTarifas[baseTarifas.length - 1];
+      precioBase = Number(tPreferida?.precioPorNoche) || precioBase;
+      try {
+        const factorPct = (TarifaService as any).TemporadaService?.calcularFactorPorcentaje?.(fechaRefISO || `${checkin}T15:00:00.000Z`) ?? 0;
+        if (!isNaN(factorPct)) precioBase = Number((precioBase * (1 + factorPct / 100)).toFixed(2));
+      } catch { /* ignore */ }
+    }
+    return precioBase || 350;
+  };
+
+  const calcularNochesRango = (r: { fechaInicio: string; fechaFin: string }): number => {
+    if (!r.fechaInicio || !r.fechaFin) return 0;
+    const ms = new Date(r.fechaFin).getTime() - new Date(r.fechaInicio).getTime();
+    return Math.max(0, Math.round(ms / (1000 * 60 * 60 * 24)));
+  };
+
+  const calcularSubtotalRango = (r: { fechaInicio: string; fechaFin: string; precioPorNoche: number }): number => {
+    return Number((calcularNochesRango(r) * Number(r.precioPorNoche || 0)).toFixed(2));
+  };
+
+  // Efecto: (a) la primera vez, inicializa 1 solo bloque = todo el rango checkin→checkout
+  //         (b) si cambian checkin/checkout y hay rangos INCONSISTENTES (fecha fin o inicio fuera), extiende/ajusta automáticamente el 1er bloque
+  useEffect(() => {
+    if (!checkin || !checkout || noches < 1) return;
+    setRangosTarifarios((prev) => {
+      if (prev.length === 0) {
+        const pb = calcularPrecioBaseSugerido();
+        return [{ id: seedUtil.generateUUID(), fechaInicio: checkin, fechaFin: checkout, precioPorNoche: pb }];
+      }
+      let cambiado = false;
+      const next = prev.map((r, i) => {
+        let { fechaInicio, fechaFin, precioPorNoche } = r;
+        if (i === 0 && new Date(fechaInicio) > new Date(checkin)) { fechaInicio = checkin; cambiado = true; }
+        if (i === prev.length - 1 && new Date(fechaFin) < new Date(checkout)) { fechaFin = checkout; cambiado = true; }
+        if (!precioPorNoche || Number(precioPorNoche) <= 0) {
+          const pb = calcularPrecioBaseSugerido(`${fechaInicio}T15:00:00.000Z`);
+          if (pb && pb > 0) { precioPorNoche = pb; cambiado = true; }
+        }
+        return { ...r, fechaInicio, fechaFin, precioPorNoche };
+      });
+      return cambiado ? next : prev;
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [checkin, checkout, habitacionSeleccionada?.id]);
+
+  const agregarNuevoRango = () => {
+    if (rangosTarifarios.length === 0) {
+      // No hay rangos: crear 1er rango = rango general completo
+      const pb = calcularPrecioBaseSugerido();
+      setRangosTarifarios([{ id: seedUtil.generateUUID(), fechaInicio: checkin, fechaFin: checkout, precioPorNoche: pb }]);
+      return;
+    }
+    // Hay rangos: tomar último rango, crear uno nuevo 1 día después del fin del último (para encadenar sin huecos por defecto)
+    const ult = rangosTarifarios[rangosTarifarios.length - 1];
+    const siguienteInicio = (() => {
+      if (!ult.fechaFin) return checkin;
+      const d = new Date(ult.fechaFin);
+      d.setDate(d.getDate());
+      const iso = d.toISOString().slice(0, 10);
+      if (new Date(iso) > new Date(checkout)) return checkout;
+      return iso;
+    })();
+    const siguienteFin = (() => {
+      if (new Date(siguienteInicio) >= new Date(checkout)) {
+        // Corregir: si siguienteInicio >= checkout, ajustar ultimo rango para que termine en checkout y crear rango nuevo = checkin +1día + checkout
+        return checkout;
+      }
+      return checkout;
+    })();
+    if (new Date(siguienteInicio) >= new Date(siguienteFin)) {
+      // Ya no hay más días libres para agregar rangos (todos cubiertos). No crear bloque hueco.
+      return;
+    }
+    const pb = calcularPrecioBaseSugerido(`${siguienteInicio}T15:00:00.000Z`);
+    const nr: RangoTarifario = { id: seedUtil.generateUUID(), fechaInicio: siguienteInicio, fechaFin: siguienteFin, precioPorNoche: pb };
+    setRangosTarifarios([...rangosTarifarios, nr]);
+  };
+
+  const eliminarRangoPorId = (id: string) => {
+    setRangosTarifarios((prev) => prev.filter((r) => r.id !== id));
+  };
+
+  const actualizarRangoPorId = (id: string, patch: Partial<RangoTarifario>) => {
+    setRangosTarifarios((prev) => prev.map((r) => (r.id === id ? { ...r, ...patch } : r)));
+  };
+
+  // Validación COBERTURA 100% + NO SOLAPAMIENTOS (regla 2=A):
+  // Retorna { valido:boolean, cobertura: [fecha1 -> 0/1/2 veces cubierta], faltantes:string[], solapados:string[] }
+  const validacionRangosCompleta = useMemo<{
+    valido: boolean;
+    coberturaMap: Record<string, number>;
+    faltantesNochesStr: string[];
+    solapadosNochesStr: string[];
+    erroresCount: number;
+  }>(() => {
+    const coberturaMap: Record<string, number> = {};
+    if (noches < 1 || !checkin || !checkout) {
+      return { valido: false, coberturaMap, faltantesNochesStr: [], solapadosNochesStr: [], erroresCount: 99 };
+    }
+    // Generar cada "noche individual" del rango general = fechaInicioNoche (fecha que hace noche esa fecha)
+    const nochesStr: string[] = [];
+    const fecIni = new Date(checkin);
+    const fecFin = new Date(checkout);
+    for (let d = new Date(fecIni); d < fecFin; d.setDate(d.getDate() + 1)) {
+      nochesStr.push(d.toISOString().slice(0, 10));
+    }
+    nochesStr.forEach((n) => (coberturaMap[n] = 0));
+    for (const r of rangosTarifarios) {
+      if (!r.fechaInicio || !r.fechaFin) continue;
+      const r0 = new Date(r.fechaInicio);
+      const r1 = new Date(r.fechaFin);
+      // Limitar al rango general (evitar días fuera)
+      const rIni = r0 > fecIni ? r0 : fecIni;
+      const rFin = r1 < fecFin ? r1 : fecFin;
+      for (let d = new Date(rIni); d < rFin; d.setDate(d.getDate() + 1)) {
+        const k = d.toISOString().slice(0, 10);
+        if (!(k in coberturaMap)) continue;
+        coberturaMap[k] += 1;
+      }
+    }
+    const faltantesNochesStr: string[] = [];
+    const solapadosNochesStr: string[] = [];
+    nochesStr.forEach((n) => {
+      const c = coberturaMap[n] || 0;
+      if (c === 0) faltantesNochesStr.push(n);
+      if (c >= 2) solapadosNochesStr.push(n);
+    });
+    const erroresCount = faltantesNochesStr.length + solapadosNochesStr.length + (nochesStr.length === 0 ? 1 : 0);
+    return { valido: erroresCount === 0, coberturaMap, faltantesNochesStr, solapadosNochesStr, erroresCount };
+  }, [rangosTarifarios, checkin, checkout, noches]);
+
+  const totalSumaRangos = Number(rangosTarifarios.reduce((s, r) => s + calcularSubtotalRango(r), 0).toFixed(2));
+
+  const avanzarPaso = (sig: PasoId) => {
+    if (paso === 1 && !huespedFinal) {
+      setErrorMsg('Selecciona o crea un huésped antes de continuar.'); return;
+    }
+    if (paso === 2 && (!habitacionSeleccionada || noches < 1)) {
+      setErrorMsg('Selecciona fechas y una habitación disponible.'); return;
+    }
+    if (paso === 3) {
+      if (rangosTarifarios.length === 0) {
+        setErrorMsg('Paso 3: Agrega al menos 1 rango de precios con el botón [+ Agregar rango].'); return;
+      }
+      if (!validacionRangosCompleta.valido) {
+        let mensajeE = 'Paso 3: Revisa rangos. ';
+        if (validacionRangosCompleta.faltantesNochesStr.length > 0) {
+          mensajeE += `Faltan ${validacionRangosCompleta.faltantesNochesStr.length} noche(s) por asignar precio: ${validacionRangosCompleta.faltantesNochesStr.slice(0, 5).join(', ')}${validacionRangosCompleta.faltantesNochesStr.length > 5 ? '...' : ''}. `;
+        }
+        if (validacionRangosCompleta.solapadosNochesStr.length > 0) {
+          mensajeE += `Hay ${validacionRangosCompleta.solapadosNochesStr.length} noche(s) solapadas (precio doble): ${validacionRangosCompleta.solapadosNochesStr.slice(0, 5).join(', ')}${validacionRangosCompleta.solapadosNochesStr.length > 5 ? '...' : ''}. `;
+        }
+        setErrorMsg(mensajeE); return;
+      }
+      if (!resumenTarifa) { setErrorMsg('Paso 3: Calcula tarifa antes de continuar.'); return; }
+    }
+    setPaso(sig);
+  };
+
+  // ====== Paso 3: Promo (codigo promocional + descuento) ======
   const [codPromoInput, setCodPromoInput] = useState('');
-  const [precioNocheManual, setPrecioNocheManual] = useState<string>('');
-  const [tarifaSeleccionadaId, setTarifaSeleccionadaId] = useState<string | null>(null);
   const [promoValidacionMsg, setPromoValidacionMsg] = useState<{ ok: boolean; texto: string } | null>(null);
 
   const tarifasDisponiblesParaHab = useMemo(() => {
@@ -123,45 +287,78 @@ const NuevaReserva: React.FC = () => {
 
   const resumenTarifa = useMemo(() => {
     if (!habitacionSeleccionada || noches < 1) return null;
-    let precioNoche: number;
+
+    // ===== MODO NUEVO: TARIFICACIÓN POR RANGOS DINÁMICOS (default 1 bloque completo) =====
+    // Si hay rangos y todos son válidos (o al menos hay rangos y suma>0) → usamos totalSumaRangos
+    const sumaRangosBruta = Number(rangosTarifarios.reduce((s, r) => s + calcularSubtotalRango(r), 0).toFixed(2));
+    const usarModoRangos = rangosTarifarios.length > 0 && sumaRangosBruta > 0;
+
+    // (1) Determinar valores base de cálculo (subTotalSinImpuestos + precioNoche promedio + tarifaNombre)
+    let precioNoche: number = 0;
     let tarifaNombre = '';
     let tarifaId: string | null = null;
+    let subTotalSinImpuestos: number;
+    let montoImpuestos: number;
 
-    if (precioNocheManual.trim() && !isNaN(Number(precioNocheManual)) && Number(precioNocheManual) > 0) {
-      precioNoche = Number(precioNocheManual);
-      tarifaNombre = 'Precio manual (override)';
+    if (usarModoRangos) {
+      // totalSumaRangos = Σ r.noches × r.precioPorNoche  (precio base de rango se asume es precio CON impuestos incluidos = standar peruano SUNAT)
+      const totalConImpuestosRangos = sumaRangosBruta;
+      subTotalSinImpuestos = Number((totalConImpuestosRangos / 1.18).toFixed(2));
+      montoImpuestos = Number((totalConImpuestosRangos - subTotalSinImpuestos).toFixed(2));
+      const diff = totalConImpuestosRangos - Number((subTotalSinImpuestos + montoImpuestos).toFixed(2));
+      if (Math.abs(diff) > 0.001) subTotalSinImpuestos = Number((subTotalSinImpuestos + diff).toFixed(2));
+      // precioNoche "promedio ponderado" (solo para visualizar en el resumen)
+      let totalNochesCubiertas = 0;
+      for (const r of rangosTarifarios) totalNochesCubiertas += calcularNochesRango(r);
+      precioNoche = totalNochesCubiertas > 0 ? Number((totalConImpuestosRangos / totalNochesCubiertas).toFixed(2)) : 0;
+      tarifaNombre = rangosTarifarios.length === 1 ? 'Tarifa 1 rango' : `Tarifa ${rangosTarifarios.length} rangos (días distintos)`;
+      tarifaId = rangosTarifarios[0]?.id || null;
     } else {
-      let tarifa: any = null;
-      if (tarifaSeleccionadaId) {
-        tarifa = tarifasDisponiblesParaHab.find((t: any) => t.id === tarifaSeleccionadaId) || null;
-      }
-      if (!tarifa && tarifasDisponiblesParaHab.length > 0) {
-        tarifa = tarifasDisponiblesParaHab[tarifasDisponiblesParaHab.length - 1];
-      }
-      if (!tarifa) {
-        const tipoHab = HabitacionService.listarTipos().find((t) => t.id === habitacionSeleccionada.tipoHabitacionId);
-        precioNoche = Number(tipoHab?.precioBaseNoche) || 350;
-        tarifaNombre = `Tarifa Base ${tipoHab?.nombre || 'Habitación'}`;
+      // ====== MODO LEGACY: Tarifa seleccionada o precio manual (1 solo precio noche × noches) ======
+      let _precioNoche: number;
+      let _tarifaNombre = '';
+      let _tarifaId: string | null = null;
+      const _precioNocheManualStr = ''; // legacy deshabilitado (ahora solo rangos). Si quieres volver, usar el viejo precioNocheManual.
+      if (_precioNocheManualStr.trim() && !isNaN(Number(_precioNocheManualStr)) && Number(_precioNocheManualStr) > 0) {
+        _precioNoche = Number(_precioNocheManualStr);
+        _tarifaNombre = 'Precio manual (override)';
       } else {
-        const factorPct = (TarifaService as any).TemporadaService?.calcularFactorPorcentaje?.(`${checkin}T15:00:00.000Z`) ?? 0;
-        precioNoche = Number((Number(tarifa.precioPorNoche || 0) * (1 + factorPct / 100)).toFixed(2));
-        tarifaNombre = tarifa.nombre;
-        tarifaId = tarifa.id;
+        let tarifa: any = null;
+        if (!tarifa && tarifasDisponiblesParaHab.length > 0) {
+          tarifa = tarifasDisponiblesParaHab[tarifasDisponiblesParaHab.length - 1];
+        }
+        if (!tarifa) {
+          const tipoHab = HabitacionService.listarTipos().find((t) => t.id === habitacionSeleccionada.tipoHabitacionId);
+          _precioNoche = Number(tipoHab?.precioBaseNoche) || 350;
+          _tarifaNombre = `Tarifa Base ${tipoHab?.nombre || 'Habitación'}`;
+        } else {
+          const factorPct = (TarifaService as any).TemporadaService?.calcularFactorPorcentaje?.(`${checkin}T15:00:00.000Z`) ?? 0;
+          _precioNoche = Number((Number(tarifa.precioPorNoche || 0) * (1 + factorPct / 100)).toFixed(2));
+          _tarifaNombre = tarifa.nombre;
+          _tarifaId = tarifa.id;
+        }
       }
+      precioNoche = _precioNoche;
+      tarifaNombre = _tarifaNombre;
+      tarifaId = _tarifaId;
+      subTotalSinImpuestos = Number((precioNoche * noches).toFixed(2));
+      montoImpuestos = Number((subTotalSinImpuestos * 0.18).toFixed(2));
     }
 
-    const subTotalSinImpuestos = Number((precioNoche * noches).toFixed(2));
+    // (2) Impuestos detalle (SOLO IGV 18% - regla SUNAT). Se arma impuestosDetalle para el render.
     const imps = (TarifaService as any).ImpuestoService?.listarTodos?.() ?? [];
-    const impuestosDetalle = imps.map((i: any) => {
+    const impuestosDetalle = imps.length > 0 ? imps.map((i: any) => {
       const porc = i.tipo === 'PORCENTAJE' ? i.valor : 0;
       return {
         impuesto: i,
         monto: Number(((subTotalSinImpuestos * porc) / 100).toFixed(2)),
       };
-    });
-    const montoImpuestos = Number(impuestosDetalle.reduce((s: number, x: any) => s + Number(x.monto || 0), 0).toFixed(2));
+    }) : [
+      { impuesto: { id: 'IGV-18', nombre: 'IGV', valor: 18, tipo: 'PORCENTAJE' }, monto: montoImpuestos },
+    ];
     const subTotalConImpuestos = Number((subTotalSinImpuestos + montoImpuestos).toFixed(2));
 
+    // (3) Promo (aplica sobre subTotalConImpuestos)
     let descuentoPromo = 0;
     let promoAplicada: any = null;
     let promoValida = false;
@@ -198,8 +395,19 @@ const NuevaReserva: React.FC = () => {
       promoAplicada,
       promoValida,
       totalFinal,
-    };
-  }, [habitacionSeleccionada, noches, tarifasDisponiblesParaHab, tarifaSeleccionadaId, precioNocheManual, codPromoInput, checkin]);
+      // nuevas props para Rangos:
+      modoRangos: usarModoRangos,
+      totalRangosConImpuestos: sumaRangosBruta,
+      rangosResumen: rangosTarifarios.map((r) => ({
+        id: r.id,
+        fechaInicio: r.fechaInicio,
+        fechaFin: r.fechaFin,
+        precioPorNoche: Number(r.precioPorNoche || 0),
+        noches: calcularNochesRango(r),
+        subtotal: calcularSubtotalRango(r),
+      })),
+    } as any;
+  }, [habitacionSeleccionada, noches, tarifasDisponiblesParaHab, codPromoInput, checkin, rangosTarifarios]);
 
   // ====== Paso 4: Origen + Crear ======
   const [origen, setOrigen] = useState<OrigenReserva>('WEB_OFICIAL');
@@ -318,8 +526,6 @@ const NuevaReserva: React.FC = () => {
   // ===== Acciones Paso 2 =====
   const seleccionarHabitacion = (h: Habitacion) => {
     setHabitacionSeleccionada(h);
-    setTarifaSeleccionadaId(null);
-    setPrecioNocheManual('');
     const capHab = Number((h as any).capacidadMaximaPax ?? (h as any).capacidadPersonas ?? 0);
     const tipo = HabitacionService.listarTipos().find((t) => t.id === h.tipoHabitacionId);
     const capTipo = tipo ? (Number(tipo.capacidadAdultos || 0) + Number(tipo.capacidadNinos || 0)) : 0;
@@ -393,7 +599,7 @@ const NuevaReserva: React.FC = () => {
           fechaCheckin: `${checkin}T15:00:00.000Z`,
           fechaCheckout: `${checkout}T11:00:00.000Z`,
           totalNoches: noches,
-          precioBaseAcordadoPorNoche: Number(resumenTarifa.precioNoche),
+          precioBaseAcordadoPorNoche: Number(resumenTarifa.precioNoche), // precio promedio ponderado (backward compat)
           tarifaAplicadaId: resumenTarifa.tarifaId || null as any,
           promocionAplicadaId: resumenTarifa.promoAplicada?.id || null as any,
           precioTotalAlojamiento: Number(resumenTarifa.totalFinal),
@@ -403,22 +609,44 @@ const NuevaReserva: React.FC = () => {
           createdAt: seedUtil.nowISO(),
           updatedAt: seedUtil.nowISO(),
         } as any],
-        tarifasAplicadas: [{
-          id: resumenTarifa.tarifaId || seedUtil.generateUUID(),
-          reservaId: '',
-          tarifaId: resumenTarifa.tarifaId || 'TARIFA-GENERAL',
-          nombreTarifa: resumenTarifa.tarifaNombre || 'Tarifa General',
-          tipoHabitacionId: tipoHabitacion.id,
-          temporadaId: null as any,
-          factorVigenteId: '',
-          fechaInicio: `${checkin}T15:00:00.000Z`,
-          fechaFin: `${checkout}T11:00:00.000Z`,
-          precioBaseNocheInicial: Number(resumenTarifa.precioNoche),
-          createdAt: seedUtil.nowISO(),
-          updatedAt: seedUtil.nowISO(),
-          createdBy: 'USR-MOISES-0001',
-          updatedBy: 'USR-MOISES-0001',
-        } as any],
+        tarifasAplicadas: [
+          // backward compat: 1 tarifa "resumen"
+          {
+            id: resumenTarifa.tarifaId || seedUtil.generateUUID(),
+            reservaId: '',
+            tarifaId: resumenTarifa.tarifaId || 'TARIFA-GENERAL',
+            nombreTarifa: resumenTarifa.tarifaNombre || 'Tarifa General',
+            tipoHabitacionId: tipoHabitacion.id,
+            temporadaId: null as any,
+            factorVigenteId: '',
+            fechaInicio: `${checkin}T15:00:00.000Z`,
+            fechaFin: `${checkout}T11:00:00.000Z`,
+            precioBaseNocheInicial: Number(resumenTarifa.precioNoche),
+            createdAt: seedUtil.nowISO(),
+            updatedAt: seedUtil.nowISO(),
+            createdBy: 'USR-MOISES-0001',
+            updatedBy: 'USR-MOISES-0001',
+          } as any,
+          // RANGOS INDIVIDUALES: 1 entrada por bloque (para que detalle reserva los pueda listar)
+          ...(resumenTarifa.rangosResumen || []).map((rg: any) => ({
+            id: seedUtil.generateUUID(),
+            reservaId: '',
+            tarifaId: `RANGO-${rg.id}`,
+            nombreTarifa: `Rango ${rg.fechaInicio} → ${rg.fechaFin} · ${rg.noches} noche(s) × S/${Number(rg.precioPorNoche || 0).toFixed(2)}`,
+            tipoHabitacionId: tipoHabitacion.id,
+            temporadaId: null as any,
+            factorVigenteId: '',
+            fechaInicio: `${rg.fechaInicio}T15:00:00.000Z`,
+            fechaFin: `${rg.fechaFin}T11:00:00.000Z`,
+            precioBaseNocheInicial: Number(rg.precioPorNoche || 0),
+            nochesAplicables: Number(rg.noches || 0),
+            subtotalAplicable: Number(rg.subtotal || 0),
+            createdAt: seedUtil.nowISO(),
+            updatedAt: seedUtil.nowISO(),
+            createdBy: 'USR-MOISES-0001',
+            updatedBy: 'USR-MOISES-0001',
+          } as any)),
+        ],
         promocionesAplicadas: resumenTarifa.promoAplicada ? [{
           id: resumenTarifa.promoAplicada.id,
           reservaId: '',
@@ -526,8 +754,6 @@ const NuevaReserva: React.FC = () => {
     setHabitacionesDisponibles([]);
     setHabitacionSeleccionada(null);
     setCodPromoInput('');
-    setPrecioNocheManual('');
-    setTarifaSeleccionadaId(null);
     setPromoValidacionMsg(null);
     setOrigen('WEB_OFICIAL');
     setNotasInternas('');
@@ -562,8 +788,6 @@ const NuevaReserva: React.FC = () => {
     setHabitacionesDisponibles([]);
     setHabitacionSeleccionada(null);
     setCodPromoInput('');
-    setPrecioNocheManual('');
-    setTarifaSeleccionadaId(null);
     setPromoValidacionMsg(null);
     setOrigen('WEB_OFICIAL');
     setNotasInternas('');
@@ -851,138 +1075,378 @@ const NuevaReserva: React.FC = () => {
                   <IonCol size="12" sizeMd="6">
                     <IonCard>
                       <IonCardHeader>
-                        <IonCardTitle>Tarifas disponibles</IonCardTitle>
-                        <IonCardSubtitle>Selecciona una tarifa predefinida o usa precio manual</IonCardSubtitle>
+                        <IonCardTitle>
+                          <IonIcon icon={addCircle} style={{ marginRight: 8 }} />
+                          Tarifas por Rangos de Fechas
+                        </IonCardTitle>
+                        <IonCardSubtitle>
+                          ✅ Rango general de cobro: <b>{checkin || '—'}</b> → <b>{checkout || '—'}</b> · <b>{noches} {noches === 1 ? 'noche' : 'noches'}</b> · Agrega bloques con el botón [+] para poner precio diferente por tramo.
+                        </IonCardSubtitle>
                       </IonCardHeader>
                       <IonCardContent>
-                        {tarifasDisponiblesParaHab.length === 0 ? (
-                          <IonNote color="medium">Selecciona primero una habitación (Paso 2).</IonNote>
+                        {!habitacionSeleccionada ? (
+                          <IonNote color="medium">
+                            ⚠️ Primero selecciona una habitación disponible (Paso 2) para activar el cálculo automático de rangos.
+                          </IonNote>
                         ) : (
-                          <IonList lines="full">
-                            {tarifasDisponiblesParaHab.map((t: any, idx: number) => {
-                              const precio = Number(t.precioPorNoche || 0);
-                              const sel = tarifaSeleccionadaId
-                                ? t.id === tarifaSeleccionadaId
-                                : idx === tarifasDisponiblesParaHab.length - 1;
-                              const manualActivo = precioNocheManual.trim() !== '';
-                              return (
-                                <IonItem
-                                  key={t.id}
-                                  button={!manualActivo}
-                                  onClick={() => { if (!manualActivo) { setTarifaSeleccionadaId(t.id); setPrecioNocheManual(''); } }}
-                                  color={sel && !manualActivo ? 'primary' : undefined}
-                                  style={sel && !manualActivo ? { backgroundColor: '#e8f5e9' } : undefined}
-                                >
+                          <>
+                            {/* ===== LISTA DE BLOQUES ===== */}
+                            <IonList lines="full" style={{ marginTop: 0 }}>
+                              {rangosTarifarios.length === 0 && (
+                                <IonItem color="warning">
                                   <IonLabel>
-                                    <h2>
-                                      <IonBadge color={sel && !manualActivo ? 'success' : 'medium'}>
-                                        {sel && !manualActivo ? '✓ ' : ''}{t.nombre || `Tarifa ${idx + 1}`}
-                                      </IonBadge>
-                                    </h2>
-                                    <p>{t.descripcion || `Tarifa tipo: ${t.tipoHabitacionId || 'general'}`}</p>
-                                  </IonLabel>
-                                  <IonLabel slot="end" style={{ textAlign: 'right' }}>
-                                    <b style={{ fontSize: 18 }}>S/ {precio.toFixed(2)}</b>
-                                    <p style={{ fontSize: 12 }}>/ noche</p>
+                                    ⚠️ No hay rangos agregados. Pulsa el botón <b>➕ AGREGAR RANGO</b> para crear el primer bloque.
                                   </IonLabel>
                                 </IonItem>
-                              );
-                            })}
-                            <IonItem style={{ marginTop: 12 }}>
-                              <IonLabel position="stacked">
-                                ✏️ Precio manual (sobrescribe tarifa seleccionada)
-                              </IonLabel>
-                              <IonInput
-                                type="number"
-                                placeholder="Ej: 420.00"
-                                value={precioNocheManual}
-                                onIonInput={(e) => setPrecioNocheManual(e.detail.value || '')}
-                              />
-                            </IonItem>
-                            <IonNote color="medium" style={{ display: 'block', marginTop: 8 }}>
-                              💡 Para desactivar modo manual, borra el número del campo.
-                            </IonNote>
-                          </IonList>
-                        )}
-                      </IonCardContent>
-                    </IonCard>
+                              )}
+                              {rangosTarifarios.map((rg, idx) => {
+                                const nochesRg = calcularNochesRango(rg);
+                                const subRg = calcularSubtotalRango(rg);
+                                // Validaciones individuales por bloque
+                                const fueraDeRango =
+                                  (rg.fechaInicio && new Date(rg.fechaInicio) < new Date(checkin)) ||
+                                  (rg.fechaFin && new Date(rg.fechaFin) > new Date(checkout));
+                                const inversionFechas =
+                                  rg.fechaInicio && rg.fechaFin && new Date(rg.fechaInicio) >= new Date(rg.fechaFin);
+                                const nochesBloqueCobertura = (() => {
+                                  const nochesStr: string[] = [];
+                                  if (!rg.fechaInicio || !rg.fechaFin) return nochesStr;
+                                  const rIni = new Date(rg.fechaInicio);
+                                  const rFin = new Date(rg.fechaFin);
+                                  const gIni = new Date(checkin);
+                                  const gFin = new Date(checkout);
+                                  const i = rIni > gIni ? rIni : gIni;
+                                  const f = rFin < gFin ? rFin : gFin;
+                                  for (let d = new Date(i); d < f; d.setDate(d.getDate() + 1)) {
+                                    nochesStr.push(d.toISOString().slice(0, 10));
+                                  }
+                                  return nochesStr;
+                                })();
+                                const nochesSolapadas = nochesBloqueCobertura.filter(
+                                  (n) => (validacionRangosCompleta.coberturaMap[n] || 0) >= 2,
+                                );
+                                const nochesFaltantes = validacionRangosCompleta.faltantesNochesStr.slice(0, 10);
+                                const bloqueConError =
+                                  fueraDeRango ||
+                                  inversionFechas ||
+                                  nochesSolapadas.length > 0 ||
+                                  nochesRg <= 0 ||
+                                  Number(rg.precioPorNoche) <= 0;
+                                return (
+                                  <IonItem
+                                    key={rg.id}
+                                    lines="full"
+                                    color={bloqueConError ? 'warning' : undefined}
+                                    style={{
+                                      borderTop: bloqueConError ? '2px solid #f59e0b' : '2px solid #10b981',
+                                      borderRadius: 8,
+                                      marginBottom: 10,
+                                    }}
+                                  >
+                                    <IonGrid style={{ paddingInline: 0 }}>
+                                      <IonRow className="ion-align-items-center">
+                                        <IonCol size="12" sizeMd="1">
+                                          <h3 style={{ margin: 0 }}>🧱 Bloque {idx + 1}</h3>
+                                        </IonCol>
+                                        <IonCol size="12" sizeMd="11" className="ion-text-right" style={{ paddingBottom: 6 }}>
+                                          <IonButton
+                                            fill="clear"
+                                            color="danger"
+                                            size="small"
+                                            onClick={() => eliminarRangoPorId(rg.id)}
+                                            disabled={rangosTarifarios.length <= 1}
+                                          >
+                                            <IonIcon icon={trash} slot="icon-only" />
+                                            &nbsp; Eliminar
+                                          </IonButton>
+                                        </IonCol>
+                                      </IonRow>
+                                      <IonRow>
+                                        <IonCol size="12" sizeMd="4">
+                                          <IonItem style={{ marginBottom: 6 }}>
+                                            <IonLabel position="stacked">📅 Día inicio</IonLabel>
+                                            <IonDatetime
+                                              value={rg.fechaInicio}
+                                              onIonChange={(e) =>
+                                                actualizarRangoPorId(rg.id, {
+                                                  fechaInicio: (e.detail.value as string).slice(0, 10),
+                                                })
+                                              }
+                                              style={{ maxWidth: '100%' }}
+                                              min={checkin}
+                                              max={checkout}
+                                            />
+                                          </IonItem>
+                                        </IonCol>
+                                        <IonCol size="12" sizeMd="4">
+                                          <IonItem style={{ marginBottom: 6 }}>
+                                            <IonLabel position="stacked">📅 Día fin</IonLabel>
+                                            <IonDatetime
+                                              value={rg.fechaFin}
+                                              onIonChange={(e) =>
+                                                actualizarRangoPorId(rg.id, {
+                                                  fechaFin: (e.detail.value as string).slice(0, 10),
+                                                })
+                                              }
+                                              style={{ maxWidth: '100%' }}
+                                              min={checkin}
+                                              max={checkout}
+                                            />
+                                          </IonItem>
+                                        </IonCol>
+                                        <IonCol size="12" sizeMd="4">
+                                          <IonItem style={{ marginBottom: 6 }}>
+                                            <IonLabel position="stacked">💰 Precio por noche S/</IonLabel>
+                                            <IonInput
+                                              type="number"
+                                              min="0"
+                                              step="0.5"
+                                              value={String(Number(rg.precioPorNoche) || 0)}
+                                              onIonChange={(e) =>
+                                                actualizarRangoPorId(rg.id, {
+                                                  precioPorNoche: Number(e.detail.value) || 0,
+                                                })
+                                              }
+                                            />
+                                          </IonItem>
+                                        </IonCol>
+                                      </IonRow>
+                                      <IonRow className="ion-align-items-center">
+                                        <IonCol size="12" sizeMd="7">
+                                          {inversionFechas && (
+                                            <IonNote color="danger" style={{ fontSize: 12 }}>
+                                              ⛔ Fecha fin tiene que ser MAYOR que fecha inicio.
+                                            </IonNote>
+                                          )}
+                                          {!inversionFechas && fueraDeRango && (
+                                            <IonNote color="warning" style={{ fontSize: 12 }}>
+                                              ⚠️ Rango fuera de {checkin}→{checkout}. Fechas se limitarán al rango general.
+                                            </IonNote>
+                                          )}
+                                          {!inversionFechas && !fueraDeRango && nochesSolapadas.length > 0 && (
+                                            <IonNote color="danger" style={{ fontSize: 12 }}>
+                                              ⛔ Solapa con otros bloques: {nochesSolapadas.slice(0, 5).join(', ')}
+                                              {nochesSolapadas.length > 5 ? '...' : ''}
+                                            </IonNote>
+                                          )}
+                                        </IonCol>
+                                        <IonCol size="12" sizeMd="5">
+                                          <IonChip
+                                            color={bloqueConError ? 'warning' : 'success'}
+                                            outline={bloqueConError}
+                                            style={{
+                                              float: 'right',
+                                              padding: '10px 16px',
+                                              fontSize: 15,
+                                              fontWeight: 700,
+                                              minHeight: 40,
+                                            }}
+                                          >
+                                            {nochesRg <= 0 ? '0 noches' : `${nochesRg} ${nochesRg === 1 ? 'noche' : 'noches'}`} ·{' '}
+                                            Subtotal <b>S/ {Number(subRg).toFixed(2)}</b>
+                                          </IonChip>
+                                        </IonCol>
+                                      </IonRow>
+                                    </IonGrid>
+                                  </IonItem>
+                                );
+                              })}
+                            </IonList>
 
-                    <IonCard style={{ marginTop: 12 }}>
-                      <IonCardHeader>
-                        <IonCardTitle>Código promocional</IonCardTitle>
-                        <IonCardSubtitle>(opcional) Prueba: <b>3NOCHES50OFF</b> o <b>10OFFWEB</b></IonCardSubtitle>
-                      </IonCardHeader>
-                      <IonCardContent>
-                        <IonItem>
-                          <IonIcon icon={pricetags} slot="start" />
-                          <IonInput placeholder="Ej: 10OFFWEB" value={codPromoInput} onIonInput={(e) => setCodPromoInput(e.detail.value!.toUpperCase())} />
-                        </IonItem>
-                        {codPromoInput.trim() && (
-                          <IonCard
-                            color={resumenTarifa?.promoValida ? 'success' : 'danger'}
-                            style={{ marginTop: 12 }}
-                          >
-                            <IonCardContent style={{ color: 'white' }}>
-                              <IonIcon
-                                icon={resumenTarifa?.promoValida ? checkmarkCircle : alertCircle}
-                                style={{ marginRight: 8 }}
-                              />
-                              {resumenTarifa?.promoValida
-                                ? `✅ Promo "${resumenTarifa.promoAplicada?.codigo}" aplicada: -S/ ${Number(resumenTarifa.descuentoPromo || 0).toFixed(2)} ${
-                                    resumenTarifa.promoAplicada?.tipoDescuento === 'PORCENTAJE'
-                                      ? `(${resumenTarifa.promoAplicada?.valorDescuento}%)`
-                                      : ''
-                                  }`
-                                : `Código "${codPromoInput.trim()}" no válido. Revisa fechas, mínimo de noches o monto.`}
-                            </IonCardContent>
-                          </IonCard>
+                            {/* ===== BOTÓN AGREGAR RANGO ===== */}
+                            <IonButton
+                              expand="block"
+                              color="primary"
+                              onClick={agregarNuevoRango}
+                              style={{ marginTop: 10 }}
+                            >
+                              <IonIcon icon={addCircle} slot="start" />
+                              ➕ AGREGAR OTRO RANGO DE FECHAS
+                            </IonButton>
+
+                            {/* ===== RESUMEN VALIDACIÓN GLOBAL ===== */}
+                            <IonCard
+                              color={validacionRangosCompleta.valido ? 'success' : 'danger'}
+                              style={{ marginTop: 16, marginBottom: 0 }}
+                            >
+                              <IonCardContent style={{ color: 'white' }}>
+                                {validacionRangosCompleta.valido ? (
+                                  <>
+                                    <IonIcon icon={checkmarkCircle} style={{ marginRight: 6 }} />
+                                    ✅ CUBIERTO 100% — <b>{noches} {noches === 1 ? 'noche' : 'noches'}</b> sin solapamientos. Precio total por rangos:
+                                    <b style={{ float: 'right' }}>S/ {Number(totalSumaRangos).toFixed(2)}</b>
+                                  </>
+                                ) : (
+                                  <>
+                                    <IonIcon icon={alertCircle} style={{ marginRight: 6 }} />
+                                    ⛔ REVISA LOS RANGOS:
+                                    {validacionRangosCompleta.faltantesNochesStr.length > 0 && (
+                                      <div style={{ marginTop: 6 }}>
+                                        • Falta asignar precio a{' '}
+                                        <b>{validacionRangosCompleta.faltantesNochesStr.length}</b> noche(s):{' '}
+                                        <code style={{ color: 'white' }}>
+                                          {validacionRangosCompleta.faltantesNochesStr.join(', ')}
+                                        </code>
+                                        . Agrega otro rango ➕ o amplía un bloque.
+                                      </div>
+                                    )}
+                                    {validacionRangosCompleta.solapadosNochesStr.length > 0 && (
+                                      <div style={{ marginTop: 6 }}>
+                                        • Noches con precio doble (solapadas):{' '}
+                                        <code style={{ color: 'white' }}>
+                                          {validacionRangosCompleta.solapadosNochesStr.join(', ')}
+                                        </code>
+                                        . Reduce el día fin de un bloque o elimina un rango.
+                                      </div>
+                                    )}
+                                  </>
+                                )}
+                              </IonCardContent>
+                            </IonCard>
+
+                            {/* ===== CÓDIGO PROMOCIONAL ===== */}
+                            <IonCard style={{ marginTop: 12 }}>
+                              <IonCardHeader>
+                                <IonCardTitle>Código promocional</IonCardTitle>
+                                <IonCardSubtitle>
+                                  (opcional) Prueba: <b>3NOCHES50OFF</b> o <b>10OFFWEB</b>
+                                </IonCardSubtitle>
+                              </IonCardHeader>
+                              <IonCardContent>
+                                <IonItem>
+                                  <IonIcon icon={pricetags} slot="start" />
+                                  <IonInput
+                                    placeholder="Ej: 10OFFWEB"
+                                    value={codPromoInput}
+                                    onIonInput={(e) => setCodPromoInput(e.detail.value!.toUpperCase())}
+                                  />
+                                </IonItem>
+                                {codPromoInput.trim() && (
+                                  <IonCard
+                                    color={resumenTarifa?.promoValida ? 'success' : 'danger'}
+                                    style={{ marginTop: 12 }}
+                                  >
+                                    <IonCardContent style={{ color: 'white' }}>
+                                      <IonIcon
+                                        icon={resumenTarifa?.promoValida ? checkmarkCircle : alertCircle}
+                                        style={{ marginRight: 8 }}
+                                      />
+                                      {resumenTarifa?.promoValida
+                                        ? `✅ Promo "${resumenTarifa.promoAplicada?.codigo}" aplicada: -S/ ${Number(
+                                            resumenTarifa.descuentoPromo || 0,
+                                          ).toFixed(2)} ${
+                                            resumenTarifa.promoAplicada?.tipoDescuento === 'PORCENTAJE'
+                                              ? `(${resumenTarifa.promoAplicada?.valorDescuento}%)`
+                                              : ''
+                                          }`
+                                        : `Código "${codPromoInput.trim()}" no válido. Revisa fechas, mínimo de noches o monto.`}
+                                    </IonCardContent>
+                                  </IonCard>
+                                )}
+                              </IonCardContent>
+                            </IonCard>
+                          </>
                         )}
                       </IonCardContent>
                     </IonCard>
                   </IonCol>
+
+                  {/* ===== COLUMNA 2: RESUMEN ECONÓMICO (igual que antes pero ahora incluye BLOQUES detalle) ===== */}
                   <IonCol size="12" sizeMd="6">
                     <IonCard>
                       <IonCardHeader>
                         <IonCardTitle>Resumen económico</IonCardTitle>
                         <IonCardSubtitle>
-                          Habitación: {habitacionSeleccionada?.codigo || '(sin seleccionar)'} · {noches} {noches === 1 ? 'noche' : 'noches'} · {adultos}A {ninos > 0 ? `${ninos}N` : ''}
+                          Habitación: {habitacionSeleccionada?.codigo || '(sin seleccionar)'} · {noches}{' '}
+                          {noches === 1 ? 'noche' : 'noches'} · {adultos}A {ninos > 0 ? `${ninos}N` : ''}
                         </IonCardSubtitle>
                       </IonCardHeader>
                       <IonCardContent>
                         {!resumenTarifa ? (
-                          <IonNote color="medium">Selecciona una habitación en el Paso 2 para ver el cálculo.</IonNote>
+                          <IonNote color="medium">
+                            Selecciona una habitación en el Paso 2 para ver el cálculo.
+                          </IonNote>
                         ) : (
                           <IonList lines="full">
+                            {/* ===== DETALLE POR BLOQUES RANGOS ===== */}
+                            {(resumenTarifa.rangosResumen || []).length > 0 && (
+                              <>
+                                <IonItem>
+                                  <IonLabel style={{ fontWeight: 700 }}>
+                                    🧱 Desglose por rangos ({resumenTarifa.rangosResumen.length})
+                                  </IonLabel>
+                                </IonItem>
+                                {resumenTarifa.rangosResumen.map((rg: any) => (
+                                  <IonItem key={rg.id}>
+                                    <IonLabel>
+                                      {rg.fechaInicio} → {rg.fechaFin} · <b>{rg.noches} noche(s)</b> · S/{' '}
+                                      {Number(rg.precioPorNoche || 0).toFixed(2)}/noche
+                                    </IonLabel>
+                                    <IonLabel slot="end" style={{ textAlign: 'right' }}>
+                                      = <b>S/ {Number(rg.subtotal || 0).toFixed(2)}</b>
+                                    </IonLabel>
+                                  </IonItem>
+                                ))}
+                                <IonItem color="light">
+                                  <IonLabel>
+                                    <b>Suma bloques (sin impuestos internos)</b>
+                                  </IonLabel>
+                                  <IonLabel slot="end">
+                                    <b>S/ {Number(resumenTarifa.totalRangosConImpuestos || 0).toFixed(2)}</b>
+                                  </IonLabel>
+                                </IonItem>
+                              </>
+                            )}
+
                             <IonItem>
                               <IonLabel>Tarifa aplicada</IonLabel>
                               <IonLabel slot="end" style={{ textAlign: 'right' }}>
-                                <IonBadge color={precioNocheManual.trim() ? 'warning' : 'primary'}>
-                                  {precioNocheManual.trim() ? 'MANUAL' : resumenTarifa.tarifaNombre?.slice(0, 20)}
+                                <IonBadge color={resumenTarifa.modoRangos ? 'success' : 'primary'}>
+                                  {resumenTarifa.tarifaNombre?.slice(0, 22)}
                                 </IonBadge>
                               </IonLabel>
                             </IonItem>
+                            {resumenTarifa.modoRangos ? (
+                              <IonItem>
+                                <IonLabel>Precio promedio x noche</IonLabel>
+                                <IonLabel slot="end">
+                                  <b>S/ {Number(resumenTarifa.precioNoche).toFixed(2)}</b>
+                                </IonLabel>
+                              </IonItem>
+                            ) : (
+                              <IonItem>
+                                <IonLabel>Precio / noche</IonLabel>
+                                <IonLabel slot="end">
+                                  <b>S/ {Number(resumenTarifa.precioNoche).toFixed(2)}</b>
+                                </IonLabel>
+                              </IonItem>
+                            )}
                             <IonItem>
-                              <IonLabel>Precio / noche</IonLabel>
-                              <IonLabel slot="end"><b>S/ {Number(resumenTarifa.precioNoche).toFixed(2)}</b></IonLabel>
-                            </IonItem>
-                            <IonItem>
-                              <IonLabel>Subtotal alojamiento ({noches} noches, sin impuestos)</IonLabel>
+                              <IonLabel>
+                                Subtotal alojamiento ({noches} noches, sin impuestos)
+                              </IonLabel>
                               <IonLabel slot="end">S/ {Number(resumenTarifa.subTotalSinImpuestos).toFixed(2)}</IonLabel>
                             </IonItem>
                             {resumenTarifa.impuestosDetalle.map((d: any) => (
                               <IonItem key={d.impuesto?.id || Math.random()}>
-                                <IonLabel>{d.impuesto?.nombre || 'Impuesto'} ({d.impuesto?.valor || 0}%)</IonLabel>
+                                <IonLabel>
+                                  {d.impuesto?.nombre || 'Impuesto'} ({d.impuesto?.valor || 0}%)
+                                </IonLabel>
                                 <IonLabel slot="end">S/ {Number(d.monto || 0).toFixed(2)}</IonLabel>
                               </IonItem>
                             ))}
                             {Number(resumenTarifa.descuentoPromo) > 0 && (
                               <IonItem color="success">
                                 <IonLabel>🎁 Descuento promoción</IonLabel>
-                                <IonLabel slot="end" color="success">−S/ {Number(resumenTarifa.descuentoPromo).toFixed(2)}</IonLabel>
+                                <IonLabel slot="end" color="success">
+                                  −S/ {Number(resumenTarifa.descuentoPromo).toFixed(2)}
+                                </IonLabel>
                               </IonItem>
                             )}
                             <IonItem lines="none">
-                              <IonLabel style={{ fontSize: 20 }}><b>TOTAL A PAGAR</b></IonLabel>
+                              <IonLabel style={{ fontSize: 20 }}>
+                                <b>TOTAL A PAGAR</b>
+                              </IonLabel>
                               <IonLabel slot="end" color="primary" style={{ fontSize: 24 }}>
                                 <b>S/ {Number(resumenTarifa.totalFinal).toFixed(2)}</b>
                               </IonLabel>
