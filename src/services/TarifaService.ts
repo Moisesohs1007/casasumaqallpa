@@ -1,6 +1,24 @@
 // @ts-nocheck
 import { db, seedUtil, type Create, type Update, type Tarifa, type Temporada, type PoliticaCancelacion, type CodigoPromocional, type ImpuestoTarifa } from './__db__';
 import { db as dbRemota } from './__supabase_db__';
+import * as pendingSync from './__pending_sync__';
+
+const TIMEOUT_REMOTO_MS = 3500;
+const timeoutPromise = (ms: number) => new Promise<never>((_, rej) => setTimeout(() => rej(new Error('TIMEOUT_REMOTO')), ms));
+
+async function _remotoConQueue(method: 'add' | 'update' | 'remove', key: string, matchId: string, payload: any, remotoCallFn: () => Promise<any>): Promise<void> {
+  if (!dbRemota.isOnline()) {
+    pendingSync.enqueue(key, method, matchId, payload);
+    return;
+  }
+  try {
+    const res = await Promise.race([remotoCallFn(), timeoutPromise(TIMEOUT_REMOTO_MS)]);
+    if (!res && method !== 'remove') throw new Error('respuesta remota vacía');
+  } catch (e) {
+    console.warn('[Tarifa._remotoConQueue] remoto falló → enqueue. Key=', key, 'm=', method, 'id=', matchId, 'err=', (e as Error)?.message || e);
+    pendingSync.enqueue(key, method, matchId, payload);
+  }
+}
 
 const KEY_TAR = 'tarifas';
 const KEY_TEMP = 'temporadas';
@@ -67,12 +85,16 @@ export const TemporadaService = {
   buscarPorId(id: string): Temporada | undefined { return db.getById<Temporada>(KEY_TEMP, id); },
   crear(payload: Create<Temporada>): Temporada {
     const nueva = db.add<Temporada>(KEY_TEMP, payload);
-    dbRemota.addAsync<Temporada>(KEY_TEMP, payload).catch((e) => console.error('[TemporadaService] crear:', e));
+    const payloadFinal = { ...payload, id: nueva.id };
+    (async () => { try { await _remotoConQueue('add', KEY_TEMP, nueva.id, payloadFinal, () => dbRemota.addAsync<Temporada>(KEY_TEMP, payloadFinal as any)); } catch (_) {} })().catch(()=>{});
     return nueva;
   },
   actualizar(id: string, changes: Update<Temporada>): Temporada | undefined {
     const act = db.update<Temporada>(KEY_TEMP, id, changes);
-    if (act) dbRemota.updateAsync<Temporada>(KEY_TEMP, id, changes).catch((e) => console.error('[TemporadaService] actualizar:', e));
+    if (act) {
+      const payloadDelta = { id, ...changes };
+      (async () => { try { await _remotoConQueue('update', KEY_TEMP, id, payloadDelta, () => dbRemota.updateAsync<Temporada>(KEY_TEMP, id, changes as any)); } catch (_) {} })().catch(()=>{});
+    }
     return act;
   },
   calcularFactorPorcentaje(fechaISO: string): number {
@@ -89,12 +111,16 @@ export const PoliticaCancelacionService = {
   buscarPorId(id: string): PoliticaCancelacion | undefined { return db.getById<PoliticaCancelacion>(KEY_POL, id); },
   crear(payload: Create<PoliticaCancelacion>): PoliticaCancelacion {
     const nueva = db.add<PoliticaCancelacion>(KEY_POL, payload);
-    dbRemota.addAsync<PoliticaCancelacion>(KEY_POL, payload).catch((e) => console.error('[PoliticaCancelacionService] crear:', e));
+    const payloadFinal = { ...payload, id: nueva.id };
+    (async () => { try { await _remotoConQueue('add', KEY_POL, nueva.id, payloadFinal, () => dbRemota.addAsync<PoliticaCancelacion>(KEY_POL, payloadFinal as any)); } catch (_) {} })().catch(()=>{});
     return nueva;
   },
   actualizar(id: string, changes: Update<PoliticaCancelacion>): PoliticaCancelacion | undefined {
     const act = db.update<PoliticaCancelacion>(KEY_POL, id, changes);
-    if (act) dbRemota.updateAsync<PoliticaCancelacion>(KEY_POL, id, changes).catch((e) => console.error('[PoliticaCancelacionService] actualizar:', e));
+    if (act) {
+      const payloadDelta = { id, ...changes };
+      (async () => { try { await _remotoConQueue('update', KEY_POL, id, payloadDelta, () => dbRemota.updateAsync<PoliticaCancelacion>(KEY_POL, id, changes as any)); } catch (_) {} })().catch(()=>{});
+    }
     return act;
   },
   calcularPenalidad(
@@ -141,7 +167,8 @@ export const CodigoPromocionalService = {
   buscarPorId(id: string): CodigoPromocional | undefined { return db.getById<CodigoPromocional>(KEY_PROM, id); },
   crear(payload: Create<CodigoPromocional>): CodigoPromocional {
     const nueva = db.add<CodigoPromocional>(KEY_PROM, payload);
-    dbRemota.addAsync<CodigoPromocional>(KEY_PROM, payload).catch((e) => console.error('[CodigoPromocionalService] crear:', e));
+    const payloadFinal = { ...payload, id: nueva.id };
+    (async () => { try { await _remotoConQueue('add', KEY_PROM, nueva.id, payloadFinal, () => dbRemota.addAsync<CodigoPromocional>(KEY_PROM, payloadFinal as any)); } catch (_) {} })().catch(()=>{});
     return nueva;
   },
   validarYAplicar(params: {
@@ -199,7 +226,10 @@ export const CodigoPromocionalService = {
     if ((promo.usosMaximosTotales || 0) > 0 && usos >= (promo.usosMaximosTotales || 0)) estado = 'INACTIVO';
     const patch: any = { usosActualesTotales: usos, estado, updatedBy: 'system-promociones' };
     const act = db.update<CodigoPromocional>(KEY_PROM, id, patch);
-    if (act) dbRemota.updateAsync<CodigoPromocional>(KEY_PROM, id, patch).catch((e) => console.error('[CodigoPromocionalService] registrarUso:', e));
+    if (act) {
+      const payloadDelta = { id, ...patch };
+      (async () => { try { await _remotoConQueue('update', KEY_PROM, id, payloadDelta, () => dbRemota.updateAsync<CodigoPromocional>(KEY_PROM, id, patch)); } catch (_) {} })().catch(()=>{});
+    }
     return act;
   },
   hidratarDesdeSupabase: hidratarTarifasGroup,
@@ -295,17 +325,21 @@ export const TarifaService = {
   },
   crear(payload: Create<Tarifa>): Tarifa {
     const nueva = db.add<Tarifa>(KEY_TAR, payload);
-    dbRemota.addAsync<Tarifa>(KEY_TAR, payload).catch((e) => console.error('[TarifaService] crear:', e));
+    const payloadFinal = { ...payload, id: nueva.id };
+    (async () => { try { await _remotoConQueue('add', KEY_TAR, nueva.id, payloadFinal, () => dbRemota.addAsync<Tarifa>(KEY_TAR, payloadFinal as any)); } catch (_) {} })().catch(()=>{});
     return nueva;
   },
   actualizar(id: string, changes: Update<Tarifa>): Tarifa | undefined {
     const act = db.update<Tarifa>(KEY_TAR, id, changes);
-    if (act) dbRemota.updateAsync<Tarifa>(KEY_TAR, id, changes).catch((e) => console.error('[TarifaService] actualizar:', e));
+    if (act) {
+      const payloadDelta = { id, ...changes };
+      (async () => { try { await _remotoConQueue('update', KEY_TAR, id, payloadDelta, () => dbRemota.updateAsync<Tarifa>(KEY_TAR, id, changes as any)); } catch (_) {} })().catch(()=>{});
+    }
     return act;
   },
   eliminar(id: string): boolean {
     const ok = db.remove(KEY_TAR, id);
-    if (ok) dbRemota.removeAsync(KEY_TAR, id).catch((e) => console.error('[TarifaService] eliminar:', e));
+    if (ok) (async () => { try { await _remotoConQueue('remove', KEY_TAR, id, { id }, () => dbRemota.removeAsync(KEY_TAR, id)); } catch (_) {} })().catch(()=>{});
     return ok;
   },
   reiniciarSeed(): void { db.reset(); },

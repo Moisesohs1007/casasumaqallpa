@@ -8,6 +8,23 @@ const KEY_TIPO = 'tiposHabitacion' as const;
 const KEY_TAR = 'tarifas' as const;
 const KEY_POL = 'politicasCancelacion' as const;
 
+const TIMEOUT_REMOTO_MS = 3500;
+const timeoutPromise = (ms: number) => new Promise<never>((_, rej) => setTimeout(() => rej(new Error('TIMEOUT_REMOTO')), ms));
+
+async function _remotoConQueue(method: 'add' | 'update' | 'remove', key: string, matchId: string, payload: any, remotoCallFn: () => Promise<any>): Promise<void> {
+  if (!dbRemota || !((dbRemota as any)?.isOnline?.())) {
+    pendingSync.enqueue(key, method, matchId, payload);
+    return;
+  }
+  try {
+    const res = await Promise.race([remotoCallFn(), timeoutPromise(TIMEOUT_REMOTO_MS)]);
+    if (!res && method !== 'remove') throw new Error('respuesta remota vacía');
+  } catch (e) {
+    console.warn('[Hab._remotoConQueue] remoto falló → enqueue. Key=', key, 'm=', method, 'id=', matchId, 'err=', (e as Error)?.message || e);
+    pendingSync.enqueue(key, method, matchId, payload);
+  }
+}
+
 let _hidratacionDone = false;
 let _hidratandoPromise: Promise<boolean> | null = null;
 
@@ -76,15 +93,16 @@ export const HabitacionService = {
 
   crearTipo(payload: Create<TipoHabitacion>): TipoHabitacion {
     const tipo = db.add<TipoHabitacion>(KEY_TIPO, payload);
-    // dual-write: no esperar asíncrono para no bloquear UI
-    dbRemota.addAsync<TipoHabitacion>(KEY_TIPO, tipo as any).catch((e) => console.error('[HabitacionService] crearTipo sync remoto falló:', e?.message || e));
+    const payloadFinal = { ...tipo };
+    (async () => { try { await _remotoConQueue('add', KEY_TIPO, tipo.id, payloadFinal, () => dbRemota.addAsync<TipoHabitacion>(KEY_TIPO, tipo as any)); } catch (_) {} })().catch(()=>{});
     return tipo;
   },
 
   actualizarTipo(id: string, changes: Update<TipoHabitacion>): TipoHabitacion | undefined {
     const local = db.update<TipoHabitacion>(KEY_TIPO, id, changes);
     if (local) {
-      dbRemota.updateAsync<TipoHabitacion>(KEY_TIPO, id, changes as any).catch((e) => console.error('[HabitacionService] actualizarTipo sync remoto falló:', e?.message || e));
+      const payloadDelta = { id, ...changes };
+      (async () => { try { await _remotoConQueue('update', KEY_TIPO, id, payloadDelta, () => dbRemota.updateAsync<TipoHabitacion>(KEY_TIPO, id, changes as any)); } catch (_) {} })().catch(()=>{});
     }
     return local;
   },
@@ -167,14 +185,16 @@ export const HabitacionService = {
   crear(payload: Create<Habitacion>): Habitacion {
     const hab = db.add<Habitacion>(KEY_HAB, payload);
     if (!hab.tipoHabitacion && hab.tipoHabitacionId) hab.tipoHabitacion = this.buscarTipoPorId(hab.tipoHabitacionId);
-    dbRemota.addAsync<Habitacion>(KEY_HAB, hab as any).catch((e) => console.error('[HabitacionService] crear sync remoto falló:', e?.message || e));
+    const payloadFinal = { ...hab };
+    (async () => { try { await _remotoConQueue('add', KEY_HAB, hab.id, payloadFinal, () => dbRemota.addAsync<Habitacion>(KEY_HAB, hab as any)); } catch (_) {} })().catch(()=>{});
     return hab;
   },
 
   actualizar(id: string, changes: Update<Habitacion>): Habitacion | undefined {
     const local = db.update<Habitacion>(KEY_HAB, id, changes);
     if (local) {
-      dbRemota.updateAsync<Habitacion>(KEY_HAB, id, changes as any).catch((e) => console.error('[HabitacionService] actualizar sync remoto falló:', e?.message || e));
+      const payloadDelta = { id, ...changes };
+      (async () => { try { await _remotoConQueue('update', KEY_HAB, id, payloadDelta, () => dbRemota.updateAsync<Habitacion>(KEY_HAB, id, changes as any)); } catch (_) {} })().catch(()=>{});
     }
     return local;
   },
@@ -239,7 +259,7 @@ export const HabitacionService = {
   eliminar(id: string): boolean {
     const ok = db.remove(KEY_HAB, id);
     if (ok) {
-      dbRemota.removeAsync(KEY_HAB, id).catch((e) => console.error('[HabitacionService] eliminar sync remoto falló:', e?.message || e));
+      (async () => { try { await _remotoConQueue('remove', KEY_HAB, id, { id }, () => dbRemota.removeAsync(KEY_HAB, id)); } catch (_) {} })().catch(()=>{});
     }
     return ok;
   },

@@ -1,16 +1,19 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import {
   IonApp,
+  IonBadge,
+  IonButton,
   IonIcon,
   IonLabel,
   IonRouterOutlet,
   IonTabBar,
   IonTabButton,
   IonTabs,
+  IonToast,
   setupIonicReact,
 } from '@ionic/react';
 import { IonReactRouter } from '@ionic/react-router';
-import { home, calendar, bed, restaurant, person } from 'ionicons/icons';
+import { cloud, cloudOffline, refreshCircle, home, calendar, bed, restaurant, person, alertCircle, checkmarkCircle } from 'ionicons/icons';
 import { Redirect, Route, useHistory, useLocation } from 'react-router-dom';
 
 import HomePage from './pages/Home/Home';
@@ -22,6 +25,7 @@ import PosPage from './pages/Pos/Pos';
 import PerfilPage from './pages/Perfil/Perfil';
 import FolioPage from './pages/Folio/Folio';
 import { HabitacionService, ReservaService, TarifaService, PosService, HuespedService, FolioService, pendingSync, seedProductos } from './services';
+import { dbRemota } from './services/__supabase_db__';
 
 setupIonicReact({
   mode: 'md',
@@ -32,6 +36,7 @@ const STORAGE_KEY = 'lodge_ultima_pestana_v1';
 const RUTAS_TAB = ['/home', '/reservas', '/habitaciones', '/pos', '/perfil'];
 const EVENTO_HIDRATACION = 'lodge:hidratacion-listo' as const;
 
+type NetworkMode = 'ONLINE' | 'OFFLINE' | 'CHECKING';
 const dispatchHidratado = (grupo: string, ok: boolean) => {
   try {
     if (typeof window !== 'undefined' && window.dispatchEvent) {
@@ -106,7 +111,150 @@ function TabBarCondicional() {
   );
 }
 
+function BannerEstadoConexion({
+  networkMode,
+  pendientesCount,
+  onReintentar,
+}: {
+  networkMode: NetworkMode;
+  pendientesCount: number;
+  onReintentar: () => void;
+}) {
+  const [toastOk, setToastOk] = useState<{ show: boolean; msg: string }>({ show: false, msg: '' });
+  const [loadingRetry, setLoadingRetry] = useState(false);
+
+  const fondoBanner = useMemo(() => {
+    if (networkMode === 'OFFLINE') return '#fde68a';
+    if (pendientesCount > 0) return '#dbeafe';
+    return '#dcfce7';
+  }, [networkMode, pendientesCount]);
+  const colorTexto = useMemo(() => {
+    if (networkMode === 'OFFLINE') return '#78350f';
+    if (pendientesCount > 0) return '#1e3a8a';
+    return '#14532d';
+  }, [networkMode, pendientesCount]);
+  const icono = useMemo(() => {
+    if (networkMode === 'OFFLINE') return cloudOffline;
+    if (networkMode === 'CHECKING') return alertCircle;
+    return pendientesCount > 0 ? cloud : checkmarkCircle;
+  }, [networkMode, pendientesCount]);
+  const label = useMemo(() => {
+    if (networkMode === 'OFFLINE') return '⚠️ Sin internet · Modo offline (se guarda local, luego se sincroniza)';
+    if (pendientesCount > 0) return `🟡 ${pendientesCount} cambios pendientes de sincronizar a la nube`;
+    if (networkMode === 'CHECKING') return '🔄 Verificando conexión...';
+    return '✅ Conectado · Todo sincronizado';
+  }, [networkMode, pendientesCount]);
+
+  const reintentar = useCallback(async () => {
+    setLoadingRetry(true);
+    try {
+      const [ok, fail] = (await pendingSync.processQueue?.(true)) || [0, 0, 0];
+      const total = Number(ok || 0) + Number(fail || 0);
+      if (total === 0 && networkMode === 'ONLINE') {
+        setToastOk({ show: true, msg: 'No hay cambios pendientes de sincronizar' });
+      } else if (fail === 0) {
+        setToastOk({ show: true, msg: `✅ ${ok} cambios sincronizados a la nube` });
+      } else {
+        setToastOk({ show: true, msg: `⚠️ ${ok} OK / ${fail} fallidos · Reintenta en 30s o con Wi-Fi` });
+      }
+    } catch (e: any) {
+      setToastOk({ show: true, msg: e?.message || 'Error al reintentar' });
+    } finally {
+      setTimeout(() => setLoadingRetry(false), 400);
+    }
+  }, [networkMode]);
+
+  return (
+    <>
+      <div
+        onClick={() => { if (networkMode !== 'ONLINE' || pendientesCount > 0) reintentar(); }}
+        style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          zIndex: 99999,
+          padding: '6px 14px',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 10,
+          background: fondoBanner,
+          color: colorTexto,
+          fontSize: 13,
+          fontWeight: 600,
+          borderBottom: `1px solid ${colorTexto}33`,
+          userSelect: 'none',
+          cursor: (networkMode !== 'ONLINE' || pendientesCount > 0) ? 'pointer' : 'default',
+        }}
+      >
+        <IonIcon icon={icono} style={{ fontSize: 18 }} />
+        <div style={{ flex: 1, minWidth: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{label}</div>
+        {(networkMode !== 'ONLINE' || pendientesCount > 0) && (
+          <IonButton
+            size="small"
+            color={networkMode === 'OFFLINE' ? 'warning' : 'primary'}
+            onClick={(e) => { e.stopPropagation(); onReintentar(); }}
+            disabled={loadingRetry}
+            style={{ marginInline: 0, marginBlock: 0, minHeight: 30 }}
+          >
+            <IonIcon slot="start" icon={refreshCircle} />
+            Reintentar
+          </IonButton>
+        )}
+        {pendientesCount > 0 && (
+          <IonBadge color={networkMode === 'OFFLINE' ? 'warning' : 'primary'} style={{ fontSize: 12 }}>{pendientesCount}</IonBadge>
+        )}
+      </div>
+      <IonToast
+        isOpen={toastOk.show}
+        onDidDismiss={() => setToastOk({ show: false, msg: '' })}
+        message={toastOk.msg}
+        duration={2400}
+        position="top"
+        style={{ marginTop: 42 }}
+      />
+    </>
+  );
+}
+
 const App: React.FC = () => {
+  const [networkMode, setNetworkMode] = useState<NetworkMode>('CHECKING');
+  const [pendientesCount, setPendientesCount] = useState<number>(0);
+  const [retryTick, setRetryTick] = useState(0);
+
+  const checkNetworkAndQueue = useCallback(() => {
+    try {
+      const online = typeof navigator !== 'undefined' ? navigator.onLine : true;
+      const supabaseOk = !!dbRemota?.isOnline?.();
+      const finalOnline = !!online && !!supabaseOk;
+      setNetworkMode(finalOnline ? 'ONLINE' : 'OFFLINE');
+      const n = Number(pendingSync.countPendientes?.() || 0);
+      setPendientesCount(Number.isFinite(n) ? n : 0);
+    } catch { setNetworkMode('ONLINE'); setPendientesCount(0); }
+  }, []);
+
+  useEffect(() => {
+    checkNetworkAndQueue();
+    const t1 = window.setInterval(checkNetworkAndQueue, 5000);
+    const t2 = window.setInterval(() => setRetryTick((t) => t + 1), 15000);
+    const on = () => checkNetworkAndQueue();
+    window.addEventListener?.('online', on);
+    window.addEventListener?.('offline', on);
+    try {
+      const onDBMutated = () => setTimeout(checkNetworkAndQueue, 250);
+      window.addEventListener?.('lodge:db:mutated', onDBMutated);
+      window.addEventListener?.('lodge:pending:enqueued', onDBMutated);
+    } catch (_) {}
+    return () => {
+      window.clearInterval(t1);
+      window.clearInterval(t2);
+      window.removeEventListener?.('online', on);
+      window.removeEventListener?.('offline', on);
+    };
+  }, [checkNetworkAndQueue]);
+
+  useEffect(() => { checkNetworkAndQueue(); }, [retryTick, checkNetworkAndQueue]);
+
   // 1 vez al boot: hidratar InMemoryDB con datos reales de Supabase Cloud
   useEffect(() => {
     let cancelled = false;
@@ -202,7 +350,12 @@ const App: React.FC = () => {
   }, []);
 
   return (
-    <IonApp>
+    <IonApp style={{ paddingTop: 36 }}>
+      <BannerEstadoConexion
+        networkMode={networkMode}
+        pendientesCount={pendientesCount}
+        onReintentar={() => { checkNetworkAndQueue(); setRetryTick((t) => t + 1); }}
+      />
       <IonReactRouter basename="/casasumaqallpa">
         <ControlPestanaPersistente />
         <IonTabs>

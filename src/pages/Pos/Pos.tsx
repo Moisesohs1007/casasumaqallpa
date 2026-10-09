@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import {
   IonContent, IonHeader, IonPage, IonTitle, IonToolbar,
   IonGrid, IonRow, IonCol, IonCard, IonCardHeader, IonCardTitle, IonCardSubtitle, IonCardContent,
@@ -12,7 +12,8 @@ import TomarComanda from '../../components/modals/TomarComanda';
 import PagoForm, { PagoFormValue } from '../../components/PagoForm';
 import { METODOS_PAGO_LISTA } from '../../types/etapa2';
 import { Mesa, Comanda, ProductoFB } from '../../types';
-import { MesaService, ComandaService, CatalogoFBService, InventarioService, seedProductos } from '../../services';
+import { MesaService, ComandaService, CatalogoFBService, InventarioService, seedProductos, PosService } from '../../services';
+import { supabase } from '../../services/__supabase_db__';
 import './Pos.css';
 
 type EstadoMesaLabel = 'libre' | 'ocupada' | 'sucia';
@@ -301,23 +302,59 @@ const PosPage: React.FC = () => {
   };
   useIonViewWillEnter(() => {
     setRefreshTick(t => t + 1);
-    // FIX Auto-detectar catalogo corrupto (muchos "Sin categoría") → forzar reset seed oficial automatico
     setTimeout(() => {
       try {
-        const prods = CatalogoFBService?.listarProductos?.({ soloActivos: true }) || [];
+        const prods = CatalogoFBService?.listarProductos?.({ soloActivos: false }) || [];
         const cats = CatalogoFBService?.listarCategorias?.() || [];
-        const sinCat = prods.filter((p: any) => !cats.find((c: any) => c.id === p.categoriaId)).length;
-        if (cats.length < 10 || sinCat > 5 || prods.length < 50) {
+        const catalogoVACIO_TOTAL = cats.length === 0 && prods.length === 0;
+        if (catalogoVACIO_TOTAL) {
           if (seedProductos?.ensureSeedInicialCompleto) {
             seedProductos.ensureSeedInicialCompleto(true);
             setRefreshTick(t => t + 2);
-            mostrarToast('🔄 Sincronizando catálogo oficial...');
+            mostrarToast('🔄 Instalando catálogo oficial por primera vez...');
           }
         }
       } catch {}
     }, 300);
     cargar();
   });
+
+  useEffect(() => {
+    let alive = true;
+    let debounceId: any;
+    const TABLAS = ['comandas', 'comandas_detalles', 'mesas', 'categorias_fb', 'productos_fb', 'presentaciones_fb', 'puntos_venta', 'habitaciones'];
+
+    const recargarDebounced = () => {
+      if (!alive) return;
+      clearTimeout(debounceId);
+      debounceId = setTimeout(async () => {
+        if (!alive) return;
+        try {
+          await Promise.all([
+            PosService.hidratarDesdeSupabase?.(true),
+          ]);
+        } catch (_) {}
+        try { cargar(); } catch (_) {}
+        try { setRefreshTick(t => t + 1); } catch (_) {}
+      }, 650);
+    };
+
+    const canales: any[] = [];
+    try {
+      for (const t of TABLAS) {
+        const ch = supabase.channel(`rt-pos-${t}-${Math.random().toString(36).slice(2,7)}`)
+          .on('postgres_changes', { event: '*' as any, schema: 'public', table: t }, recargarDebounced)
+          .subscribe();
+        canales.push(ch);
+      }
+    } catch (_) {}
+
+    return () => {
+      alive = false;
+      clearTimeout(debounceId);
+      try { Promise.all(canales.map(c => supabase.removeChannel(c))).catch(()=>{}); } catch (_) {}
+    };
+  }, []);
 
   // --- Cart helpers ---
   const agregarProducto = (p: any) => {

@@ -16,37 +16,104 @@ type CollectionKey =
   | 'huespedes' | 'roles' | 'usuarios'
   | 'puntosVenta' | 'mesas' | 'reservas' | 'folios' | 'cargosFolio' | 'pagosFolio' | 'comandas' | 'comandasDetalles';
 
+const LS_KEY_PERSIST = 'lodge_inmemory_db_v1';
+const LS_FLAG_PRIMER_BOOT = 'lodge_inmemory_db_boot_v1';
+
 const CLONE = <T>(x: T): T => JSON.parse(JSON.stringify(x));
+
+const ALL_COLLECTION_KEYS: CollectionKey[] = [
+  'alergenos', 'categoriasFB', 'productosFB', 'presentacionesFB', 'modificadoresFB', 'impuestos',
+  'tiposHabitacion', 'habitaciones', 'tarifas', 'temporadas', 'politicasCancelacion', 'codigosPromo',
+  'huespedes', 'roles', 'usuarios',
+  'puntosVenta', 'mesas', 'reservas', 'folios', 'cargosFolio', 'pagosFolio', 'comandas', 'comandasDetalles',
+];
+
+function _lsSupported(): boolean {
+  try {
+    if (typeof localStorage === 'undefined') return false;
+    const t = '__test_ls__';
+    localStorage.setItem(t, t);
+    localStorage.removeItem(t);
+    return true;
+  } catch (_e) { return false; }
+}
+function _readLS(): Record<CollectionKey, unknown[]> | null {
+  try {
+    if (!_lsSupported()) return null;
+    const raw = localStorage.getItem(LS_KEY_PERSIST);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) return parsed as any;
+    return null;
+  } catch (_e) { return null; }
+}
+function _writeLS(data: Record<CollectionKey, unknown[]>): void {
+  try {
+    if (!_lsSupported()) return;
+    localStorage.setItem(LS_KEY_PERSIST, JSON.stringify(data));
+  } catch (_e) {}
+}
+
+function _seedInicial(): Record<CollectionKey, unknown[]> {
+  return {
+    alergenos: CLONE(seed.alergenos),
+    categoriasFB: CLONE(seed.categoriasFB),
+    productosFB: CLONE(seed.productosFB),
+    presentacionesFB: CLONE(seed.presentacionesFB),
+    modificadoresFB: CLONE(seed.modificadoresFB),
+    impuestos: CLONE(seed.impuestos),
+    tiposHabitacion: CLONE(seed.tiposHabitacion),
+    habitaciones: CLONE(seed.habitaciones),
+    tarifas: CLONE(seed.tarifas),
+    temporadas: CLONE(seed.temporadas),
+    politicasCancelacion: CLONE(seed.politicasCancelacion),
+    codigosPromo: CLONE(seed.codigosPromo),
+    huespedes: CLONE(seed.huespedes),
+    roles: CLONE(seed.roles),
+    usuarios: CLONE(seed.usuarios),
+    puntosVenta: CLONE(seed.puntosVenta),
+    mesas: CLONE(seed.mesas),
+    reservas: CLONE(seed.reservas),
+    folios: CLONE(seed.folios as any[]),
+    cargosFolio: CLONE((seed.folios as any[]).flatMap((f: any) => f.cargos || [])),
+    pagosFolio: CLONE([...(seed.pagosFolio as any[]), ...(seed.folios as any[]).flatMap((f: any) => f.pagos || [])]),
+    comandas: CLONE(seed.comandas as any[]),
+    comandasDetalles: CLONE((seed.comandas as any[]).flatMap((c: Comanda) => (c.detalles ?? c.items ?? []).map((d: ComandaDetalle) => ({ ...d, comandaId: c.id })) || [])),
+  };
+}
 
 class InMemoryDB {
   private data: Record<CollectionKey, unknown[]>;
 
   constructor() {
-    this.data = {
-      alergenos: CLONE(seed.alergenos),
-      categoriasFB: CLONE(seed.categoriasFB),
-      productosFB: CLONE(seed.productosFB),
-      presentacionesFB: CLONE(seed.presentacionesFB),
-      modificadoresFB: CLONE(seed.modificadoresFB),
-      impuestos: CLONE(seed.impuestos),
-      tiposHabitacion: CLONE(seed.tiposHabitacion),
-      habitaciones: CLONE(seed.habitaciones),
-      tarifas: CLONE(seed.tarifas),
-      temporadas: CLONE(seed.temporadas),
-      politicasCancelacion: CLONE(seed.politicasCancelacion),
-      codigosPromo: CLONE(seed.codigosPromo),
-      huespedes: CLONE(seed.huespedes),
-      roles: CLONE(seed.roles),
-      usuarios: CLONE(seed.usuarios),
-      puntosVenta: CLONE(seed.puntosVenta),
-      mesas: CLONE(seed.mesas),
-      reservas: CLONE(seed.reservas),
-      folios: CLONE(seed.folios as any[]),
-      cargosFolio: CLONE((seed.folios as any[]).flatMap((f: any) => f.cargos || [])),
-      pagosFolio: CLONE([...(seed.pagosFolio as any[]), ...(seed.folios as any[]).flatMap((f: any) => f.pagos || [])]),
-      comandas: CLONE(seed.comandas as any[]),
-      comandasDetalles: CLONE((seed.comandas as any[]).flatMap((c: Comanda) => (c.detalles ?? c.items ?? []).map((d: ComandaDetalle) => ({ ...d, comandaId: c.id })) || [])),
-    };
+    const inicial = _seedInicial();
+    const desdeLS = _readLS();
+    if (desdeLS) {
+      const merged = { ...inicial };
+      for (const k of ALL_COLLECTION_KEYS) {
+        const arr = desdeLS[k];
+        if (Array.isArray(arr)) (merged as any)[k] = CLONE(arr);
+      }
+      this.data = merged;
+    } else {
+      this.data = inicial;
+    }
+    try {
+      if (_lsSupported() && !localStorage.getItem(LS_FLAG_PRIMER_BOOT)) {
+        localStorage.setItem(LS_FLAG_PRIMER_BOOT, '1');
+        _writeLS(this.data);
+      }
+    } catch (_e) {}
+  }
+
+  private _persist(): void {
+    _writeLS(this.data);
+    if (typeof window !== 'undefined') {
+      try {
+        const ev = new CustomEvent('lodge:db:mutated', { detail: { at: Date.now() } });
+        window.dispatchEvent(ev);
+      } catch (_) {}
+    }
   }
 
   all<T>(key: CollectionKey): T[] {
@@ -55,6 +122,7 @@ class InMemoryDB {
 
   setAll<T>(key: CollectionKey, value: T[]): void {
     (this.data[key] as unknown[]) = CLONE(value);
+    this._persist();
   }
 
   getById<T extends { id: string }>(key: CollectionKey, id: string): T | undefined {
@@ -75,6 +143,7 @@ class InMemoryDB {
       ...(item as unknown as T),
     } as T;
     (this.data[key] as unknown[]).push(nuevo);
+    this._persist();
     return CLONE(nuevo);
   }
 
@@ -93,6 +162,7 @@ class InMemoryDB {
       updatedAt: seedUtil.nowISO(),
     } as T;
     arr[idx] = actualizado;
+    this._persist();
     return CLONE(actualizado);
   }
 
@@ -101,6 +171,7 @@ class InMemoryDB {
     const idx = arr.findIndex((x) => x.id === id);
     if (idx < 0) return false;
     arr.splice(idx, 1);
+    this._persist();
     return true;
   }
 
@@ -109,6 +180,7 @@ class InMemoryDB {
     const arr = this.data[key] as T[];
     if (arr.some((x) => x.id === id)) return undefined;
     arr.push(rawItem);
+    this._persist();
     return CLONE(rawItem);
   }
 
@@ -134,6 +206,7 @@ class InMemoryDB {
     const deduped = Array.from(seen.values());
     if (deduped.length < originalLen) {
       (this.data[key] as unknown[]) = deduped;
+      this._persist();
       return originalLen - deduped.length;
     }
     return 0;
@@ -190,6 +263,7 @@ class InMemoryDB {
       }
     }
     existingBy.clear();
+    this._persist();
     return [inserted, updated, arr.length - (inserted + (rows.length - (inserted > 0 ? 0 : 0)))];
   }
 
@@ -208,8 +282,11 @@ class InMemoryDB {
   }
 
   reset(): void {
-    const fresh = new InMemoryDB();
-    this.data = fresh.data;
+    this.data = _seedInicial();
+    try {
+      if (_lsSupported()) localStorage.removeItem(LS_KEY_PERSIST);
+    } catch (_e) {}
+    this._persist();
   }
 }
 

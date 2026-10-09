@@ -10,6 +10,7 @@ import type { Color } from '@ionic/core';
 import { add, remove, trash, close, save, receiptOutline, wallet, cart, person, restaurant, bed, cash, pricetag } from 'ionicons/icons';
 import { Habitacion, EstadoHabitacion, ProductoFB, Reserva } from '../../types';
 import { HabitacionService, ReservaService, CatalogoFBService, InventarioService, seedProductos, FolioService } from '../../services';
+import { supabase } from '../../services/__supabase_db__';
 import CheckinModal from '../../components/modals/CheckinModal';
 import CheckoutModal from '../../components/modals/CheckoutModal';
 import TomarComanda from '../../components/modals/TomarComanda';
@@ -229,6 +230,45 @@ const HabitacionesPage: React.FC = () => {
       try { window.removeEventListener('lodge:hidratacion-listo', onHidratado as EventListener); } catch {}
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    let alive = true;
+    let debounceId: any;
+    const TABLAS = ['habitaciones', 'reservas', 'folios', 'cargos_folio', 'pagos_folio', 'comandas', 'comandas_detalles', 'huespedes'];
+
+    const recargarDebounced = () => {
+      if (!alive) return;
+      clearTimeout(debounceId);
+      debounceId = setTimeout(async () => {
+        if (!alive) return;
+        try {
+          await Promise.all([
+            HabitacionService.hidratarDesdeSupabase?.(true),
+            (ReservaService as any).hidratarDesdeSupabase?.(true),
+            FolioService.hidratarDesdeSupabase?.(true),
+          ]);
+        } catch (_) {}
+        try { cargar(); } catch (_) {}
+        try { setRefreshTick(t => t + 1); } catch (_) {}
+      }, 700);
+    };
+
+    const canales: any[] = [];
+    try {
+      for (const t of TABLAS) {
+        const ch = supabase.channel(`rt-hab-${t}-${Math.random().toString(36).slice(2,7)}`)
+          .on('postgres_changes', { event: '*' as any, schema: 'public', table: t }, recargarDebounced)
+          .subscribe();
+        canales.push(ch);
+      }
+    } catch (_) {}
+
+    return () => {
+      alive = false;
+      clearTimeout(debounceId);
+      try { Promise.all(canales.map(c => supabase.removeChannel(c))).catch(()=>{}); } catch (_) {}
+    };
   }, []);
 
   const mostrarAlerta = (header: string, sub?: string) => { setAlertMsg({ header, sub }); setAlertOpen(true); };

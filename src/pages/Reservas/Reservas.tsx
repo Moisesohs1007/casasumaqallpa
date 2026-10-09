@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { IonContent, IonHeader, IonPage, IonTitle, IonToolbar, IonList, IonItem, IonLabel, IonBadge, IonFab, IonFabButton, IonIcon, useIonRouter, useIonViewWillEnter, IonButton, IonButtons } from '@ionic/react';
 import { addCircle, logIn, create } from 'ionicons/icons';
 import type { Color } from '@ionic/core';
@@ -8,6 +8,7 @@ import {
   OrigenReserva,
 } from '../../types';
 import { ReservaService } from '../../services';
+import { supabase } from '../../services/__supabase_db__';
 import CheckinModal from '../../components/modals/CheckinModal';
 import './Reservas.css';
 
@@ -52,7 +53,7 @@ const ReservasPage: React.FC = () => {
     setModalCheckinOpen(true);
   };
 
-  useIonViewWillEnter(() => {
+  const cargarReservas = () => {
     try {
       const todas = ReservaService.listarTodas ? ReservaService.listarTodas() : [];
       const ordenadas = [...todas].sort((a: any, b: any) => {
@@ -64,7 +65,43 @@ const ReservasPage: React.FC = () => {
     } catch {
       setReservas([]);
     }
-  });
+  };
+
+  useIonViewWillEnter(() => { cargarReservas(); });
+
+  useEffect(() => {
+    let alive = true;
+    let debounceId: any;
+    const TABLAS = ['reservas', 'huespedes', 'habitaciones'];
+
+    const recargarDebounced = () => {
+      if (!alive) return;
+      clearTimeout(debounceId);
+      debounceId = setTimeout(async () => {
+        if (!alive) return;
+        try { await Promise.all([ (ReservaService as any).hidratarDesdeSupabase?.(true) ]); } catch (_) {}
+        try { cargarReservas(); } catch (_) {}
+      }, 650);
+    };
+
+    const canales: any[] = [];
+    try {
+      for (const t of TABLAS) {
+        const ch = supabase.channel(`rt-res-${t}-${Math.random().toString(36).slice(2,7)}`)
+          .on('postgres_changes', { event: '*' as any, schema: 'public', table: t }, recargarDebounced)
+          .subscribe();
+        canales.push(ch);
+      }
+    } catch (_) {}
+
+    return () => {
+      alive = false;
+      clearTimeout(debounceId);
+      try {
+        Promise.all(canales.map(c => supabase.removeChannel(c))).catch(()=>{});
+      } catch (_) {}
+    };
+  }, []);
 
   return (
     <IonPage>

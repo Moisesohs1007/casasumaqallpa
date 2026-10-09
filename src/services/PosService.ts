@@ -1,8 +1,24 @@
 // @ts-nocheck
 import { db, seedUtil, type Create, type Update, type Comanda, type ComandaDetalle, type EstadoComanda, type TipoConsumoComanda, type TipoComanda, type PrioridadComanda, type Mesa, type ProductoFB, type PuntoVenta, type CargoFolio } from './__db__';
-import { dbRemota } from './__supabase_db__';
+import { dbRemota, type CollectionKey } from './__supabase_db__';
 import { FolioService, CargoFolioService } from './FolioService';
 import { ImpuestoService } from './TarifaService';
+import * as pendingSync from './__pending_sync__';
+
+async function _remotoConQueue(
+  method: 'add' | 'update' | 'remove',
+  key: CollectionKey,
+  matchId: string,
+  payload: any,
+  remotoCallFn: () => Promise<any>
+): Promise<void> {
+  if (!dbRemota.isOnline()) { pendingSync.enqueue(key, method, matchId, payload); return; }
+  try { await remotoCallFn(); }
+  catch (e: any) {
+    console.warn('[PosService._remotoConQueue] remoto falló → enqueue. Key=', key, 'm=', method, 'id=', matchId, 'err=', (e && e.message) || e);
+    pendingSync.enqueue(key, method, matchId, payload);
+  }
+}
 
 const KEY_PV = 'puntosVenta';
 const KEY_MESA = 'mesas';
@@ -66,17 +82,19 @@ export const CatalogoFBService = {
   crearCategoria(payload: any, usuarioId = 'system-catalogo'): any {
     const data = { ...payload, estado: payload.estado ?? 'ACTIVO', orden: payload.orden ?? 0, createdAt: seedUtil.nowISO(), updatedAt: seedUtil.nowISO(), createdBy: usuarioId, updatedBy: usuarioId };
     const nueva = db.add<any>(KEY_CAT, data);
-    dbRemota.addAsync<any>(KEY_CAT, { ...data, id: nueva.id }).catch((e) => console.error('[CatalogoFB.crearCategoria] remoto fail:', e));
+    const final = { ...data, id: nueva.id };
+    (async () => { await _remotoConQueue('add', KEY_CAT, nueva.id, final, () => dbRemota.addAsync<any>(KEY_CAT, final)); })().catch(() => {});
     return nueva;
   },
   actualizarCategoria(id: string, payload: any, usuarioId = 'system-catalogo'): any | undefined {
-    const upd = db.update<any>(KEY_CAT, id, { ...payload, updatedAt: seedUtil.nowISO(), updatedBy: usuarioId });
-    if (upd) dbRemota.updateAsync<any>(KEY_CAT, id, { ...payload, updatedAt: seedUtil.nowISO(), updatedBy: usuarioId }).catch((e) => console.error('[CatalogoFB.actualizarCategoria] remoto fail:', e));
+    const delta = { ...payload, updatedAt: seedUtil.nowISO(), updatedBy: usuarioId };
+    const upd = db.update<any>(KEY_CAT, id, delta);
+    if (upd) (async () => { await _remotoConQueue('update', KEY_CAT, id, delta, () => dbRemota.updateAsync<any>(KEY_CAT, id, delta)); })().catch(() => {});
     return upd;
   },
   eliminarCategoria(id: string): boolean {
     const ok = db.remove(KEY_CAT, id);
-    if (ok) dbRemota.removeAsync(KEY_CAT, id).catch((e) => console.error('[CatalogoFB.eliminarCategoria] remoto fail:', e));
+    if (ok) (async () => { await _remotoConQueue('remove', KEY_CAT, id, { id }, () => dbRemota.removeAsync(KEY_CAT, id)); })().catch(() => {});
     return ok;
   },
 
@@ -130,7 +148,8 @@ export const CatalogoFBService = {
       updatedBy: usuarioId,
     };
     const nuevo = db.add<ProductoFB>(KEY_PROD, data as any);
-    dbRemota.addAsync<ProductoFB>(KEY_PROD, { ...data, id: nuevo.id } as any).catch((e) => console.error('[CatalogoFB.crearProducto] remoto fail:', e));
+    const final: any = { ...data, id: nuevo.id };
+    (async () => { await _remotoConQueue('add', KEY_PROD, nuevo.id, final, () => dbRemota.addAsync<ProductoFB>(KEY_PROD, final as any)); })().catch(() => {});
     return nuevo;
   },
   actualizarProducto(id: string, payload: any, usuarioId = 'system-catalogo'): ProductoFB | undefined {
@@ -140,12 +159,12 @@ export const CatalogoFBService = {
     if (delta.stockActual !== undefined) delta.stockActual = Number(delta.stockActual || 0);
     if (delta.stockMinimo !== undefined) delta.stockMinimo = Number(delta.stockMinimo || 0);
     const upd = db.update<ProductoFB>(KEY_PROD, id, delta as any);
-    if (upd) dbRemota.updateAsync<ProductoFB>(KEY_PROD, id, delta as any).catch((e) => console.error('[CatalogoFB.actualizarProducto] remoto fail:', e));
+    if (upd) (async () => { await _remotoConQueue('update', KEY_PROD, id, delta, () => dbRemota.updateAsync<ProductoFB>(KEY_PROD, id, delta as any)); })().catch(() => {});
     return upd;
   },
   eliminarProducto(id: string): boolean {
     const ok = db.remove(KEY_PROD, id);
-    if (ok) dbRemota.removeAsync(KEY_PROD, id).catch((e) => console.error('[CatalogoFB.eliminarProducto] remoto fail:', e));
+    if (ok) (async () => { await _remotoConQueue('remove', KEY_PROD, id, { id }, () => dbRemota.removeAsync(KEY_PROD, id)); })().catch(() => {});
     return ok;
   },
 
@@ -155,7 +174,8 @@ export const CatalogoFBService = {
   crearPresentacion(payload: any, usuarioId = 'system-catalogo'): any {
     const data = { ...payload, estado: payload.estado ?? 'ACTIVO', stockControl: payload.stockControl ?? false, stockActual: Number(payload.stockActual || 0), stockMinimo: Number(payload.stockMinimo || 0), createdAt: seedUtil.nowISO(), updatedAt: seedUtil.nowISO(), createdBy: usuarioId, updatedBy: usuarioId };
     const nueva = db.add<any>(KEY_PRES, data);
-    dbRemota.addAsync<any>(KEY_PRES, { ...data, id: nueva.id }).catch((e) => console.error('[CatalogoFB.crearPresentacion] remoto fail:', e));
+    const final = { ...data, id: nueva.id };
+    (async () => { await _remotoConQueue('add', KEY_PRES, nueva.id, final, () => dbRemota.addAsync<any>(KEY_PRES, final)); })().catch(() => {});
     return nueva;
   },
   actualizarPresentacion(id: string, payload: any, usuarioId = 'system-catalogo'): any | undefined {
@@ -164,12 +184,12 @@ export const CatalogoFBService = {
     if (delta.stockActual !== undefined) delta.stockActual = Number(delta.stockActual || 0);
     if (delta.stockMinimo !== undefined) delta.stockMinimo = Number(delta.stockMinimo || 0);
     const upd = db.update<any>(KEY_PRES, id, delta);
-    if (upd) dbRemota.updateAsync<any>(KEY_PRES, id, delta).catch((e) => console.error('[CatalogoFB.actualizarPresentacion] remoto fail:', e));
+    if (upd) (async () => { await _remotoConQueue('update', KEY_PRES, id, delta, () => dbRemota.updateAsync<any>(KEY_PRES, id, delta)); })().catch(() => {});
     return upd;
   },
   eliminarPresentacion(id: string): boolean {
     const ok = db.remove(KEY_PRES, id);
-    if (ok) dbRemota.removeAsync(KEY_PRES, id).catch((e) => console.error('[CatalogoFB.eliminarPresentacion] remoto fail:', e));
+    if (ok) (async () => { await _remotoConQueue('remove', KEY_PRES, id, { id }, () => dbRemota.removeAsync(KEY_PRES, id)); })().catch(() => {});
     return ok;
   },
 
@@ -194,19 +214,20 @@ export const CatalogoFBService = {
   crearModificador(payload: any, usuarioId = 'system-catalogo'): any {
     const data = { ...payload, estado: payload.estado ?? 'ACTIVO', precio: Number(payload.precio || 0), createdAt: seedUtil.nowISO(), updatedAt: seedUtil.nowISO(), createdBy: usuarioId, updatedBy: usuarioId };
     const nuevo = db.add<any>(KEY_MOD, data);
-    dbRemota.addAsync<any>(KEY_MOD, { ...data, id: nuevo.id }).catch((e) => console.error('[CatalogoFB.crearModificador] remoto fail:', e));
+    const final = { ...data, id: nuevo.id };
+    (async () => { await _remotoConQueue('add', KEY_MOD, nuevo.id, final, () => dbRemota.addAsync<any>(KEY_MOD, final)); })().catch(() => {});
     return nuevo;
   },
   actualizarModificador(id: string, payload: any, usuarioId = 'system-catalogo'): any | undefined {
     const delta = { ...payload, updatedAt: seedUtil.nowISO(), updatedBy: usuarioId };
     if (delta.precio !== undefined) delta.precio = Number(delta.precio || 0);
     const upd = db.update<any>(KEY_MOD, id, delta);
-    if (upd) dbRemota.updateAsync<any>(KEY_MOD, id, delta).catch((e) => console.error('[CatalogoFB.actualizarModificador] remoto fail:', e));
+    if (upd) (async () => { await _remotoConQueue('update', KEY_MOD, id, delta, () => dbRemota.updateAsync<any>(KEY_MOD, id, delta)); })().catch(() => {});
     return upd;
   },
   eliminarModificador(id: string): boolean {
     const ok = db.remove(KEY_MOD, id);
-    if (ok) dbRemota.removeAsync(KEY_MOD, id).catch((e) => console.error('[CatalogoFB.eliminarModificador] remoto fail:', e));
+    if (ok) (async () => { await _remotoConQueue('remove', KEY_MOD, id, { id }, () => dbRemota.removeAsync(KEY_MOD, id)); })().catch(() => {});
     return ok;
   },
 
@@ -223,18 +244,19 @@ export const CatalogoFBService = {
   crearAlergeno(payload: any, usuarioId = 'system-catalogo'): any {
     const data = { ...payload, estado: payload.estado ?? 'ACTIVO', createdAt: seedUtil.nowISO(), updatedAt: seedUtil.nowISO(), createdBy: usuarioId, updatedBy: usuarioId };
     const nuevo = db.add<any>(KEY_ALERG, data);
-    dbRemota.addAsync<any>(KEY_ALERG, { ...data, id: nuevo.id }).catch((e) => console.error('[CatalogoFB.crearAlergeno] remoto fail:', e));
+    const final = { ...data, id: nuevo.id };
+    (async () => { await _remotoConQueue('add', KEY_ALERG, nuevo.id, final, () => dbRemota.addAsync<any>(KEY_ALERG, final)); })().catch(() => {});
     return nuevo;
   },
   actualizarAlergeno(id: string, payload: any, usuarioId = 'system-catalogo'): any | undefined {
     const delta = { ...payload, updatedAt: seedUtil.nowISO(), updatedBy: usuarioId };
     const upd = db.update<any>(KEY_ALERG, id, delta);
-    if (upd) dbRemota.updateAsync<any>(KEY_ALERG, id, delta).catch((e) => console.error('[CatalogoFB.actualizarAlergeno] remoto fail:', e));
+    if (upd) (async () => { await _remotoConQueue('update', KEY_ALERG, id, delta, () => dbRemota.updateAsync<any>(KEY_ALERG, id, delta)); })().catch(() => {});
     return upd;
   },
   eliminarAlergeno(id: string): boolean {
     const ok = db.remove(KEY_ALERG, id);
-    if (ok) dbRemota.removeAsync(KEY_ALERG, id).catch((e) => console.error('[CatalogoFB.eliminarAlergeno] remoto fail:', e));
+    if (ok) (async () => { await _remotoConQueue('remove', KEY_ALERG, id, { id }, () => dbRemota.removeAsync(KEY_ALERG, id)); })().catch(() => {});
     return ok;
   },
 };
@@ -251,13 +273,14 @@ export const PuntoVentaService = {
   crear(payload: any, usuarioId = 'system-pv'): PuntoVenta {
     const data = { ...payload, estado: payload.estado ?? 'ACTIVO', createdAt: seedUtil.nowISO(), updatedAt: seedUtil.nowISO(), createdBy: usuarioId, updatedBy: usuarioId };
     const nuevo = db.add<PuntoVenta>(KEY_PV, data as any);
-    dbRemota.addAsync<PuntoVenta>(KEY_PV, { ...data, id: nuevo.id } as any).catch((e) => console.error('[PuntoVenta.crear] remoto fail:', e));
+    const final: any = { ...data, id: nuevo.id };
+    (async () => { await _remotoConQueue('add', KEY_PV, nuevo.id, final, () => dbRemota.addAsync<PuntoVenta>(KEY_PV, final as any)); })().catch(() => {});
     return nuevo;
   },
   actualizar(id: string, payload: any, usuarioId = 'system-pv'): PuntoVenta | undefined {
     const delta = { ...payload, updatedAt: seedUtil.nowISO(), updatedBy: usuarioId };
     const upd = db.update<PuntoVenta>(KEY_PV, id, delta as any);
-    if (upd) dbRemota.updateAsync<PuntoVenta>(KEY_PV, id, delta as any).catch((e) => console.error('[PuntoVenta.actualizar] remoto fail:', e));
+    if (upd) (async () => { await _remotoConQueue('update', KEY_PV, id, delta, () => dbRemota.updateAsync<PuntoVenta>(KEY_PV, id, delta as any)); })().catch(() => {});
     return upd;
   },
   ensureDefault(puntoVentaIdDefault = 'PV-RESTAURANTE-01'): PuntoVenta {
@@ -309,13 +332,14 @@ export const MesaService = {
   crear(payload: any, usuarioId = 'system-mesas'): Mesa {
     const data = { ...payload, estado: payload.estado ?? 'LIBRE', createdAt: seedUtil.nowISO(), updatedAt: seedUtil.nowISO(), createdBy: usuarioId, updatedBy: usuarioId };
     const nueva = db.add<Mesa>(KEY_MESA, data as any);
-    dbRemota.addAsync<Mesa>(KEY_MESA, { ...data, id: nueva.id } as any).catch((e) => console.error('[Mesa.crear] remoto fail:', e));
+    const final: any = { ...data, id: nueva.id };
+    (async () => { await _remotoConQueue('add', KEY_MESA, nueva.id, final, () => dbRemota.addAsync<Mesa>(KEY_MESA, final as any)); })().catch(() => {});
     return nueva;
   },
   actualizar(id: string, payload: any, usuarioId = 'system-mesas'): Mesa | undefined {
     const delta = { ...payload, updatedAt: seedUtil.nowISO(), updatedBy: usuarioId };
     const upd = db.update<Mesa>(KEY_MESA, id, delta as any);
-    if (upd) dbRemota.updateAsync<Mesa>(KEY_MESA, id, delta as any).catch((e) => console.error('[Mesa.actualizar] remoto fail:', e));
+    if (upd) (async () => { await _remotoConQueue('update', KEY_MESA, id, delta, () => dbRemota.updateAsync<Mesa>(KEY_MESA, id, delta as any)); })().catch(() => {});
     return upd;
   },
   crearRoomServiceSiNoExiste(params: {
@@ -343,7 +367,7 @@ export const MesaService = {
           updatedAt: seedUtil.nowISO(),
         };
         const upd = db.update<Mesa>(KEY_MESA, existing.id, delta as unknown as Update<Mesa>);
-        if (upd) dbRemota.updateAsync<Mesa>(KEY_MESA, existing.id, delta as any).catch((e) => console.error('[Mesa.crearRS.exist] remoto fail:', e));
+        if (upd) (async () => { await _remotoConQueue('update', KEY_MESA, existing.id, delta, () => dbRemota.updateAsync<Mesa>(KEY_MESA, existing.id, delta as any)); })().catch(() => {});
         if (upd) return upd;
       } catch { return existing; }
       return existing;
@@ -363,7 +387,7 @@ export const MesaService = {
           updatedAt: seedUtil.nowISO(),
         };
         const upd = db.update<Mesa>(KEY_MESA, sinAsignar.id, delta as unknown as Update<Mesa>);
-        if (upd) dbRemota.updateAsync<Mesa>(KEY_MESA, sinAsignar.id, delta as any).catch((e) => console.error('[Mesa.crearRS.sinAsignar] remoto fail:', e));
+        if (upd) (async () => { await _remotoConQueue('update', KEY_MESA, sinAsignar.id, delta, () => dbRemota.updateAsync<Mesa>(KEY_MESA, sinAsignar.id, delta as any)); })().catch(() => {});
         if (upd) return upd;
       } catch { return sinAsignar; }
       return sinAsignar;
@@ -388,7 +412,8 @@ export const MesaService = {
       updatedBy: usuarioId,
     };
     const nueva = db.add<Mesa>(KEY_MESA, data as unknown as Create<Mesa>);
-    dbRemota.addAsync<Mesa>(KEY_MESA, { ...data, id: nueva.id } as any).catch((e) => console.error('[Mesa.crearRS.nueva] remoto fail:', e));
+    const final: any = { ...data, id: nueva.id };
+    (async () => { await _remotoConQueue('add', KEY_MESA, nueva.id, final, () => dbRemota.addAsync<Mesa>(KEY_MESA, final as any)); })().catch(() => {});
     return nueva;
   },
   cambiarEstado(id: string, estado: Mesa['estado'], actualizadoPor = 'system-mesas'): Mesa | undefined {
@@ -398,7 +423,7 @@ export const MesaService = {
       updatedAt: seedUtil.nowISO(),
     };
     const upd = db.update<Mesa>(KEY_MESA, id, delta as unknown as Update<Mesa>);
-    if (upd) dbRemota.updateAsync<Mesa>(KEY_MESA, id, delta as any).catch((e) => console.error('[Mesa.cambiarEstado] remoto fail:', e));
+    if (upd) (async () => { await _remotoConQueue('update', KEY_MESA, id, delta, () => dbRemota.updateAsync<Mesa>(KEY_MESA, id, delta as any)); })().catch(() => {});
     return upd;
   },
   actualizarCapacidadUsada(id: string, pax: number, actualizadoPor = 'system-mesas'): Mesa | undefined {
@@ -410,12 +435,12 @@ export const MesaService = {
       updatedAt: seedUtil.nowISO(),
     };
     const upd = db.update<Mesa>(KEY_MESA, id, delta as unknown as Update<Mesa>);
-    if (upd) dbRemota.updateAsync<Mesa>(KEY_MESA, id, delta as any).catch((e) => console.error('[Mesa.actualizarCap] remoto fail:', e));
+    if (upd) (async () => { await _remotoConQueue('update', KEY_MESA, id, delta, () => dbRemota.updateAsync<Mesa>(KEY_MESA, id, delta as any)); })().catch(() => {});
     return upd;
   },
   eliminar(id: string): boolean {
     const ok = db.remove(KEY_MESA, id);
-    if (ok) dbRemota.removeAsync(KEY_MESA, id).catch((e) => console.error('[Mesa.eliminar] remoto fail:', e));
+    if (ok) (async () => { await _remotoConQueue('remove', KEY_MESA, id, { id }, () => dbRemota.removeAsync(KEY_MESA, id)); })().catch(() => {});
     return ok;
   },
 };
@@ -529,7 +554,10 @@ export const ComandaService = {
       updatedAt: seedUtil.nowISO(),
     };
     const upd = db.update<Comanda>(KEY_COM, id, delta as unknown as Update<Comanda>);
-    if (upd) dbRemota.updateAsync<Comanda>(KEY_COM, id, delta as any).catch((e) => console.error('[Comanda.recalc] remoto fail:', e));
+    if (upd) {
+      const payloadDelta = { id, ...delta };
+      (async () => { try { await _remotoConQueue('update', KEY_COM, id, payloadDelta, () => dbRemota.updateAsync<Comanda>(KEY_COM, id, delta as any)); } catch (_) {} })().catch(()=>{});
+    }
     return upd;
   },
 
@@ -625,7 +653,8 @@ export const ComandaService = {
       updatedBy: params.usuarioIdMozoApertura,
     };
     const comandaSeed = db.add<Comanda>(KEY_COM, comandaData as unknown as Create<Comanda>);
-    dbRemota.addAsync<Comanda>(KEY_COM, { ...comandaData, id: comandaSeed.id } as any).catch((e) => console.error('[Comanda.crear.comanda] remoto fail:', e));
+    const payloadComanda = { ...comandaData, id: comandaSeed.id };
+    (async () => { try { await _remotoConQueue('add', KEY_COM, comandaSeed.id, payloadComanda, () => dbRemota.addAsync<Comanda>(KEY_COM, payloadComanda as any)); } catch (_) {} })().catch(()=>{});
 
     const comandaId = comandaSeed.id;
     const cargosFolioCreados: CargoFolio[] = [];
@@ -700,7 +729,8 @@ export const ComandaService = {
         updatedBy: usuarioId,
       };
       const detalle = db.add<ComandaDetalle>(KEY_COMDET, detalleData as unknown as Create<ComandaDetalle>);
-      dbRemota.addAsync<ComandaDetalle>(KEY_COMDET, { ...detalleData, id: detalle.id } as any).catch((e) => console.error('[Comanda.crear.detalle] remoto fail:', e));
+      const payloadDetalle = { ...detalleData, id: detalle.id };
+      (async () => { try { await _remotoConQueue('add', KEY_COMDET, detalle.id, payloadDetalle, () => dbRemota.addAsync<ComandaDetalle>(KEY_COMDET, payloadDetalle as any)); } catch (_) {} })().catch(()=>{});
 
       // ===== DESCUENTO AUTOMÁTICO DE STOCK (por cada línea comanda room service o POS) =====
       try {
@@ -809,7 +839,10 @@ export const ComandaService = {
       updatedAt: seedUtil.nowISO(),
     };
     const updKds = db.update<Comanda>(KEY_COM, comandaId, deltaKds as unknown as Update<Comanda>);
-    if (updKds) dbRemota.updateAsync<Comanda>(KEY_COM, comandaId, deltaKds as any).catch((e) => console.error('[Comanda.crear.kds] remoto fail:', e));
+    if (updKds) {
+      const payloadKds = { id: comandaId, ...deltaKds };
+      (async () => { try { await _remotoConQueue('update', KEY_COM, comandaId, payloadKds, () => dbRemota.updateAsync<Comanda>(KEY_COM, comandaId, deltaKds as any)); } catch (_) {} })().catch(()=>{});
+    }
 
     return {
       comanda: this.buscarPorId(comandaId)!,
@@ -837,7 +870,8 @@ export const ComandaService = {
       updatedAt: now,
     };
     const detalle = db.add<ComandaDetalle>(KEY_COMDET, detalleData as unknown as Create<ComandaDetalle>);
-    dbRemota.addAsync<ComandaDetalle>(KEY_COMDET, { ...detalleData, id: detalle.id } as any).catch((e) => console.error('[Comanda.agregarLinea] remoto fail:', e));
+    const payloadDetalleAgregar = { ...detalleData, id: detalle.id };
+    (async () => { try { await _remotoConQueue('add', KEY_COMDET, detalle.id, payloadDetalleAgregar, () => dbRemota.addAsync<ComandaDetalle>(KEY_COMDET, payloadDetalleAgregar as any)); } catch (_) {} })().catch(()=>{});
 
     // ===== DESCUENTO AUTOMÁTICO DE STOCK (agregar línea) =====
     try {
@@ -920,7 +954,7 @@ export const ComandaService = {
     if (!det) return false;
     const comandaId = det.comandaId;
     const ok = db.remove(KEY_COMDET, detalleId);
-    if (ok) dbRemota.removeAsync(KEY_COMDET, detalleId).catch((e) => console.error('[Comanda.quitarLinea] remoto fail:', e));
+    if (ok) (async () => { try { await _remotoConQueue('remove', KEY_COMDET, detalleId, { id: detalleId }, () => dbRemota.removeAsync(KEY_COMDET, detalleId)); } catch (_) {} })().catch(()=>{});
     if (ok && comandaId) this.recalcularTotales(comandaId, usuarioId);
     return ok;
   },
@@ -934,7 +968,8 @@ export const ComandaService = {
     if (delta.descuentoMonto !== undefined) delta.descuentoMonto = Number(delta.descuentoMonto || 0);
     const upd = db.update<ComandaDetalle>(KEY_COMDET, detalleId, delta as any);
     if (upd) {
-      dbRemota.updateAsync<ComandaDetalle>(KEY_COMDET, detalleId, delta as any).catch((e) => console.error('[Comanda.actualizarLinea] remoto fail:', e));
+      const payloadDeltaLinea = { id: detalleId, ...delta };
+      (async () => { try { await _remotoConQueue('update', KEY_COMDET, detalleId, payloadDeltaLinea, () => dbRemota.updateAsync<ComandaDetalle>(KEY_COMDET, detalleId, delta as any)); } catch (_) {} })().catch(()=>{});
       this.recalcularTotales(upd.comandaId, usuarioId);
     }
     return upd;
@@ -948,7 +983,10 @@ export const ComandaService = {
       observacionesInternas: comentario,
     };
     const actualizados = db.update<Comanda>(KEY_COM, comandaId, delta as unknown as Update<Comanda>);
-    if (actualizados) dbRemota.updateAsync<Comanda>(KEY_COM, comandaId, delta as any).catch((e) => console.error('[Comanda.cambiarEstado] remoto fail:', e));
+    if (actualizados) {
+      const payloadDeltaEstado = { id: comandaId, ...delta };
+      (async () => { try { await _remotoConQueue('update', KEY_COM, comandaId, payloadDeltaEstado, () => dbRemota.updateAsync<Comanda>(KEY_COM, comandaId, delta as any)); } catch (_) {} })().catch(()=>{});
+    }
     return actualizados ? this.buscarPorId(actualizados.id) : undefined;
   },
 
@@ -1000,7 +1038,10 @@ export const ComandaService = {
       updatedAt: now,
     };
     const cerrada = db.update<Comanda>(KEY_COM, params.comandaId, delta as unknown as Update<Comanda>);
-    if (cerrada) dbRemota.updateAsync<Comanda>(KEY_COM, params.comandaId, delta as any).catch((e) => console.error('[Comanda.cerrarCobrar] remoto fail:', e));
+    if (cerrada) {
+      const payloadDeltaCerrar = { id: params.comandaId, ...delta };
+      (async () => { try { await _remotoConQueue('update', KEY_COM, params.comandaId, payloadDeltaCerrar, () => dbRemota.updateAsync<Comanda>(KEY_COM, params.comandaId, delta as any)); } catch (_) {} })().catch(()=>{});
+    }
     return cerrada ? this.buscarPorId(cerrada.id) : undefined;
   },
 
@@ -1016,7 +1057,8 @@ export const ComandaService = {
     };
     const upd = db.update<Comanda>(KEY_COM, comandaId, delta as unknown as Update<Comanda>);
     if (upd) {
-      dbRemota.updateAsync<Comanda>(KEY_COM, comandaId, delta as any).catch((e) => console.error('[Comanda.anular] remoto fail:', e));
+      const payloadDeltaAnular = { id: comandaId, ...delta };
+      (async () => { try { await _remotoConQueue('update', KEY_COM, comandaId, payloadDeltaAnular, () => dbRemota.updateAsync<Comanda>(KEY_COM, comandaId, delta as any)); } catch (_) {} })().catch(()=>{});
       if (upd.mesaId) MesaService.cambiarEstado(upd.mesaId, 'LIBRE', usuarioId);
     }
     return upd ? this.buscarPorId(upd.id) : undefined;

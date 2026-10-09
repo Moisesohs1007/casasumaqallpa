@@ -41,7 +41,8 @@ import {
   informationCircle, documentText, barcode, cash, people,
 } from 'ionicons/icons';
 import { Usuario, Rol, RolUsuario, ModuloPermiso, Moneda, AuditFields, Habitacion, TipoHabitacion, EstadoHabitacion } from '../../types';
-import { HabitacionService, CatalogoFBService, InventarioService, seedProductos, type MoverStockResult } from '../../services';
+import { HabitacionService, CatalogoFBService, InventarioService, seedProductos, type MoverStockResult, TarifaService, PosService } from '../../services';
+import { supabase } from '../../services/__supabase_db__';
 import './Perfil.css';
 
 const nowIso = new Date().toISOString();
@@ -293,6 +294,45 @@ const PerfilPage: React.FC = () => {
       try { window.removeEventListener('lodge:hidratacion-listo', onHidratado as EventListener); } catch {}
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    let alive = true;
+    let debounceId: any;
+    const TABLAS = ['habitaciones', 'tipos_habitacion', 'categorias_fb', 'productos_fb', 'presentaciones_fb', 'tarifas', 'temporadas', 'politicas_cancelacion', 'codigos_promocionales', 'impuestos', 'mesas', 'puntos_venta'];
+
+    const recargarDebounced = () => {
+      if (!alive) return;
+      clearTimeout(debounceId);
+      debounceId = setTimeout(async () => {
+        if (!alive) return;
+        try {
+          await Promise.all([
+            HabitacionService.hidratarDesdeSupabase?.(true),
+            TarifaService.hidratarDesdeSupabase?.(true),
+            PosService?.hidratarDesdeSupabase?.(true),
+          ]);
+        } catch (_) {}
+        try { cargarHabs(); } catch (_) {}
+        try { cargarCatProd(); } catch (_) {}
+      }, 700);
+    };
+
+    const canales: any[] = [];
+    try {
+      for (const t of TABLAS) {
+        const ch = supabase.channel(`rt-per-${t}-${Math.random().toString(36).slice(2,7)}`)
+          .on('postgres_changes', { event: '*' as any, schema: 'public', table: t }, recargarDebounced)
+          .subscribe();
+        canales.push(ch);
+      }
+    } catch (_) {}
+
+    return () => {
+      alive = false;
+      clearTimeout(debounceId);
+      try { Promise.all(canales.map(c => supabase.removeChannel(c))).catch(()=>{}); } catch (_) {}
+    };
   }, []);
 
   const generarCodigoProdAuto = (categoriaIdSel: string): string => {
