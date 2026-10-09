@@ -3,7 +3,7 @@ import {
   IonContent, IonHeader, IonPage, IonTitle, IonToolbar,
   IonGrid, IonRow, IonCol, IonCard, IonCardHeader, IonCardTitle, IonCardSubtitle, IonCardContent,
   IonBadge, IonLabel, IonChip, IonIcon, IonSkeletonText, IonSegment, IonSegmentButton,
-  IonButton, IonInput, IonTextarea, IonSelect, IonSelectOption, IonList, IonItem, IonNote,
+  IonButton, IonInput, IonTextarea, IonSelect, IonSelectOption, IonList, IonItem, IonNote, IonText,
   useIonViewWillEnter,
 } from '@ionic/react';
 import type { Color } from '@ionic/core';
@@ -51,6 +51,25 @@ const _planoStockProducto = (p: any): { stockControl: boolean; stockActual: numb
   const sA = typeof p?.stockActual === 'number' ? p.stockActual : Number(p?.payload?.stockActual ?? 0);
   const sM = typeof p?.stockMinimo === 'number' ? p.stockMinimo : Number(p?.payload?.stockMinimo ?? 0);
   return { stockControl: !!sC, stockActual: sA, stockMinimo: sM };
+};
+
+// PREVIEW: mismo helper emoji categoría que TomarComanda (coherencia visual)
+const emojiCategoria = (catId: string) => {
+  if (!catId) return '🍴';
+  const c = String(catId).toUpperCase();
+  if (c.includes('DESAYUNO')) return '🥣';
+  if (c.includes('JUGO')) return '🥤';
+  if (c.includes('SANDWICH') || c.includes('TRIPLE') || c.includes('SANGUCH')) return '🥪';
+  if (c.includes('ENTRADA')) return '🥗';
+  if (c.includes('SOPA') || c.includes('CALDO') || c.includes('CREMA')) return '🍲';
+  if (c.includes('PLATO') || c.includes('PRINCIPAL')) return '🍽️';
+  if (c.includes('PIZZA')) return '🍕';
+  if (c.includes('BEBIDAS-FRIAS') || c === 'CAT-BEBIDAS-FRIAS' || c.includes('BEBIDA FRIA')) return '🧊';
+  if (c.includes('BEBIDAS-CALIENTES') || c === 'CAT-BEBIDAS-CALIENTES' || c.includes('BEBIDA CALIENTE')) return '☕';
+  if (c.includes('ALCOHOL') || c.includes('BAR') || c.includes('CERVE') || c.includes('VINO')) return '🍻';
+  if (c.includes('POSTRE') || c.includes('HELADO') || c.includes('WAFFLE') || c.includes('CREPE') || c.includes('CORCHO')) return '🍰';
+  if (c.includes('MINIBAR') || c.includes('SNACK') || c.includes('EXTRAS') || c.includes('SERVICIO')) return '🧃';
+  return '🍴';
 };
 
 interface LineaVenta {
@@ -426,72 +445,98 @@ const PosPage: React.FC = () => {
                   </IonCardContent>
                 </IonCard>
 
-                {/* Categorías Filtro */}
-                <div className="chips-filtro">
-                  {categoriasCartaFull.map(c => (
+                {/* Categorías Filtro · PREVIEW estilo TomarComanda referencia (emoji + orden carta) */}
+                <div className="chips-filtro" style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 10 }}>
+                  <IonChip
+                    key="Todos"
+                    color={categoriaCartaSel === 'Todos' ? 'success' : 'medium'}
+                    outline={categoriaCartaSel !== 'Todos'}
+                    onClick={() => setCategoriaCartaSel('Todos')}
+                    style={{ cursor: 'pointer', fontWeight: categoriaCartaSel === 'Todos' ? 800 : 500 }}
+                  >
+                    <span slot="start" style={{ fontSize: 15, marginRight: 4 }}>🍽️</span>Todos los productos
+                  </IonChip>
+                  {categoriasObjList.map((cat: any) => (
                     <IonChip
-                      key={c}
-                      color={categoriaCartaSel === c ? 'success' : 'outline'}
-                      onClick={() => setCategoriaCartaSel(c)}
-                      style={{ cursor: 'pointer' }}
-                    >{c}</IonChip>
+                      key={cat.id}
+                      color={categoriaCartaSel === cat.nombre ? 'success' : 'medium'}
+                      outline={categoriaCartaSel !== cat.nombre}
+                      onClick={() => setCategoriaCartaSel(cat.nombre)}
+                      style={{ cursor: 'pointer', fontWeight: categoriaCartaSel === cat.nombre ? 800 : 500 }}
+                    >
+                      <span slot="start" style={{ fontSize: 15, marginRight: 4 }}>{emojiCategoria(cat.id)}</span>
+                      {cat.nombre}
+                    </IonChip>
                   ))}
                 </div>
 
-                {/* ====== PRODUCTOS UNIFICADOS (1 GRID PROFESIONAL) ====== */}
-                <div className="seccion-prod">
+                {/* ====== PREVIEW: PRODUCTOS UNIFICADOS · DISEÑO MARKETPLACE = TomarComanda referencia ====== */}
+                <div className="seccion-prod" style={{ marginTop: 4 }}>
                   {(() => {
                     const lista = productosFiltradosVisual;
                     if (!lista || lista.length === 0) {
                       return <IonNote color="warning" style={{padding:'16px 12px', display:'block', fontSize:13}}>No hay productos en esta categoría.</IonNote>;
                     }
                     return (
-                      <div className="grid-prod-md">
-                        {lista.map(p => {
-                          const esStock = !!p.stockControl;
-                          const stk = Number(p._stock ?? 0);
-                          const min = Number(p._stockMin ?? p.stockMinimo ?? 0);
-                          const agotado = esStock && stk <= 0;
-                          const bajo = esStock && !agotado && stk <= min;
-                          return (
-                            <IonCard
-                              className={`prod-card ${agotado ? 'prod-agotado' : ''}`}
-                              key={p.id}
-                              button
-                              onClick={() => agregarProducto(p)}
-                              style={{ minHeight: 108 }}
-                            >
-                              <IonCardContent style={{ padding: '10px 12px 12px 12px' }}>
-                                <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
-                                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, flex: 1, minWidth: 0 }}>
-                                    <div style={{ fontSize: 22, lineHeight: 1, marginTop: 2, flexShrink: 0 }}>{esStock ? '🥤' : '🍽️'}</div>
-                                    <div style={{ flex: 1, minWidth: 0 }}>
-                                      <div style={{ fontWeight: 800, fontSize: 14, lineHeight: 1.15 }}>{p.nombre}</div>
-                                      <div style={{ fontSize: 11, opacity: 0.78, marginTop: 4 }}>
-                                        {p.categoriaNombre || 'General'}
-                                        {esStock && (
-                                          <>
-                                            {' · '}
-                                            <span style={{
-                                              fontWeight: 700,
-                                              color: agotado ? '#dc2626' : (bajo ? '#d97706' : '#374151'),
-                                            }}>
-                                              {agotado ? '⛔ AGOTADO' : (bajo ? `⚠️ Disp: ${stk}` : `Disp: ${stk}`)}
-                                            </span>
-                                          </>
-                                        )}
-                                      </div>
+                      <IonGrid style={{ padding: 0 }}>
+                        <IonRow>
+                          {lista.map(p => {
+                            const stockControl = Boolean(p.stockControl);
+                            const stk = Number(p._stock ?? 0);
+                            const min = Math.max(1, Number(p._stockMin ?? p.stockMinimo ?? 0), 3);
+                            const agotado = stockControl && stk <= 0;
+                            const bajo = stockControl && !agotado && stk <= min;
+                            return (
+                              <IonCol key={p.id} size="6" sizeMd="4" sizeLg="3">
+                                <IonCard style={{ height: '100%', position: 'relative', overflow: 'hidden', opacity: agotado ? 0.58 : 1, margin: '0 0 10px 0' }}>
+                                  {/* Cabecera ícono grande · PREVIEW igual TomarComanda */}
+                                  <div style={{
+                                    background: stockControl ? '#dbeafe' : '#ecfccb',
+                                    padding: 22,
+                                    fontSize: 44,
+                                    textAlign: 'center',
+                                    borderTopLeftRadius: 12,
+                                    borderTopRightRadius: 12,
+                                  }}>
+                                    <span style={{ fontSize: 44 }}>{emojiCategoria(p.categoriaId)}</span>
+                                    {stockControl && (
+                                      <IonBadge
+                                        color={agotado ? 'danger' : bajo ? 'warning' : 'primary'}
+                                        style={{ position: 'absolute', top: 8, right: 8, fontSize: 11, fontWeight: 900 }}
+                                      >
+                                        {agotado ? 'AGOTADO' : bajo ? `DISP: ${stk}` : `Stock: ${stk}`}
+                                      </IonBadge>
+                                    )}
+                                  </div>
+                                  <IonCardContent style={{ padding: 12 }}>
+                                    <IonCardTitle style={{ fontSize: 15, margin: 0, fontWeight: 800, lineHeight: 1.2 }}>
+                                      {p.nombre}
+                                    </IonCardTitle>
+                                    <IonCardSubtitle style={{ marginTop: 4, fontSize: 12, minHeight: 34, opacity: 0.85 }}>
+                                      {stockControl
+                                        ? `${(p as any).sku || (p as any).codigo || ''}  ${(p as any).descripcion || ''}`.trim()
+                                        : `${(p as any).descripcion || ''}`.trim()}
+                                    </IonCardSubtitle>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 8 }}>
+                                      <IonText color="primary" style={{ fontSize: 16, fontWeight: 900 }}>
+                                        {fmtSoles(Number(p.precioVentaBase || 0))}
+                                      </IonText>
+                                      <IonButton
+                                        color={agotado ? 'medium' : 'success'}
+                                        size="small"
+                                        onClick={() => !agotado && agregarProducto(p)}
+                                        disabled={agotado}
+                                      >
+                                        <IonIcon slot="icon-only" icon={add} />
+                                      </IonButton>
                                     </div>
-                                  </div>
-                                  <div style={{ fontWeight: 900, fontSize: 17, whiteSpace: 'nowrap', color: '#1f2937', alignSelf: 'baseline' }}>
-                                    {fmtSoles(Number(p.precioVentaBase || 0))}
-                                  </div>
-                                </div>
-                              </IonCardContent>
-                            </IonCard>
-                          );
-                        })}
-                      </div>
+                                  </IonCardContent>
+                                </IonCard>
+                              </IonCol>
+                            );
+                          })}
+                        </IonRow>
+                      </IonGrid>
                     );
                   })()}
                 </div>
