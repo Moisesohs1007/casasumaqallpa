@@ -37,6 +37,42 @@ const RUTAS_TAB = ['/home', '/reservas', '/habitaciones', '/pos', '/perfil'];
 const EVENTO_HIDRATACION = 'lodge:hidratacion-listo' as const;
 
 type NetworkMode = 'ONLINE' | 'OFFLINE' | 'CHECKING';
+
+// ====== Helper PING REAL a Supabase (no heurísticas navigator.onLine) ======
+const PING_TIMEOUT_MS = 2500;
+const PING_CACHE_MS = 4200;
+let _pingCache: { ts: number; result: boolean } | null = null;
+let _pingEnCurso: Promise<boolean> | null = null;
+
+async function _pingSupabaseReal(): Promise<boolean> {
+  const ahora = Date.now();
+  if (_pingCache && (ahora - _pingCache.ts) < PING_CACHE_MS) return _pingCache.result;
+  if (_pingEnCurso) return _pingEnCurso;
+
+  _pingEnCurso = (async (): Promise<boolean> => {
+    try {
+      const client = dbRemota?.client;
+      if (!client || !(client as any).from) {
+        _pingCache = { ts: Date.now(), result: false };
+        return false;
+      }
+      const timeout = new Promise<never>((_, rj) =>
+        setTimeout(() => rj(new Error('PING_TIMEOUT')), PING_TIMEOUT_MS)
+      );
+      const req = (client as any).from('impuestos').select('id', { count: 'exact', head: true }).limit(1);
+      const res = await Promise.race([req, timeout]);
+      const ok = !(res?.error);
+      _pingCache = { ts: Date.now(), result: ok };
+      return ok;
+    } catch (_e) {
+      _pingCache = { ts: Date.now(), result: false };
+      return false;
+    } finally {
+      _pingEnCurso = null;
+    }
+  })();
+  return _pingEnCurso;
+}
 const dispatchHidratado = (grupo: string, ok: boolean) => {
   try {
     if (typeof window !== 'undefined' && window.dispatchEvent) {
@@ -221,27 +257,44 @@ const App: React.FC = () => {
   const [networkMode, setNetworkMode] = useState<NetworkMode>('CHECKING');
   const [pendientesCount, setPendientesCount] = useState<number>(0);
   const [retryTick, setRetryTick] = useState(0);
+  const checkingRef = React.useRef(false);
 
-  const checkNetworkAndQueue = useCallback(() => {
+  const checkNetworkAndQueue = useCallback(async (force = false) => {
+    if (checkingRef.current && !force) return;
+    checkingRef.current = true;
     try {
-      const online = typeof navigator !== 'undefined' ? navigator.onLine : true;
-      const supabaseOk = !!dbRemota?.isOnline?.();
-      const finalOnline = !!online && !!supabaseOk;
-      setNetworkMode(finalOnline ? 'ONLINE' : 'OFFLINE');
+      setNetworkMode((prev) => prev === 'CHECKING' ? 'CHECKING' : prev);
+      // 1. Actualizar contador pendientes SIEMPRE (también sirve offline)
       const n = Number(pendingSync.countPendientes?.() || 0);
       setPendientesCount(Number.isFinite(n) ? n : 0);
-    } catch { setNetworkMode('ONLINE'); setPendientesCount(0); }
+      // 2. Heurística RÁPIDA: si navigator.onLine=false + VPN/proxy a veces miente → NO BLOQUEAR, solo optimizar.
+      //    Solo saltear ping si navigator.onLine=false Y ya sabemos que el último ping fue falso (debatir offline real)
+      const navOnline = typeof navigator !== 'undefined' ? navigator.onLine : true;
+      // 3. PING REAL a Supabase con cache y timeout 2.5s (PRUEBA VERDADERA de conexión)
+      const pingOk = await _pingSupabaseReal();
+      const finalOnline = pingOk && !!navOnline;
+      setNetworkMode(finalOnline ? 'ONLINE' : 'OFFLINE');
+      // 4. Si volvemos ONLINE con pendientes → disparar auto-flush suave
+      if (finalOnline && pendingSync.countPendientes?.() > 0) {
+        pendingSync.processQueue?.(false).catch(() => {});
+      }
+    } catch {
+      setNetworkMode('ONLINE');
+      setPendientesCount(0);
+    } finally {
+      checkingRef.current = false;
+    }
   }, []);
 
   useEffect(() => {
-    checkNetworkAndQueue();
-    const t1 = window.setInterval(checkNetworkAndQueue, 5000);
-    const t2 = window.setInterval(() => setRetryTick((t) => t + 1), 15000);
-    const on = () => checkNetworkAndQueue();
+    checkNetworkAndQueue(true);
+    const t1 = window.setInterval(() => checkNetworkAndQueue(false), 5500);
+    const t2 = window.setInterval(() => setRetryTick((t) => t + 1), 18000);
+    const on = () => { _pingCache = null; checkNetworkAndQueue(true); };
     window.addEventListener?.('online', on);
     window.addEventListener?.('offline', on);
     try {
-      const onDBMutated = () => setTimeout(checkNetworkAndQueue, 250);
+      const onDBMutated = () => setTimeout(() => checkNetworkAndQueue(false), 300);
       window.addEventListener?.('lodge:db:mutated', onDBMutated);
       window.addEventListener?.('lodge:pending:enqueued', onDBMutated);
     } catch (_) {}
@@ -253,7 +306,7 @@ const App: React.FC = () => {
     };
   }, [checkNetworkAndQueue]);
 
-  useEffect(() => { checkNetworkAndQueue(); }, [retryTick, checkNetworkAndQueue]);
+  useEffect(() => { checkNetworkAndQueue(true); }, [retryTick, checkNetworkAndQueue]);
 
   // 1 vez al boot: hidratar InMemoryDB con datos reales de Supabase Cloud
   useEffect(() => {
