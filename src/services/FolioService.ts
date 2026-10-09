@@ -711,12 +711,30 @@ export const FolioService = {
         cerrados.push(this.buscarPorId(f.id)!);
       }
 
+      // === FIX CHECKOUT BUG: Liberar habitacion SOLO f.habitacionId,
+      // SINO que tambien buscar en f.reservaId→reserva.habitaciones[] (JSONB en el 90% casos) ===
+      const habitacionesParaLiberar: Array<{ id: string }> = [];
       if (f.habitacionId) {
-        HabitacionService.cambiarEstado(
-          f.habitacionId,
-          params.estadoHabitacionEntrega || 'LIMPIEZA',
-          userId
-        );
+        habitacionesParaLiberar.push({ id: f.habitacionId });
+      }
+      try {
+        const reservaRef = f.reservaId ? ReservaService.buscarPorId(f.reservaId) : null;
+        const habs = reservaRef && Array.isArray((reservaRef as any).habitaciones) ? (reservaRef as any).habitaciones : [];
+        for (const rh of habs) {
+          const hid = rh?.habitacionId || rh?.habitacion?.id;
+          if (hid && !habitacionesParaLiberar.some((x) => x.id === hid)) {
+            habitacionesParaLiberar.push({ id: hid });
+          }
+        }
+      } catch(_) {}
+      for (const hObj of habitacionesParaLiberar) {
+        try {
+          HabitacionService.cambiarEstado(
+            hObj.id,
+            params.estadoHabitacionEntrega || 'LIMPIEZA',
+            userId
+          );
+        } catch (_) { /* ya */ }
       }
 
       reservaIdFinal = f.reservaId || reservaIdFinal;

@@ -443,6 +443,27 @@ export const ReservaService = {
     // Dual-write: remoto
     dbRemota.updateAsync<Reserva>(KEY, id, payloadLocal as any).catch((e) => console.error('[ReservaService.cambiarEstado] Sync remoto falló:', e?.message || e));
 
+    // === FIX CHECKOUT BUG: Liberar/Cambiar estado habitaciones en CHECKED_OUT (igual que en cancelar) ===
+    if (nuevoEstado === 'CHECKED_OUT') {
+      const reservaRef = this.buscarPorId(actual!.id);
+      if (reservaRef) {
+        for (const rh of reservaRef.habitaciones || []) {
+          const habId = rh.habitacionId || (rh.habitacion as any)?.id;
+          if (habId) {
+            try {
+              const hab = HabitacionService.buscarPorId(habId);
+              if (hab) {
+                // Solo cambiar si sigue en OCUPADA/CHECKED_IN/RESERVADA
+                if (['OCUPADA','CHECKED_IN','RESERVADA'].includes(String(hab.estado || ''))) {
+                  HabitacionService.cambiarEstado(habId, 'LIMPIEZA', params.usuarioResponsableId);
+                }
+              }
+            } catch (_) {}
+          }
+        }
+      }
+    }
+
     return this.buscarPorId(actual!.id);
   },
 

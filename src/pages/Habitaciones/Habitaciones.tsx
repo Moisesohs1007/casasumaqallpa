@@ -1104,7 +1104,37 @@ const HabitacionesPage: React.FC = () => {
                   <div className="nv-corte">-- corte ticket --</div>
                 </div>
                 <div className="modal-foot no-print">
-                  <IonButton color="primary" onClick={() => setTimeout(() => window.print(), 60)}><IonIcon slot="start" icon={receiptOutline} />Imprimir (Ticket 80mm)</IonButton>
+                  <IonButton color="primary" onClick={() => {
+                    setTimeout(() => window.print(), 60);
+                    // === FIX BUG CHECKOUT: Si saldo pagado, AUTO-marcar habitación LIBRE y cerrar después de imprimir ===
+                    if (saldo <= 0.01 && notaVentaCheckout?.habId) {
+                      setTimeout(async () => {
+                        try {
+                          await refrescarFuerza();
+                        } catch(_) {}
+                        const habObj = habitaciones.find(h => h.id === notaVentaCheckout.habId);
+                        if (habObj) {
+                          try {
+                            // Primero a LIMPIEZA (estándar hotelero: check-out → limpieza),
+                            // luego marcar LIBRE automáticamente si el staff quiere.
+                            // Mantener LIBRE para que se vea disponible inmediatamente.
+                            marcarEstado(habObj, 'LIBRE');
+                          } catch(e: any) {
+                            console.error('[Checkout] No se pudo marcar LIBRE:', e?.message || e);
+                          }
+                        }
+                        try {
+                          if (checkoutReservaId) {
+                            const r = (window as any).ReservaService?.buscarPorId?.(checkoutReservaId);
+                            if (r && String(r.estado || '') !== 'CHECKED_OUT') {
+                              try { (window as any).ReservaService?.cambiarEstado?.(checkoutReservaId, 'CHECKED_OUT', { usuarioResponsableId: USUARIO_ACTUAL.id, comentario: 'Check-out desde Nota Venta (auto)', informacionAdicional: { fechaCheckoutReal: new Date().toISOString() } }); } catch(_){}
+                            }
+                          }
+                        } catch(_){}
+                        setTimeout(() => setNotaVentaCheckout(null), 1200);
+                      }, 900);
+                    }
+                  }}><IonIcon slot="start" icon={receiptOutline} />Imprimir (Ticket 80mm) {saldo <= 0.01 && '· Marcar LIBRE Auto'}</IonButton>
                   {saldo <= 0.01 && (
                     <IonButton color="success" onClick={() => {
                       setNotaVentaCheckout(null);
