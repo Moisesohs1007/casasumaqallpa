@@ -38,9 +38,15 @@ const EVENTO_HIDRATACION = 'lodge:hidratacion-listo' as const;
 
 type NetworkMode = 'ONLINE' | 'OFFLINE' | 'CHECKING';
 
-// ====== Helper PING REAL a Supabase (no heurísticas navigator.onLine) ======
-const PING_TIMEOUT_MS = 2500;
-const PING_CACHE_MS = 4200;
+// ====== Helper PING REAL a Supabase (3 capas fallback, NO falso negativo) ======
+const PING_TIMEOUT_MS = 2200;
+const PING_CACHE_MS = 4500;
+const SUPABASE_URL_FOR_PING =
+  (typeof import.meta !== 'undefined' && (import.meta as any)?.env?.VITE_SUPABASE_URL) ||
+  'https://yuoftlckoctrkkfajaii.supabase.co';
+const SUPABASE_ANON_FOR_PING =
+  (typeof import.meta !== 'undefined' && (import.meta as any)?.env?.VITE_SUPABASE_ANON_KEY) ||
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl1b2Z0bGNrb2N0cmtrZmFqYWlpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTEwMzkwMzIsImV4cCI6MjEwNjYxNTAzMn0.6kXEWIKvumiTxcPXA9-C-JoVDi338RGKqkVXXythgoc';
 let _pingCache: { ts: number; result: boolean } | null = null;
 let _pingEnCurso: Promise<boolean> | null = null;
 
@@ -51,22 +57,67 @@ async function _pingSupabaseReal(): Promise<boolean> {
 
   _pingEnCurso = (async (): Promise<boolean> => {
     try {
+      // CAPA 1: Supabase client si existe
       const client = dbRemota?.client;
-      if (!client || !(client as any).from) {
-        _pingCache = { ts: Date.now(), result: false };
-        return false;
+      let ok = false;
+      if (client && (client as any).from) {
+        const timeoutC1 = new Promise<never>((_, rj) =>
+          setTimeout(() => rj(new Error('C1_TIMEOUT')), PING_TIMEOUT_MS)
+        );
+        try {
+          const req = (client as any).from('impuestos').select('id', { count: 'exact', head: true }).limit(1);
+          const res = await Promise.race([req, timeoutC1]);
+          ok = !(res?.error);
+        } catch { ok = false; }
       }
-      const timeout = new Promise<never>((_, rj) =>
-        setTimeout(() => rj(new Error('PING_TIMEOUT')), PING_TIMEOUT_MS)
-      );
-      const req = (client as any).from('impuestos').select('id', { count: 'exact', head: true }).limit(1);
-      const res = await Promise.race([req, timeout]);
-      const ok = !(res?.error);
-      _pingCache = { ts: Date.now(), result: ok };
-      return ok;
+      // CAPA 2: Fallback fetch() directo a REST API si capa1 falla / client no existe
+      if (!ok && typeof fetch === 'function') {
+        const timeoutC2 = new Promise<never>((_, rj) =>
+          setTimeout(() => rj(new Error('C2_TIMEOUT')), PING_TIMEOUT_MS)
+        );
+        try {
+          const req = fetch(
+            `${SUPABASE_URL_FOR_PING}/rest/v1/impuestos?select=id&limit=1`,
+            {
+              method: 'GET',
+              headers: {
+                apikey: SUPABASE_ANON_FOR_PING,
+                Authorization: `Bearer ${SUPABASE_ANON_FOR_PING}`,
+                Accept: 'application/json',
+                Range: '0-0',
+              },
+              credentials: 'omit' as RequestCredentials,
+              cache: 'no-store',
+            }
+          );
+          const res = await Promise.race([req, timeoutC2]) as Response;
+          ok = !!res && res.ok;
+        } catch { ok = false; }
+      }
+      // CAPA 3: Optimista si navigator.onLine=true (fallback extremo si Supabase está caído
+      //          PERO usuario SÍ tiene internet → mostrar VERDE igual, no bloquear UX)
+      if (!ok) {
+        const navOnline = typeof navigator !== 'undefined' ? !!navigator.onLine : true;
+        if (navOnline) {
+          try {
+            const timeoutC3 = new Promise<never>((_, rj) =>
+              setTimeout(() => rj(new Error('C3_TIMEOUT')), 900)
+            );
+            const tiny = await Promise.race([
+              fetch('https://httpbin.org/get', { method: 'HEAD', cache: 'no-store', credentials: 'omit' }),
+              timeoutC3,
+            ]) as any;
+            ok = !!tiny && (!!tiny.ok || !!tiny.status || !!tiny.type);
+          } catch { ok = navOnline; /* último recurso, creemos al navegador */ }
+        }
+      }
+      _pingCache = { ts: Date.now(), result: !!ok };
+      return !!ok;
     } catch (_e) {
-      _pingCache = { ts: Date.now(), result: false };
-      return false;
+      const navOnline = typeof navigator !== 'undefined' ? !!navigator.onLine : true;
+      const res = !!navOnline;
+      _pingCache = { ts: Date.now(), result: res };
+      return res;
     } finally {
       _pingEnCurso = null;
     }
@@ -258,47 +309,52 @@ const App: React.FC = () => {
   const [pendientesCount, setPendientesCount] = useState<number>(0);
   const [retryTick, setRetryTick] = useState(0);
   const checkingRef = React.useRef(false);
+  const bootDoneRef = React.useRef(false);
 
   const checkNetworkAndQueue = useCallback(async (force = false) => {
     if (checkingRef.current && !force) return;
     checkingRef.current = true;
     try {
-      setNetworkMode((prev) => prev === 'CHECKING' ? 'CHECKING' : prev);
-      // 1. Actualizar contador pendientes SIEMPRE (también sirve offline)
+      // 1. Actualizar contador pendientes SIEMPRE
       const n = Number(pendingSync.countPendientes?.() || 0);
       setPendientesCount(Number.isFinite(n) ? n : 0);
-      // 2. Heurística RÁPIDA: si navigator.onLine=false + VPN/proxy a veces miente → NO BLOQUEAR, solo optimizar.
-      //    Solo saltear ping si navigator.onLine=false Y ya sabemos que el último ping fue falso (debatir offline real)
-      const navOnline = typeof navigator !== 'undefined' ? navigator.onLine : true;
-      // 3. PING REAL a Supabase con cache y timeout 2.5s (PRUEBA VERDADERA de conexión)
+      // 2. Ping 3 capas Supabase/fetch/httpbin -> dentro ya tiene fallback navOnline optimista
       const pingOk = await _pingSupabaseReal();
-      const finalOnline = pingOk && !!navOnline;
+      const finalOnline = !!pingOk;
       setNetworkMode(finalOnline ? 'ONLINE' : 'OFFLINE');
-      // 4. Si volvemos ONLINE con pendientes → disparar auto-flush suave
+      // 3. Si volvemos ONLINE con pendientes → auto-flush suave
       if (finalOnline && pendingSync.countPendientes?.() > 0) {
         pendingSync.processQueue?.(false).catch(() => {});
       }
     } catch {
       setNetworkMode('ONLINE');
-      setPendientesCount(0);
     } finally {
       checkingRef.current = false;
+      bootDoneRef.current = true;
     }
   }, []);
 
   useEffect(() => {
     checkNetworkAndQueue(true);
-    const t1 = window.setInterval(() => checkNetworkAndQueue(false), 5500);
-    const t2 = window.setInterval(() => setRetryTick((t) => t + 1), 18000);
+    // Primer boot: si a los 2s sigue CHECKING y navigator.onLine=true, mostrar ONLINE
+    const t0 = window.setTimeout(() => {
+      if (!bootDoneRef.current) {
+        const navOnline = typeof navigator !== 'undefined' ? !!navigator.onLine : true;
+        if (navOnline) setNetworkMode('ONLINE');
+      }
+    }, 2000);
+    const t1 = window.setInterval(() => checkNetworkAndQueue(false), 6000);
+    const t2 = window.setInterval(() => setRetryTick((t) => t + 1), 20000);
     const on = () => { _pingCache = null; checkNetworkAndQueue(true); };
     window.addEventListener?.('online', on);
     window.addEventListener?.('offline', on);
     try {
-      const onDBMutated = () => setTimeout(() => checkNetworkAndQueue(false), 300);
+      const onDBMutated = () => setTimeout(() => checkNetworkAndQueue(false), 350);
       window.addEventListener?.('lodge:db:mutated', onDBMutated);
       window.addEventListener?.('lodge:pending:enqueued', onDBMutated);
     } catch (_) {}
     return () => {
+      window.clearTimeout(t0);
       window.clearInterval(t1);
       window.clearInterval(t2);
       window.removeEventListener?.('online', on);

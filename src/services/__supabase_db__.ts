@@ -9,8 +9,17 @@ import type {
   AlergenoProducto, Mesa, Comanda, ComandaDetalle, ImpuestoTarifa,
 } from '../types';
 
-const SUPABASE_URL = (import.meta as any)?.env?.VITE_SUPABASE_URL || '';
-const SUPABASE_ANON_KEY = (import.meta as any)?.env?.VITE_SUPABASE_ANON_KEY || '';
+const SUPABASE_URL_FALLBACK = 'https://yuoftlckoctrkkfajaii.supabase.co' as const;
+const SUPABASE_ANON_KEY_FALLBACK = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl1b2Z0bGNrb2N0cmtrZmFqYWlpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTEwMzkwMzIsImV4cCI6MjEwNjYxNTAzMn0.6kXEWIKvumiTxcPXA9-C-JoVDi338RGKqkVXXythgoc' as const;
+
+const SUPABASE_URL =
+  ((import.meta as any)?.env?.VITE_SUPABASE_URL as string) ||
+  SUPABASE_URL_FALLBACK ||
+  '';
+const SUPABASE_ANON_KEY =
+  ((import.meta as any)?.env?.VITE_SUPABASE_ANON_KEY as string) ||
+  SUPABASE_ANON_KEY_FALLBACK ||
+  '';
 
 if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
   console.warn('[SupabaseDB] WARN: VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY no set (offline mode)');
