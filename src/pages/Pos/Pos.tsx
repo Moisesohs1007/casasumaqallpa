@@ -132,6 +132,15 @@ const PosPage: React.FC = () => {
   // Snapshots anti-parpadeo
   const snapshotMesas = useRef<string>('');
   const snapshotTick = useRef<number>(0);
+  // Refs estables: setState vía refs para NO recrear callbacks
+  const setVistaMesasRef = useRef<typeof setVistaMesas>(() => {});
+  setVistaMesasRef.current = setVistaMesas;
+  const setRefreshTickRef = useRef<typeof setRefreshTick>(() => {});
+  setRefreshTickRef.current = setRefreshTick;
+  const setLoadingRef = useRef<typeof setLoading>(() => {});
+  setLoadingRef.current = setLoading;
+  const vistaMesasRef = useRef<PosVistaMesaRow[]>([]);
+  vistaMesasRef.current = vistaMesas;
 
   // ============== WALK-IN ==============
   const [categoriaCartaSel, setCategoriaCartaSel] = useState<string>('Todos');
@@ -151,8 +160,10 @@ const PosPage: React.FC = () => {
     if (refreshingRef.current) return;
     refreshingRef.current = true;
     let huboCambioReal = false;
+    const vista = vistaMesasRef.current;
+    const esPrimeraCarga = (snapshotMesas.current === '' || !vista || vista.length === 0);
     try {
-      setLoading(true);
+      if (esPrimeraCarga) setLoadingRef.current(true);
       try {
         await Promise.all([
           PosService.hidratarDesdeSupabase?.(true),
@@ -160,11 +171,11 @@ const PosPage: React.FC = () => {
       } catch (_) {}
       try { pendingSync.applyPendingLocal?.(); } catch (_) {}
       try {
-        await cargar();
+        const cambio = await cargar();
+        if (cambio) huboCambioReal = true;
       } catch (_) {}
-      // postFlush también usa snapshot
     } finally {
-      setLoading(false);
+      if (esPrimeraCarga) setLoadingRef.current(false);
       refreshingRef.current = false;
       if (postFlush) {
         try { await pendingSync.processQueue?.(false); } catch (_) {}
@@ -173,14 +184,16 @@ const PosPage: React.FC = () => {
       // Incrementar refreshTick SÓLO si hubo un cambio real de snapshot
       if (snapshotMesas.current !== '' && huboCambioReal) {
         snapshotTick.current++;
-        setRefreshTick(snapshotTick.current);
+        setRefreshTickRef.current(snapshotTick.current);
       } else if (snapshotMesas.current === '') {
         snapshotTick.current++;
-        setRefreshTick(snapshotTick.current);
+        setRefreshTickRef.current(snapshotTick.current);
       }
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+  const refrescarFuerzaRef = useRef(refrescarFuerza);
+  refrescarFuerzaRef.current = refrescarFuerza;
 
   useIonViewWillEnter(() => {
     const catalogoVACIO_TOTAL = (() => {
@@ -197,62 +210,18 @@ const PosPage: React.FC = () => {
         setTimeout(() => mostrarToast('🔄 Instalando catálogo oficial por primera vez...'), 200);
       } catch (_) {}
     }
-    refrescarFuerza();
+    refrescarFuerzaRef.current();
   });
 
-  // Listener evento global refresh
+  // Listener evento global refresh — deps = [] estable
   useEffect(() => {
     const handler = (e: any) => {
       const quien = (e as any)?.detail?.page;
-      if (!quien || quien === 'POS' || quien === 'TODAS') refrescarFuerza();
+      if (!quien || quien === 'POS' || quien === 'TODAS') refrescarFuerzaRef.current();
     };
     window.addEventListener(EVENTO_REFRESCAR, handler as any);
     return () => window.removeEventListener(EVENTO_REFRESCAR, handler as any);
-  }, [refrescarFuerza]);
-
-  // Realtime channels debounce 500ms (sin guard clause) — solo cuando hay cambios remotos reales
-  useEffect(() => {
-    let alive = true;
-    let debounceId: any;
-    const TABLAS = ['comandas', 'comandas_detalles', 'mesas', 'categorias_fb', 'productos_fb', 'presentaciones_fb', 'puntos_venta', 'habitaciones'];
-
-    const recargarDebounced = () => {
-      if (!alive) return;
-      clearTimeout(debounceId);
-      debounceId = setTimeout(async () => {
-        if (!alive) return;
-        try {
-          await Promise.all([ PosService.hidratarDesdeSupabase?.(true) ]);
-        } catch (_) {}
-        try { pendingSync.applyPendingLocal?.(); } catch (_) {}
-        try { cargar(); } catch (_) {}
-        try { setRefreshTick(t => t + 1); } catch (_) {}
-      }, 500);
-    };
-
-    const canales: any[] = [];
-    try {
-      const sb = (supabase as any)?.channel ? (supabase as any) : null;
-      if (sb) {
-        for (const t of TABLAS) {
-          try {
-            const ch = sb.channel(`rt-pos-${t}-${Math.random().toString(36).slice(2,7)}`)
-              .on('postgres_changes', { event: '*' as any, schema: 'public', table: t }, recargarDebounced)
-              .subscribe();
-            canales.push(ch);
-          } catch (_) {}
-        }
-      }
-    } catch (_) {}
-    return () => {
-      alive = false;
-      clearTimeout(debounceId);
-      try {
-        const sb = (supabase as any);
-        Promise.all(canales.map(c => sb?.removeChannel?.(c))).catch(()=>{});
-      } catch (_) {}
-    };
-  }, [refrescarFuerza]);
+  }, []);
   // ===== DATOS DESDE CATÁLOGO OFICIAL (seed o Supabase) =====
   const categoriasObjList = useMemo(() => {
     try {
@@ -394,8 +363,11 @@ const PosPage: React.FC = () => {
     setComandaAEditarId(undefined); setTomarComandaOpen(true);
   };
 
-  const cargar = async () => {
-    setLoading(true);
+  const cargar = async (): Promise<boolean> => {
+    const vista = vistaMesasRef.current;
+    const esPrimeraCarga = (snapshotMesas.current === '' || !vista || vista.length === 0);
+    let cambio = false;
+    if (esPrimeraCarga) setLoadingRef.current(true);
     try {
       const [mesas, comandas] = await Promise.all([
         MesaService.listarTodas(),
@@ -431,39 +403,36 @@ const PosPage: React.FC = () => {
       const snap = stableStringify(rows);
       if (snap !== snapshotMesas.current) {
         snapshotMesas.current = snap;
-        setVistaMesas(rows);
+        setVistaMesasRef.current(rows);
         snapshotTick.current++;
-        setRefreshTick(snapshotTick.current);
+        setRefreshTickRef.current(snapshotTick.current);
+        cambio = true;
       }
     } catch {
       if (snapshotMesas.current !== '[]') {
         snapshotMesas.current = '[]';
-        setVistaMesas([]);
+        setVistaMesasRef.current([]);
         snapshotTick.current++;
-        setRefreshTick(snapshotTick.current);
+        setRefreshTickRef.current(snapshotTick.current);
+        cambio = true;
       }
-    } finally { setLoading(false); }
+    } finally { if (esPrimeraCarga) setLoadingRef.current(false); }
+    return cambio;
   };
 
-  // Realtime channels debounce 500ms (sin guard clause) — solo cuando hay cambios remotos reales
+  // Realtime channels debounce 500ms (sin guard clause) — deps = [] estable (NO SE RE-MONTA)
   useEffect(() => {
     let alive = true;
     let debounceId: any;
     const TABLAS = ['comandas', 'comandas_detalles', 'mesas', 'categorias_fb', 'productos_fb', 'presentaciones_fb', 'puntos_venta', 'habitaciones'];
-
     const recargarDebounced = () => {
       if (!alive) return;
       clearTimeout(debounceId);
-      debounceId = setTimeout(async () => {
+      debounceId = setTimeout(() => {
         if (!alive) return;
-        try {
-          await Promise.all([ PosService.hidratarDesdeSupabase?.(true) ]);
-        } catch (_) {}
-        try { pendingSync.applyPendingLocal?.(); } catch (_) {}
-        try { await cargar(); } catch (_) {}
+        refrescarFuerzaRef.current(false);
       }, 500);
     };
-
     const canales: any[] = [];
     try {
       const sb = (supabase as any)?.channel ? (supabase as any) : null;

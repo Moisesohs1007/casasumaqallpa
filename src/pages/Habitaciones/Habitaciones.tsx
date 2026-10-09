@@ -147,17 +147,33 @@ const HabitacionesPage: React.FC = () => {
   const [modalRegistrarPago, setModalRegistrarPago] = useState(false);
   const [notaVentaCheckout, setNotaVentaCheckout] = useState<{ folio: any; habId: string } | null>(null);
   const [refreshTick, setRefreshTick] = useState<number>(0);
+  // Refs estables para refrescarFuerza (nunca recrear callback)
+  const habitacionesRef = useRef<Habitacion[]>([]);
+  const setHabitacionesRef = useRef<typeof setHabitaciones>(()=>{});
+  habitacionesRef.current = habitaciones;
+  setHabitacionesRef.current = setHabitaciones;
+  const setLoadingRef = useRef<typeof setLoading>(()=>{});
+  setLoadingRef.current = setLoading;
+  const setRefreshTickRef = useRef<typeof setRefreshTick>(()=>{});
+  setRefreshTickRef.current = setRefreshTick;
 
   const [foliosLocal, setFoliosLocal] = useState<typeof FOLIOS_MOCK>(JSON.parse(JSON.stringify(FOLIOS_MOCK)));
   const [cantidadesVenta, setCantidadesVenta] = useState<Record<string, number>>({});
 
   // =================== REFRESCO GENERAL ===================
+  // PATRÓN ESTABLE INQUEBRANTABLE PARA EVITAR RE-MONTAJE EN MÓVIL:
+  //   refrescarFuerza con useCallback deps [] (ref estables).
+  //   useEffects Realtime/listener deps = [] NUNCA se re-ejecutan = canal Realtime estable
+  //   En móvil esto evita un efecto donde el useEffect constantemente
+  //   destruye/crea channels por mala dependencia [refrescarFuerza] variable.
   const refrescarFuerza = useCallback(async (postFlush = false) => {
     if (refreshingRef.current) return;
     refreshingRef.current = true;
     let huboCambioReal = false;
+    const habs = habitacionesRef.current;
+    const esPrimeraCarga = (snapshotHab.current === '' || !habs || habs.length === 0);
     try {
-      setLoading(true);
+      if (esPrimeraCarga) setLoadingRef.current(true);
       try {
         await Promise.all([
           (HabitacionService as any).hidratarDesdeSupabase?.(true),
@@ -172,21 +188,21 @@ const HabitacionesPage: React.FC = () => {
         if (snap !== snapshotHab.current) {
           snapshotHab.current = snap;
           huboCambioReal = true;
-          setHabitaciones(lista);
+          setHabitacionesRef.current(lista);
         }
       } catch {
         if (snapshotHab.current !== '[]') {
           snapshotHab.current = '[]';
           huboCambioReal = true;
-          setHabitaciones([]);
+          setHabitacionesRef.current([]);
         }
       }
       if (huboCambioReal) {
         snapshotRefreshTick.current++;
-        setRefreshTick(snapshotRefreshTick.current);
+        setRefreshTickRef.current(snapshotRefreshTick.current);
       }
     } finally {
-      setLoading(false);
+      if (esPrimeraCarga) setLoadingRef.current(false);
       refreshingRef.current = false;
       if (postFlush) {
         let huboPostCambio = false;
@@ -197,22 +213,24 @@ const HabitacionesPage: React.FC = () => {
           if (snap !== snapshotHab.current) {
             snapshotHab.current = snap;
             huboPostCambio = true;
-            setHabitaciones(lista);
+            setHabitacionesRef.current(lista);
           }
         } catch {
           if (snapshotHab.current !== '[]') {
             snapshotHab.current = '[]';
             huboPostCambio = true;
-            setHabitaciones([]);
+            setHabitacionesRef.current([]);
           }
         }
         if (huboPostCambio) {
           snapshotRefreshTick.current++;
-          setRefreshTick(snapshotRefreshTick.current);
+          setRefreshTickRef.current(snapshotRefreshTick.current);
         }
       }
     }
   }, []);
+  const refrescarFuerzaRef = useRef(refrescarFuerza);
+  refrescarFuerzaRef.current = refrescarFuerza;
 
   const cargar = async () => {
     try {
@@ -220,56 +238,47 @@ const HabitacionesPage: React.FC = () => {
       const snap = stableStringify(lista);
       if (snap !== snapshotHab.current) {
         snapshotHab.current = snap;
-        setHabitaciones(lista);
+        setHabitacionesRef.current(lista);
         snapshotRefreshTick.current++;
-        setRefreshTick(snapshotRefreshTick.current);
+        setRefreshTickRef.current(snapshotRefreshTick.current);
       }
     } catch {
       if (snapshotHab.current !== '[]') {
         snapshotHab.current = '[]';
-        setHabitaciones([]);
+        setHabitacionesRef.current([]);
         snapshotRefreshTick.current++;
-        setRefreshTick(snapshotRefreshTick.current);
+        setRefreshTickRef.current(snapshotRefreshTick.current);
       }
     }
   };
 
-  useIonViewWillEnter(() => { refrescarFuerza(); });
+  useIonViewWillEnter(() => { refrescarFuerzaRef.current(); });
 
-  // Listener evento global refresh
+  // Listener evento global refresh — deps = [] estable
   useEffect(() => {
     const handler = (e: any) => {
       const quien = (e as any)?.detail?.page;
-      if (!quien || quien === 'HABITACIONES' || quien === 'TODAS') refrescarFuerza();
+      if (!quien || quien === 'HABITACIONES' || quien === 'TODAS') refrescarFuerzaRef.current();
     };
     window.addEventListener(EVENTO_REFRESCAR, handler as any);
     return () => window.removeEventListener(EVENTO_REFRESCAR, handler as any);
-  }, [refrescarFuerza]);
+  }, []);
 
-  // Realtime Channels debounce 500ms (sin guard clause) — SOLO actualiza si hay cambios en DB remota
+  // Realtime Channels debounce 500ms SIN GUARD — deps = [] estable (NO SE RE-MONTA)
   useEffect(() => {
     let alive = true;
     let debounceId: any;
     const TABLAS = ['habitaciones', 'reservas', 'folios', 'cargos_folio', 'pagos_folio', 'comandas', 'comandas_detalles', 'huespedes'];
-
     const recargarDebounced = () => {
       if (!alive) return;
       clearTimeout(debounceId);
-      debounceId = setTimeout(async () => {
+      debounceId = setTimeout(() => {
         if (!alive) return;
-        try {
-          await Promise.all([
-            (HabitacionService as any).hidratarDesdeSupabase?.(true),
-            (ReservaService as any).hidratarDesdeSupabase?.(true),
-            FolioService.hidratarDesdeSupabase?.(true),
-          ]);
-        } catch (_) {}
-        try { pendingSync.applyPendingLocal?.(); } catch (_) {}
-        try { cargar(); } catch (_) {}
-        try { setRefreshTick(t => t + 1); } catch (_) {}
+        // IMPORTANTE NO: llamar cargar() ni setRefreshTick directamente.
+        // Pasar por refrescarFuerza que compara snap y evita re-render vacío.
+        refrescarFuerzaRef.current(false);
       }, 500);
     };
-
     const canales: any[] = [];
     try {
       const sb = (supabase as any)?.channel ? (supabase as any) : null;
@@ -284,7 +293,6 @@ const HabitacionesPage: React.FC = () => {
         }
       }
     } catch (_) {}
-
     return () => {
       alive = false;
       clearTimeout(debounceId);
@@ -293,7 +301,7 @@ const HabitacionesPage: React.FC = () => {
         Promise.all(canales.map(c => sb?.removeChannel?.(c))).catch(()=>{});
       } catch (_) {}
     };
-  }, [refrescarFuerza]);
+  }, []);
 
   // Pull-refresh handler
   const onPullRefresh = async (event: any) => {

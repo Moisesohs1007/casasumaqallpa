@@ -67,6 +67,9 @@ const ReservasPage: React.FC = () => {
   const [reservaIdParaCheckin, setReservaIdParaCheckin] = useState<string | null>(null);
   const refreshingRef = useRef(false);
   const snapshotReservas = useRef<string>('');
+  // Refs estables: setState vía refs para NO recrear refrescarFuerza
+  const setReservasRef = useRef<typeof setReservas>(() => {});
+  setReservasRef.current = setReservas;
 
   const cargarReservas = () => {
     try {
@@ -79,12 +82,12 @@ const ReservasPage: React.FC = () => {
       const snap = stableStringify(ordenadas);
       if (snap !== snapshotReservas.current) {
         snapshotReservas.current = snap;
-        setReservas(ordenadas as any);
+        setReservasRef.current(ordenadas as any);
       }
     } catch {
       if (snapshotReservas.current !== '[]') {
         snapshotReservas.current = '[]';
-        setReservas([]);
+        setReservasRef.current([]);
       }
     }
   };
@@ -110,36 +113,34 @@ const ReservasPage: React.FC = () => {
       }
     }
   }, []);
+  const refrescarFuerzaRef = useRef(refrescarFuerza);
+  refrescarFuerzaRef.current = refrescarFuerza;
 
-  useIonViewWillEnter(() => { refrescarFuerza(); });
+  useIonViewWillEnter(() => { refrescarFuerzaRef.current(); });
 
-  // Listener evento global 'lodge:refrescarAhora' (boton 🔄 / pre-accion / pull-refresh otros)
+  // Listener evento global 'lodge:refrescarAhora' — deps = [] estable
   useEffect(() => {
     const handler = (e: any) => {
       const quien = (e as any)?.detail?.page;
-      if (!quien || quien === 'RESERVAS' || quien === 'TODAS') refrescarFuerza();
+      if (!quien || quien === 'RESERVAS' || quien === 'TODAS') refrescarFuerzaRef.current();
     };
     window.addEventListener(EVENTO_REFRESCAR, handler as any);
     return () => window.removeEventListener(EVENTO_REFRESCAR, handler as any);
-  }, [refrescarFuerza]);
+  }, []);
 
-  // Realtime Channels debounce 500ms (sin guard clause) — SOLO actualiza si hay cambios
+  // Realtime Channels debounce 500ms (sin guard clause) — deps = [] estable (NO SE RE-MONTA)
   useEffect(() => {
     let alive = true;
     let debounceId: any;
     const TABLAS = ['reservas', 'huespedes', 'habitaciones', 'folios', 'cargos_folio', 'pagos_folio'];
-
     const recargarDebounced = () => {
       if (!alive) return;
       clearTimeout(debounceId);
-      debounceId = setTimeout(async () => {
+      debounceId = setTimeout(() => {
         if (!alive) return;
-        try { await Promise.all([ (ReservaService as any).hidratarDesdeSupabase?.(true) ]); } catch (_) {}
-        try { pendingSync.applyPendingLocal?.(); } catch (_) {}
-        try { cargarReservas(); } catch (_) {}
+        refrescarFuerzaRef.current(false);
       }, 500);
     };
-
     const canales: any[] = [];
     try {
       const sb = (supabase as any)?.channel ? (supabase as any) : null;
@@ -154,7 +155,6 @@ const ReservasPage: React.FC = () => {
         }
       }
     } catch (_) {}
-
     return () => {
       alive = false;
       clearTimeout(debounceId);
@@ -163,7 +163,7 @@ const ReservasPage: React.FC = () => {
         Promise.all(canales.map(c => sb?.removeChannel?.(c))).catch(()=>{});
       } catch (_) {}
     };
-  }, [refrescarFuerza]);
+  }, []);
 
   // Pull-refresh handler (IonRefresher)
   const onPullRefresh = async (event: any) => {

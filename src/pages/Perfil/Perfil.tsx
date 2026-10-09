@@ -183,6 +183,15 @@ const PerfilPage: React.FC = () => {
   const snapTipos = useRef<string>('');
   const snapCats = useRef<string>('');
   const snapProds = useRef<string>('');
+  // Refs estables setState: NO recrear refrescarFuerza
+  const setHabsAdminRef = useRef<typeof setHabsAdmin>(() => {});
+  setHabsAdminRef.current = setHabsAdmin;
+  const setTiposHabRef = useRef<typeof setTiposHab>(() => {});
+  setTiposHabRef.current = setTiposHab;
+  const setCategoriasFBRef = useRef<typeof setCategoriasFB>(() => {});
+  setCategoriasFBRef.current = setCategoriasFB;
+  const setProductosFBRef = useRef<typeof setProductosFB>(() => {});
+  setProductosFBRef.current = setProductosFB;
 
   // ==================== HABITACIONES FUNCIONES (se mantiene) ====================
   const cargarHabs = () => {
@@ -191,11 +200,11 @@ const PerfilPage: React.FC = () => {
       const habsArr = HabitacionService.listarTodas() || [];
       const snapT = stableStringify(tiposArr);
       const snapH = stableStringify(habsArr);
-      if (snapT !== snapTipos.current) { snapTipos.current = snapT; setTiposHab(tiposArr); }
-      if (snapH !== snapHabs.current) { snapHabs.current = snapH; setHabsAdmin(habsArr); }
+      if (snapT !== snapTipos.current) { snapTipos.current = snapT; setTiposHabRef.current(tiposArr); }
+      if (snapH !== snapHabs.current) { snapHabs.current = snapH; setHabsAdminRef.current(habsArr); }
     } catch {
-      if (snapHabs.current !== '[]') { snapHabs.current = '[]'; setHabsAdmin([]); }
-      if (snapTipos.current !== '[]') { snapTipos.current = '[]'; setTiposHab([]); }
+      if (snapHabs.current !== '[]') { snapHabs.current = '[]'; setHabsAdminRef.current([]); }
+      if (snapTipos.current !== '[]') { snapTipos.current = '[]'; setTiposHabRef.current([]); }
     }
   };
 
@@ -231,9 +240,11 @@ const PerfilPage: React.FC = () => {
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+  const refrescarPerfilRef = useRef(refrescarFuerzaActual);
+  refrescarPerfilRef.current = refrescarFuerzaActual;
 
   const abrirEditar = (h: Habitacion) => {
-    refrescarFuerzaActual();
+    refrescarPerfilRef.current();
     const tipo = tiposHab.find((t) => t.id === h.tipoHabitacionId);
     const precio = Number(tipo?.precioBaseNoche ?? 0);
     const capTipo = tipo ? (Number(tipo.capacidadAdultos || 0) + Number(tipo.capacidadNinos || 0)) : 2;
@@ -326,28 +337,28 @@ const PerfilPage: React.FC = () => {
     try {
       const cats = CatalogoFBService.listarCategorias() || [];
       const snapC = stableStringify(cats);
-      if (snapC !== snapCats.current) { snapCats.current = snapC; setCategoriasFB(cats); }
+      if (snapC !== snapCats.current) { snapCats.current = snapC; setCategoriasFBRef.current(cats); }
     } catch {
-      if (snapCats.current !== '[]') { snapCats.current = '[]'; setCategoriasFB([]); }
+      if (snapCats.current !== '[]') { snapCats.current = '[]'; setCategoriasFBRef.current([]); }
     }
     try {
       const prods = CatalogoFBService.listarProductos({ soloActivos: false }) || [];
       const snapP = stableStringify(prods);
-      if (snapP !== snapProds.current) { snapProds.current = snapP; setProductosFB(prods); }
+      if (snapP !== snapProds.current) { snapProds.current = snapP; setProductosFBRef.current(prods); }
     } catch {
-      if (snapProds.current !== '[]') { snapProds.current = '[]'; setProductosFB([]); }
+      if (snapProds.current !== '[]') { snapProds.current = '[]'; setProductosFBRef.current([]); }
     }
   };
 
-  useIonViewWillEnter(() => { refrescarFuerzaActual(); });
+  useIonViewWillEnter(() => { refrescarPerfilRef.current(); });
 
-  // === Hooks NUEVOS: Listener global + Auto-refresh 10s + Realtime 200ms sin guard ===
+  // === Hooks NUEVOS: Listener global + Realtime deps = [] estable ===
   useEffect(() => {
     let alive = true;
     const onEv = (e: any) => {
       if (!alive) return;
       const pg = String(e?.detail?.page || '');
-      if (pg === 'PERFIL' || pg === 'TODAS') { refrescarFuerzaActual(true); }
+      if (pg === 'PERFIL' || pg === 'TODAS') { refrescarPerfilRef.current(true); }
     };
     try { window.addEventListener(EVENTO_REFRESCAR, onEv as EventListener); } catch {}
     return () => {
@@ -357,26 +368,17 @@ const PerfilPage: React.FC = () => {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Realtime deps = [] estable; NO tiene setTimeouts init que causen parpadeo
   useEffect(() => {
     let alive = true;
     let debounceId: any;
-    let initId: any;
     const TABLAS_RT = ['habitaciones', 'tipos_habitacion', 'categorias_fb', 'productos_fb', 'presentaciones_fb', 'tarifas', 'temporadas', 'politicas_cancelacion', 'codigos_promocionales', 'impuestos', 'mesas', 'puntos_venta'];
     const recargarDebounced = () => {
       if (!alive) return;
       clearTimeout(debounceId);
-      debounceId = setTimeout(async () => {
+      debounceId = setTimeout(() => {
         if (!alive) return;
-        try {
-          await Promise.all([
-            HabitacionService.hidratarDesdeSupabase?.(true),
-            TarifaService.hidratarDesdeSupabase?.(true),
-            PosService?.hidratarDesdeSupabase?.(true),
-          ]);
-        } catch (_) {}
-        try { pendingSync.applyPendingLocal?.(); } catch (_) {}
-        try { cargarHabs(); } catch (_) {}
-        try { cargarCatProd(); } catch (_) {}
+        refrescarPerfilRef.current(false);
       }, 500);
     };
 
@@ -385,20 +387,19 @@ const PerfilPage: React.FC = () => {
       const sb: any = (supabase as any)?.channel ? (supabase as any) : null;
       if (sb) {
         for (const t of TABLAS_RT) {
-          const ch = sb.channel(`rt-perf-${t}-${Math.random().toString(36).slice(2,7)}`)
-            .on('postgres_changes', { event: '*' as any, schema: 'public', table: t }, recargarDebounced)
-            .subscribe();
-          canales.push(ch);
+          try {
+            const ch = sb.channel(`rt-perf-${t}-${Math.random().toString(36).slice(2,7)}`)
+              .on('postgres_changes', { event: '*' as any, schema: 'public', table: t }, recargarDebounced)
+              .subscribe();
+            canales.push(ch);
+          } catch (_) {}
         }
       }
     } catch (_) {}
 
-    initId = window.setTimeout(() => { if (alive) refrescarFuerzaActual(); }, 500);
-
     return () => {
       alive = false;
       clearTimeout(debounceId);
-      clearTimeout(initId);
       try {
         const sb: any = (supabase as any)?.removeChannel ? (supabase as any) : null;
         if (sb) Promise.all(canales.map(c => sb.removeChannel?.(c))).catch(()=>{});
