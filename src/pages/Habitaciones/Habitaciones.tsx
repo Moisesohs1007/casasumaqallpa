@@ -391,8 +391,9 @@ const HabitacionesPage: React.FC = () => {
       const email = huespedTitular?.email ?? '';
       // Cargar lineas de CARGO al folio
       const folioId = folioOficial?.id;
-      const cargos = folioId ? (FolioService as any)?.listarCargos?.(folioId) ?? [] : [];
-      const pagos = folioId ? (FolioService as any)?.listarPagos?.(folioId) ?? [] : [];
+      const folioEnriquecido = folioId ? FolioService.buscarPorId(folioId) : null;
+      const cargos = (folioEnriquecido as any)?.cargos ?? [];
+      const pagos = (folioEnriquecido as any)?.pagos ?? [];
       const lineasF: LineaCargo[] = [];
       // Alojamiento: si no hay cargo alojamiento específico, usar noches de la reserva
       let lineas = lineasF;
@@ -439,19 +440,31 @@ const HabitacionesPage: React.FC = () => {
       // Cargos del folio oficial a LineaCargo compat
       for (const c of cargos) {
         const cAny = c as any;
-        const tipo = cAny.tipoLinea === 'PRODUCTO_STOCK' || cAny.tipo === 'STOCK' ? 'PRODUCTO_STOCK'
-          : cAny.tipoLinea === 'SERVICIO_EXTRA' ? 'SERVICIO_EXTRA'
-          : cAny.tipoLinea === 'ALOJAMIENTO' ? 'ALOJAMIENTO'
+        const tipoConcepto = String(cAny.tipoConcepto || cAny.origenCargo || cAny.origen || cAny.tipo || cAny.tipoLinea || '').toUpperCase();
+        const tipo = tipoConcepto.includes('ALOJ') || String(cAny.concepto || '').toUpperCase().includes('ALOJ') ? 'ALOJAMIENTO'
+          : tipoConcepto.includes('STOCK') || tipoConcepto.includes('PROD') || tipoConcepto.includes('VENTA') ? 'PRODUCTO_STOCK'
+          : tipoConcepto.includes('EXTRA') || tipoConcepto.includes('SERV') ? 'SERVICIO_EXTRA'
           : 'ROOM_SERVICE';
         if (tipo === 'ALOJAMIENTO' && lineas.some(x => x.tipo === 'ALOJAMIENTO')) continue;
+        const cantidadC = Number(cAny.cantidad ?? 1);
+        const totalC = Number(cAny.total ?? cAny.monto ?? cAny.subtotal ?? 0);
+        let puC = Number(cAny.precioUnitario ?? cAny.montoUnitario ?? cAny.precioUnit ?? cAny.precio ?? cAny.valor ?? 0);
+        if ((!puC || Number.isNaN(puC)) && cantidadC > 0 && totalC > 0) puC = Number((totalC / cantidadC).toFixed(2));
+        if (totalC <= 0 && puC <= 0) continue;
+        const nombreC = cAny.nombre
+          || cAny.concepto
+          || (cAny.conceptoDetalle && Array.isArray(cAny.conceptoDetalle) ? cAny.conceptoDetalle.join(' · ') : '')
+          || cAny.descripcion
+          || cAny.observaciones
+          || `Cargo ${cAny.id}`;
         lineas.push({
           id: cAny.id || `CRG-${Math.random()}`,
           tipo,
-          nombre: cAny.nombre || cAny.concepto || `Cargo ${cAny.id}`,
-          cantidad: Number(cAny.cantidad || 1),
-          precioUnit: Number(cAny.precioUnitario ?? cAny.montoUnitario ?? cAny.precioUnit ?? 0),
-          fecha: cAny.createdAt || cAny.fecha || fechaHoy(),
-          observaciones: cAny.observaciones || undefined,
+          nombre: String(nombreC).trim() || `Cargo ${cAny.id}`,
+          cantidad: cantidadC,
+          precioUnit: puC,
+          fecha: cAny.createdAt || cAny.fechaCargo || cAny.fechaAplicacion || cAny.fecha || fechaHoy(),
+          observaciones: cAny.observaciones || cAny.comentarios || undefined,
         });
       }
       // Pagos a RegistroPago compat
