@@ -179,13 +179,7 @@ const PosPage: React.FC = () => {
     return () => window.removeEventListener(EVENTO_REFRESCAR, handler as any);
   }, [refrescarFuerza]);
 
-  // Auto-refresh silencioso 10s
-  useEffect(() => {
-    const id = window.setInterval(() => { refrescarFuerza(); }, AUTO_REFRESH_MS);
-    return () => window.clearInterval(id);
-  }, [refrescarFuerza]);
-
-  // Realtime channels debounce 200ms (sin guard clause)
+  // Realtime channels debounce 500ms (sin guard clause) — solo cuando hay cambios remotos reales
   useEffect(() => {
     let alive = true;
     let debounceId: any;
@@ -202,7 +196,7 @@ const PosPage: React.FC = () => {
         try { pendingSync.applyPendingLocal?.(); } catch (_) {}
         try { cargar(); } catch (_) {}
         try { setRefreshTick(t => t + 1); } catch (_) {}
-      }, 200);
+      }, 500);
     };
 
     const canales: any[] = [];
@@ -219,10 +213,8 @@ const PosPage: React.FC = () => {
         }
       }
     } catch (_) {}
-    const seguro = window.setTimeout(() => { if (alive) refrescarFuerza(); }, 450);
     return () => {
       alive = false;
-      clearTimeout(seguro);
       clearTimeout(debounceId);
       try {
         const sb = (supabase as any);

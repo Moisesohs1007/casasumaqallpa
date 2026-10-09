@@ -319,16 +319,6 @@ const PerfilPage: React.FC = () => {
 
   useEffect(() => {
     let alive = true;
-    const id = window.setInterval(() => {
-      if (!alive) return;
-      refrescarFuerzaActual();
-    }, AUTO_REFRESH_MS);
-    return () => { alive = false; window.clearInterval(id); };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  useEffect(() => {
-    let alive = true;
     let debounceId: any;
     let initId: any;
     const TABLAS_RT = ['habitaciones', 'tipos_habitacion', 'categorias_fb', 'productos_fb', 'presentaciones_fb', 'tarifas', 'temporadas', 'politicas_cancelacion', 'codigos_promocionales', 'impuestos', 'mesas', 'puntos_venta'];
@@ -347,7 +337,7 @@ const PerfilPage: React.FC = () => {
         try { pendingSync.applyPendingLocal?.(); } catch (_) {}
         try { cargarHabs(); } catch (_) {}
         try { cargarCatProd(); } catch (_) {}
-      }, 200);
+      }, 500);
     };
 
     const canales: any[] = [];

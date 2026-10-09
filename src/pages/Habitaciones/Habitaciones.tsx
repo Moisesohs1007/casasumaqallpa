@@ -181,13 +181,7 @@ const HabitacionesPage: React.FC = () => {
     return () => window.removeEventListener(EVENTO_REFRESCAR, handler as any);
   }, [refrescarFuerza]);
 
-  // Auto-refresh silencioso 8s
-  useEffect(() => {
-    const id = window.setInterval(() => { refrescarFuerza(); }, AUTO_REFRESH_MS);
-    return () => window.clearInterval(id);
-  }, [refrescarFuerza]);
-
-  // Realtime Channels debounce 200ms (sin guard clause)
+  // Realtime Channels debounce 500ms (sin guard clause) — SOLO actualiza si hay cambios en DB remota
   useEffect(() => {
     let alive = true;
     let debounceId: any;
@@ -208,7 +202,7 @@ const HabitacionesPage: React.FC = () => {
         try { pendingSync.applyPendingLocal?.(); } catch (_) {}
         try { cargar(); } catch (_) {}
         try { setRefreshTick(t => t + 1); } catch (_) {}
-      }, 200);
+      }, 500);
     };
 
     const canales: any[] = [];
@@ -226,10 +220,8 @@ const HabitacionesPage: React.FC = () => {
       }
     } catch (_) {}
 
-    const seguro = window.setTimeout(() => { if (alive) refrescarFuerza(); }, 400);
     return () => {
       alive = false;
-      clearTimeout(seguro);
       clearTimeout(debounceId);
       try {
         const sb = (supabase as any);

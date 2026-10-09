@@ -99,13 +99,7 @@ const ReservasPage: React.FC = () => {
     return () => window.removeEventListener(EVENTO_REFRESCAR, handler as any);
   }, [refrescarFuerza]);
 
-  // Auto-refresh silencioso fondo cada 8s
-  useEffect(() => {
-    const id = window.setInterval(() => { refrescarFuerza(); }, AUTO_REFRESH_MS);
-    return () => window.clearInterval(id);
-  }, [refrescarFuerza]);
-
-  // Realtime Channels debounce 200ms (sin guard clause)
+  // Realtime Channels debounce 500ms (sin guard clause) — SOLO actualiza si hay cambios
   useEffect(() => {
     let alive = true;
     let debounceId: any;
@@ -119,7 +113,7 @@ const ReservasPage: React.FC = () => {
         try { await Promise.all([ (ReservaService as any).hidratarDesdeSupabase?.(true) ]); } catch (_) {}
         try { pendingSync.applyPendingLocal?.(); } catch (_) {}
         try { cargarReservas(); } catch (_) {}
-      }, 200);
+      }, 500);
     };
 
     const canales: any[] = [];
@@ -137,11 +131,8 @@ const ReservasPage: React.FC = () => {
       }
     } catch (_) {}
 
-    // Timeout seguridad: primer refresh 350ms después de montar
-    const seguro = window.setTimeout(() => { if (alive) refrescarFuerza(); }, 350);
     return () => {
       alive = false;
-      clearTimeout(seguro);
       clearTimeout(debounceId);
       try {
         const sb = (supabase as any);
