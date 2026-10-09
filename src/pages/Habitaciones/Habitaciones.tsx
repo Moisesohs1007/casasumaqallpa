@@ -95,6 +95,25 @@ const _planoStockProducto = (p: any): { stockControl: boolean; stockActual: numb
   return { stockControl: !!sC, stockActual: sA, stockMinimo: sM };
 };
 
+// Helper anti-parpadeo: JSON.stringify determinista (ordena keys)
+const stableStringify = (obj: any): string => {
+  try {
+    if (obj == null) return String(obj);
+    if (typeof obj !== 'object') return JSON.stringify(obj);
+    if (Array.isArray(obj)) {
+      return '[' + obj.map((v) => stableStringify(v)).join(',') + ']';
+    }
+    const keys = Object.keys(obj).sort();
+    const parts: string[] = [];
+    for (const k of keys) {
+      parts.push(JSON.stringify(k) + ':' + stableStringify((obj as any)[k]));
+    }
+    return '{' + parts.join(',') + '}';
+  } catch {
+    try { return JSON.stringify(obj); } catch { return String(obj); }
+  }
+};
+
 // =============== COMPONENTE ===============
 const HabitacionesPage: React.FC = () => {
   const [habitaciones, setHabitaciones] = useState<Habitacion[]>([]);
@@ -105,6 +124,9 @@ const HabitacionesPage: React.FC = () => {
   const [toast, setToast] = useState('');
   const mostrarToast = (t: string) => { setToast(t); setTimeout(() => setToast(''), 2200); };
   const refreshingRef = useRef(false);
+  // Snapshots anti-parpadeo: NO setState si los datos son IDÉNTICOS al anterior render
+  const snapshotHab = useRef<string>('');
+  const snapshotRefreshTick = useRef<number>(0);
 
   const [checkinOpen, setCheckinOpen] = useState(false);
   const [checkinReservaId, setCheckinReservaId] = useState<string | null>(null);
@@ -133,6 +155,7 @@ const HabitacionesPage: React.FC = () => {
   const refrescarFuerza = useCallback(async (postFlush = false) => {
     if (refreshingRef.current) return;
     refreshingRef.current = true;
+    let huboCambioReal = false;
     try {
       setLoading(true);
       try {
@@ -145,19 +168,48 @@ const HabitacionesPage: React.FC = () => {
       try { pendingSync.applyPendingLocal?.(); } catch (_) {}
       try {
         const lista = await HabitacionService.listarTodas();
-        setHabitaciones(lista);
-      } catch { setHabitaciones([]); }
-      setRefreshTick(t => t + 1);
+        const snap = stableStringify(lista);
+        if (snap !== snapshotHab.current) {
+          snapshotHab.current = snap;
+          huboCambioReal = true;
+          setHabitaciones(lista);
+        }
+      } catch {
+        if (snapshotHab.current !== '[]') {
+          snapshotHab.current = '[]';
+          huboCambioReal = true;
+          setHabitaciones([]);
+        }
+      }
+      if (huboCambioReal) {
+        snapshotRefreshTick.current++;
+        setRefreshTick(snapshotRefreshTick.current);
+      }
     } finally {
       setLoading(false);
       refreshingRef.current = false;
       if (postFlush) {
+        let huboPostCambio = false;
         try { await pendingSync.processQueue?.(false); } catch (_) {}
         try {
           const lista = await HabitacionService.listarTodas();
-          setHabitaciones(lista);
-        } catch {}
-        setRefreshTick(t => t + 1);
+          const snap = stableStringify(lista);
+          if (snap !== snapshotHab.current) {
+            snapshotHab.current = snap;
+            huboPostCambio = true;
+            setHabitaciones(lista);
+          }
+        } catch {
+          if (snapshotHab.current !== '[]') {
+            snapshotHab.current = '[]';
+            huboPostCambio = true;
+            setHabitaciones([]);
+          }
+        }
+        if (huboPostCambio) {
+          snapshotRefreshTick.current++;
+          setRefreshTick(snapshotRefreshTick.current);
+        }
       }
     }
   }, []);
@@ -165,8 +217,21 @@ const HabitacionesPage: React.FC = () => {
   const cargar = async () => {
     try {
       const lista = await HabitacionService.listarTodas();
-      setHabitaciones(lista);
-    } catch { setHabitaciones([]); }
+      const snap = stableStringify(lista);
+      if (snap !== snapshotHab.current) {
+        snapshotHab.current = snap;
+        setHabitaciones(lista);
+        snapshotRefreshTick.current++;
+        setRefreshTick(snapshotRefreshTick.current);
+      }
+    } catch {
+      if (snapshotHab.current !== '[]') {
+        snapshotHab.current = '[]';
+        setHabitaciones([]);
+        snapshotRefreshTick.current++;
+        setRefreshTick(snapshotRefreshTick.current);
+      }
+    }
   };
 
   useIonViewWillEnter(() => { refrescarFuerza(); });

@@ -280,22 +280,32 @@ const App: React.FC = () => {
 
   useEffect(() => {
     checkNetworkAndQueue(true);
-    // ======= applyPendingLocal GARANTIZADO al boot y cada hidratación (Capa de protección CRÍTICA)
+    // ======= applyPendingLocal SOLO 1 VEZ al boot (NO en loop — evita parpadeo) =======
     try { pendingSync.applyPendingLocal?.(); } catch (_) {}
-    try { window.setTimeout(() => { try { pendingSync.applyPendingLocal?.(); } catch (_){} }, 500); } catch (_) {}
-    try { window.setTimeout(() => { try { pendingSync.applyPendingLocal?.(); } catch (_){} }, 1500); } catch (_) {}
-    try { window.setTimeout(() => { try { pendingSync.applyPendingLocal?.(); } catch (_){} }, 3000); } catch (_) {}
-    try { window.setTimeout(() => { try { pendingSync.applyPendingLocal?.(); } catch (_){} }, 6000); } catch (_) {}
-    try { window.setTimeout(() => { try { pendingSync.applyPendingLocal?.(); } catch (_){} }, 12000); } catch (_) {}
+    // applyPending SOLO si hay hidden: hidden (pageshow = caché bfcache)
+    try {
+      window.addEventListener?.('pageshow', (_e: any) => {
+        try { pendingSync.applyPendingLocal?.(); } catch (_){}
+      });
+    } catch (_) {}
     const t0 = window.setTimeout(() => {
       if (!bootDoneRef.current) {
         const navOnline = typeof navigator !== 'undefined' ? !!navigator.onLine : true;
         if (navOnline) setNetworkMode('ONLINE');
       }
     }, 1800);
-    const t1 = window.setInterval(() => checkNetworkAndQueue(false), 6000);
-    const t2 = window.setInterval(() => setRetryTick((t) => t + 1), 20000);
-    const t3 = window.setInterval(() => { try { pendingSync.applyPendingLocal?.(); } catch (_){} }, 15000); // replay cada 15s por si Realtime pisa
+    // ==== ELIMINADOS TODOS LOS INTERVALOS QUE PROVOCAN PARPADEO:
+    //      ❌ setInterval 6s checkNetworkAndQueue (cada 6s refrescaba todo)
+    //      ❌ setInterval 15s applyPending cada 15s (cada 15s mutaba db)
+    //      ❌ setInterval 20s setRetryTick cada 20s (cada 20s re-hidrataba todo)
+    //      ❌ 5 setTimeouts 500/1500/3000/6000/12000 applyPending (parpadeo 12 primeros segundos)
+    // ==== AHORA checkNetwork + processQueue SOLO se dispara si pasa ALGO REAL:
+    //      1) online/offline (evento ventana nativo)
+    //      2) lodge:db:mutated (usuario presionó botón y guardó algo) = cada 400ms
+    //      3) lodge:pending:enqueued (nuevo pending en queue offline)
+    //      4) EVENTO_HIDRATACION = post-hidratar
+    //      5) click usuario en badge flotante (handleBadgeClick arriba)
+    //      6) pre-refresh botones clave (cada página refrescarFuerza dispara processQueue postFlush)
     const on = () => { _pingCache = null; checkNetworkAndQueue(true); };
     window.addEventListener?.('online', on);
     window.addEventListener?.('offline', on);
@@ -316,16 +326,11 @@ const App: React.FC = () => {
     } catch (_) {}
     return () => {
       window.clearTimeout(t0);
-      window.clearInterval(t1);
-      window.clearInterval(t2);
-      window.clearInterval(t3);
       window.removeEventListener?.('online', on);
       window.removeEventListener?.('offline', on);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [checkNetworkAndQueue, avisarGuardadoOffline, networkMode, pendientesCount]);
-
-  useEffect(() => { checkNetworkAndQueue(true); }, [retryTick, checkNetworkAndQueue]);
 
   // 1 vez al boot: hidratar InMemoryDB con datos reales de Supabase Cloud
   useEffect(() => {

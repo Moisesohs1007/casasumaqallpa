@@ -17,7 +17,25 @@ import { supabase } from '../../services/__supabase_db__';
 import './Pos.css';
 
 const EVENTO_REFRESCAR = 'lodge:refrescarAhora' as const;
-const AUTO_REFRESH_MS = 10000;
+
+// Helper anti-parpadeo: JSON.stringify determinista
+const stableStringify = (obj: any): string => {
+  try {
+    if (obj == null) return String(obj);
+    if (typeof obj !== 'object') return JSON.stringify(obj);
+    if (Array.isArray(obj)) {
+      return '[' + obj.map((v) => stableStringify(v)).join(',') + ']';
+    }
+    const keys = Object.keys(obj).sort();
+    const parts: string[] = [];
+    for (const k of keys) {
+      parts.push(JSON.stringify(k) + ':' + stableStringify((obj as any)[k]));
+    }
+    return '{' + parts.join(',') + '}';
+  } catch {
+    try { return JSON.stringify(obj); } catch { return String(obj); }
+  }
+};
 
 type EstadoMesaLabel = 'libre' | 'ocupada' | 'sucia';
 type EstadoComandaLabel = 'abierta' | 'cocina' | 'lista' | 'cerrada';
@@ -111,6 +129,9 @@ const PosPage: React.FC = () => {
   const [comandaAEditarId, setComandaAEditarId] = useState<string | undefined>(undefined);
   const [refreshTick, setRefreshTick] = useState<number>(0);
   const refreshingRef = useRef(false);
+  // Snapshots anti-parpadeo
+  const snapshotMesas = useRef<string>('');
+  const snapshotTick = useRef<number>(0);
 
   // ============== WALK-IN ==============
   const [categoriaCartaSel, setCategoriaCartaSel] = useState<string>('Todos');
@@ -129,6 +150,7 @@ const PosPage: React.FC = () => {
   const refrescarFuerza = useCallback(async (postFlush = false) => {
     if (refreshingRef.current) return;
     refreshingRef.current = true;
+    let huboCambioReal = false;
     try {
       setLoading(true);
       try {
@@ -137,15 +159,24 @@ const PosPage: React.FC = () => {
         ]);
       } catch (_) {}
       try { pendingSync.applyPendingLocal?.(); } catch (_) {}
-      try { await cargar(); } catch (_) {}
-      setRefreshTick(t => t + 1);
+      try {
+        await cargar();
+      } catch (_) {}
+      // postFlush también usa snapshot
     } finally {
       setLoading(false);
       refreshingRef.current = false;
       if (postFlush) {
         try { await pendingSync.processQueue?.(false); } catch (_) {}
         try { await cargar(); } catch (_) {}
-        setRefreshTick(t => t + 1);
+      }
+      // Incrementar refreshTick SÓLO si hubo un cambio real de snapshot
+      if (snapshotMesas.current !== '' && huboCambioReal) {
+        snapshotTick.current++;
+        setRefreshTick(snapshotTick.current);
+      } else if (snapshotMesas.current === '') {
+        snapshotTick.current++;
+        setRefreshTick(snapshotTick.current);
       }
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -397,10 +428,24 @@ const PosPage: React.FC = () => {
         }
         return { id: m.id, nombre, capacidad, estado: est, habitacionVinculada, comanda };
       });
-      setVistaMesas(rows);
-    } catch { setVistaMesas([]); } finally { setLoading(false); }
+      const snap = stableStringify(rows);
+      if (snap !== snapshotMesas.current) {
+        snapshotMesas.current = snap;
+        setVistaMesas(rows);
+        snapshotTick.current++;
+        setRefreshTick(snapshotTick.current);
+      }
+    } catch {
+      if (snapshotMesas.current !== '[]') {
+        snapshotMesas.current = '[]';
+        setVistaMesas([]);
+        snapshotTick.current++;
+        setRefreshTick(snapshotTick.current);
+      }
+    } finally { setLoading(false); }
   };
 
+  // Realtime channels debounce 500ms (sin guard clause) — solo cuando hay cambios remotos reales
   useEffect(() => {
     let alive = true;
     let debounceId: any;
@@ -412,31 +457,36 @@ const PosPage: React.FC = () => {
       debounceId = setTimeout(async () => {
         if (!alive) return;
         try {
-          await Promise.all([
-            PosService.hidratarDesdeSupabase?.(true),
-          ]);
+          await Promise.all([ PosService.hidratarDesdeSupabase?.(true) ]);
         } catch (_) {}
-        try { cargar(); } catch (_) {}
-        try { setRefreshTick(t => t + 1); } catch (_) {}
-      }, 650);
+        try { pendingSync.applyPendingLocal?.(); } catch (_) {}
+        try { await cargar(); } catch (_) {}
+      }, 500);
     };
 
-    if (!supabase) return;
     const canales: any[] = [];
     try {
-      for (const t of TABLAS) {
-        const ch = (supabase as any).channel(`rt-pos-${t}-${Math.random().toString(36).slice(2,7)}`)
-          .on('postgres_changes', { event: '*' as any, schema: 'public', table: t }, recargarDebounced)
-          .subscribe();
-        canales.push(ch);
+      const sb = (supabase as any)?.channel ? (supabase as any) : null;
+      if (sb) {
+        for (const t of TABLAS) {
+          try {
+            const ch = sb.channel(`rt-pos-${t}-${Math.random().toString(36).slice(2,7)}`)
+              .on('postgres_changes', { event: '*' as any, schema: 'public', table: t }, recargarDebounced)
+              .subscribe();
+            canales.push(ch);
+          } catch (_) {}
+        }
       }
     } catch (_) {}
-
     return () => {
       alive = false;
       clearTimeout(debounceId);
-      try { Promise.all(canales.map(c => (supabase as any)?.removeChannel?.(c))).catch(()=>{}); } catch (_) {}
+      try {
+        const sb = (supabase as any);
+        Promise.all(canales.map(c => sb?.removeChannel?.(c))).catch(()=>{});
+      } catch (_) {}
     };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // --- Cart helpers ---

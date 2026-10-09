@@ -14,7 +14,25 @@ import './Reservas.css';
 
 const USUARIO_ACTUAL = { id: 'USR-MOISES-0001', nombres: 'Moisés', apellidos: 'Ochoa' };
 const EVENTO_REFRESCAR = 'lodge:refrescarAhora' as const;
-const AUTO_REFRESH_MS = 8000;
+
+// Helper anti-parpadeo: JSON.stringify determinista (ordena keys)
+const stableStringify = (obj: any): string => {
+  try {
+    if (obj == null) return String(obj);
+    if (typeof obj !== 'object') return JSON.stringify(obj);
+    if (Array.isArray(obj)) {
+      return '[' + obj.map((v) => stableStringify(v)).join(',') + ']';
+    }
+    const keys = Object.keys(obj).sort();
+    const parts: string[] = [];
+    for (const k of keys) {
+      parts.push(JSON.stringify(k) + ':' + stableStringify((obj as any)[k]));
+    }
+    return '{' + parts.join(',') + '}';
+  } catch {
+    try { return JSON.stringify(obj); } catch { return String(obj); }
+  }
+};
 
 const estadoColor: Record<EstadoReserva, Color> = {
   PENDIENTE: 'warning',
@@ -48,7 +66,7 @@ const ReservasPage: React.FC = () => {
   const [modalCheckinOpen, setModalCheckinOpen] = useState(false);
   const [reservaIdParaCheckin, setReservaIdParaCheckin] = useState<string | null>(null);
   const refreshingRef = useRef(false);
-  const tickRefresh = useRef(0);
+  const snapshotReservas = useRef<string>('');
 
   const cargarReservas = () => {
     try {
@@ -58,9 +76,16 @@ const ReservasPage: React.FC = () => {
         const fb = new Date(b.fechaCreacion || b.createdAt || 0).getTime();
         return fb - fa;
       });
-      setReservas(ordenadas as any);
+      const snap = stableStringify(ordenadas);
+      if (snap !== snapshotReservas.current) {
+        snapshotReservas.current = snap;
+        setReservas(ordenadas as any);
+      }
     } catch {
-      setReservas([]);
+      if (snapshotReservas.current !== '[]') {
+        snapshotReservas.current = '[]';
+        setReservas([]);
+      }
     }
   };
 
@@ -77,7 +102,6 @@ const ReservasPage: React.FC = () => {
       } catch (_) {}
       try { pendingSync.applyPendingLocal?.(); } catch (_) {}
       cargarReservas();
-      tickRefresh.current++;
     } finally {
       refreshingRef.current = false;
       if (postFlush) {

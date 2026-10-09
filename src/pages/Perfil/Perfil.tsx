@@ -46,7 +46,25 @@ import { supabase } from '../../services/__supabase_db__';
 import './Perfil.css';
 
 const EVENTO_REFRESCAR = 'lodge:refrescarAhora' as const;
-const AUTO_REFRESH_MS = 10000;
+
+// Helper anti-parpadeo: JSON.stringify determinista
+const stableStringify = (obj: any): string => {
+  try {
+    if (obj == null) return String(obj);
+    if (typeof obj !== 'object') return JSON.stringify(obj);
+    if (Array.isArray(obj)) {
+      return '[' + obj.map((v) => stableStringify(v)).join(',') + ']';
+    }
+    const keys = Object.keys(obj).sort();
+    const parts: string[] = [];
+    for (const k of keys) {
+      parts.push(JSON.stringify(k) + ':' + stableStringify((obj as any)[k]));
+    }
+    return '{' + parts.join(',') + '}';
+  } catch {
+    try { return JSON.stringify(obj); } catch { return String(obj); }
+  }
+};
 
 const nowIso = new Date().toISOString();
 const audit: AuditFields = { createdAt: nowIso, updatedAt: nowIso };
@@ -160,14 +178,24 @@ const PerfilPage: React.FC = () => {
   const [toast, setToast] = useState('');
   const mostrarToast = (t: string) => { setToast(t); window.setTimeout(() => setToast(''), 2600); };
 
+  // Snapshots anti-parpadeo
+  const snapHabs = useRef<string>('');
+  const snapTipos = useRef<string>('');
+  const snapCats = useRef<string>('');
+  const snapProds = useRef<string>('');
+
   // ==================== HABITACIONES FUNCIONES (se mantiene) ====================
   const cargarHabs = () => {
     try {
-      setTiposHab(HabitacionService.listarTipos() || []);
-      setHabsAdmin(HabitacionService.listarTodas() || []);
+      const tiposArr = HabitacionService.listarTipos() || [];
+      const habsArr = HabitacionService.listarTodas() || [];
+      const snapT = stableStringify(tiposArr);
+      const snapH = stableStringify(habsArr);
+      if (snapT !== snapTipos.current) { snapTipos.current = snapT; setTiposHab(tiposArr); }
+      if (snapH !== snapHabs.current) { snapHabs.current = snapH; setHabsAdmin(habsArr); }
     } catch {
-      setHabsAdmin([]);
-      setTiposHab([]);
+      if (snapHabs.current !== '[]') { snapHabs.current = '[]'; setHabsAdmin([]); }
+      if (snapTipos.current !== '[]') { snapTipos.current = '[]'; setTiposHab([]); }
     }
   };
 
@@ -295,8 +323,20 @@ const PerfilPage: React.FC = () => {
     }
   };
   const cargarCatProd = () => {
-    try { setCategoriasFB(CatalogoFBService.listarCategorias() || []); } catch { setCategoriasFB([]); }
-    try { setProductosFB(CatalogoFBService.listarProductos({ soloActivos: false }) || []); } catch { setProductosFB([]); }
+    try {
+      const cats = CatalogoFBService.listarCategorias() || [];
+      const snapC = stableStringify(cats);
+      if (snapC !== snapCats.current) { snapCats.current = snapC; setCategoriasFB(cats); }
+    } catch {
+      if (snapCats.current !== '[]') { snapCats.current = '[]'; setCategoriasFB([]); }
+    }
+    try {
+      const prods = CatalogoFBService.listarProductos({ soloActivos: false }) || [];
+      const snapP = stableStringify(prods);
+      if (snapP !== snapProds.current) { snapProds.current = snapP; setProductosFB(prods); }
+    } catch {
+      if (snapProds.current !== '[]') { snapProds.current = '[]'; setProductosFB([]); }
+    }
   };
 
   useIonViewWillEnter(() => { refrescarFuerzaActual(); });
