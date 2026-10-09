@@ -400,13 +400,39 @@ const HabitacionesPage: React.FC = () => {
         const ci = reservaData.fechaCheckin || (reservaData as any).fecha_entrada || (reservaData as any).checkin;
         const co = reservaData.fechaCheckout || (reservaData as any).fecha_salida || (reservaData as any).checkout;
         const noches = (co && ci) ? Math.max(1, Math.ceil((new Date(co).getTime() - new Date(ci).getTime()) / 86400000)) : 1;
-        const precioNoche = Number(folioOficial?.totalAlojamiento ?? (reservaData as any).tarifaTotal ?? (reservaData as any).precioTotal ?? 180) / noches;
+        const totalAlojamiento = Number(
+          (reservaData as any).montoTotalReserva
+          ?? (reservaData as any).totalReserva
+          ?? (reservaData as any).precioTotalAlojamiento
+          ?? folioOficial?.totalAlojamiento
+          ?? (reservaData as any).tarifaTotal
+          ?? (reservaData as any).precioTotal
+          ?? 0
+        ) || 0;
+        let precioUnitLinea = 0;
+        let cantidadLinea = 0;
+        let nombreLinea = '';
+        const tAplicadas: any[] = Array.isArray((reservaData as any).tarifasAplicadas) ? (reservaData as any).tarifasAplicadas : [];
+        const bloquesRango = tAplicadas.filter((t: any) => String(t?.tarifaId || '').startsWith('RANGO-'));
+        if (bloquesRango.length > 0) {
+          precioUnitLinea = 1;
+          cantidadLinea = 1;
+          const totalBloques = Number(bloquesRango.reduce((s: number, t: any) => s + Number(t?.subtotalAplicable ?? t?.subtotal ?? 0), 0).toFixed(2));
+          const montoUsar = totalAlojamiento > 0 && Math.abs(totalAlojamiento - totalBloques) <= 5 ? totalAlojamiento : (totalBloques || totalAlojamiento);
+          nombreLinea = `Alojamiento ${noches} noches (${bloquesRango.length} rango${bloquesRango.length > 1 ? 's' : ''}) · ${h.codigo} ${(h as any).tipoHabitacion?.nombre || 'Habitación'}`;
+          if (montoUsar) precioUnitLinea = Number(montoUsar.toFixed(2));
+        } else {
+          precioUnitLinea = noches > 0 ? Number((totalAlojamiento / noches).toFixed(2)) : 0;
+          if (precioUnitLinea <= 0) precioUnitLinea = Number((h as any).tipoHabitacion?.precioBaseNoche ?? 180);
+          cantidadLinea = noches;
+          nombreLinea = `Alojamiento ${noches} noches · ${h.codigo} ${(h as any).tipoHabitacion?.nombre || 'Habitación'}`;
+        }
         lineas = lineas.concat([{
           id: `ALOJ-${h.id}-${noches}`,
           tipo: 'ALOJAMIENTO',
-          nombre: `Alojamiento ${noches} noches · ${h.codigo} ${(h as any).tipoHabitacion?.nombre || 'Habitación'}`,
-          cantidad: noches,
-          precioUnit: Number(precioNoche || 180),
+          nombre: nombreLinea,
+          cantidad: cantidadLinea,
+          precioUnit: precioUnitLinea,
           fecha: ci ? new Date(ci).toLocaleString('es-PE') : fechaHoy(),
         } as LineaCargo]);
       }
@@ -887,8 +913,12 @@ const HabitacionesPage: React.FC = () => {
 
         {/* NOTA VENTA CHECK-OUT 80mm */}
         {notaVentaCheckout && (() => {
-          const folio = notaVentaCheckout.folio;
-          const lineasCargo = (folio?.lineas || []).filter((l: any) => l.tipo !== 'PAGO');
+          const folioIn = notaVentaCheckout.folio;
+          const habObjNota = habitaciones.find(h => h.id === notaVentaCheckout.habId) || null;
+          const folio = habObjNota ? obtenerFolioHab(habObjNota) || folioIn : folioIn;
+          const lineasCargoIn = (folio?.lineas || []).filter((l: any) => l.tipo !== 'PAGO');
+          const hasRangoAloj = lineasCargoIn.some((l: any) => String(l?.nombre || '').includes('rango')) && lineasCargoIn.some((l: any) => l?.cantidad === 1);
+          const lineasCargo = lineasCargoIn;
           const pagos = (folio?.pagos || []) as any[];
           const { subtotal, igv, total } = calcularTotales(folio?.lineas || []);
           const totalPagado = calcularTotalPagos(folio?.pagos || []);
@@ -896,6 +926,9 @@ const HabitacionesPage: React.FC = () => {
           const metodoPago = pagos[0]?.metodoPago || 'EFECTIVO_PEN';
           const metodoLabel = METODOS_PAGO_LISTA.find(m => m.value === metodoPago)?.label || metodoPago;
           const nombreHuesped = `${folio?.huesped?.nombres || 'Huesped'} ${folio?.huesped?.apellidos || ''}`.trim() || 'Cliente Eventual';
+          const checkinNV = (folio?.reserva?.checkin || '').slice(0, 10);
+          const checkoutNV = (folio?.reserva?.checkout || '').slice(0, 10);
+          const nochesNV = Number(folio?.reserva?.noches || 1);
           return (
             <div className="modal-backdrop modal-wide no-print-bg" onClick={e => { if (e.target === e.currentTarget) setNotaVentaCheckout(null); }}>
               <div className="modal-card print-area-wrap">
@@ -907,15 +940,16 @@ const HabitacionesPage: React.FC = () => {
                   <div className="nv-header">
                     <div className="nv-logo">Sumaq Allpa</div>
                     <div className="nv-nombre-empresa">Casa Sumaq Allpa</div>
-                    <div className="nv-linea-uno">Nota de Venta · {folio?.reserva?.id || 'SIN-CORRELATIVO'}</div>
+                    <div className="nv-linea-uno">Nota de Venta · {folio?.reserva?.id || checkoutReservaId || 'SIN-CORRELATIVO'}</div>
                     <div className="nv-linea">{fechaHoy()}</div>
                   </div>
                   <div className="nv-cliente">
                     <div><b>Cliente:</b> {nombreHuesped}</div>
                     {folio?.huesped?.dni && <div><b>DNI / Doc:</b> {folio.huesped.dni}</div>}
-                    {folio?.reserva && <div><b>Periodo:</b> {folio.reserva.checkin} → {folio.reserva.checkout} · {folio.reserva.noches || 1} noche(s)</div>}
+                    {folio?.reserva && <div><b>Periodo:</b> {checkinNV || folio.reserva.checkin} → {checkoutNV || folio.reserva.checkout} · {nochesNV || folio.reserva.noches || 1} noche(s)</div>}
                     <div><b>Habitación:</b> {notaVentaCheckout.habId}</div>
                     <div><b>Cajero/a:</b> {USUARIO_ACTUAL.nombres}</div>
+                    {hasRangoAloj && <div style={{ marginTop: 4, fontSize: 11, color: '#374151' }}><b>💡 Tarifa por rangos:</b> {lineasCargo.find((l: any) => l?.tipo === 'ALOJAMIENTO')?.nombre || ''}</div>}
                   </div>
                   <table className="nv-tabla">
                     <thead>
@@ -927,6 +961,9 @@ const HabitacionesPage: React.FC = () => {
                       </tr>
                     </thead>
                     <tbody>
+                      {lineasCargo.length === 0 && (
+                        <tr><td colSpan={4} style={{ textAlign: 'center', color: '#6b7280', padding: '12px 4px' }}>No hay cargos registrados en esta habitación.</td></tr>
+                      )}
                       {lineasCargo.map((l: any) => (
                         <tr key={l.id}>
                           <td style={{ textAlign: 'left' }}>{l.nombre}</td>
