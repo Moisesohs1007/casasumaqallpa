@@ -235,9 +235,9 @@ export function ensureSeedInicialProductos(force = false): number {
         orden: s.orden ?? 0,
         imagenUrl: null,
         observaciones: `seed-inicial-${seedUtil.hoy()}`,
-        createdAt: seedUtil.nowISO(),
+        createdAt: exist?.createdAt || seedUtil.nowISO(),
         updatedAt: seedUtil.nowISO(),
-        createdBy: USR,
+        createdBy: exist?.createdBy || USR,
         updatedBy: USR,
         payload: {
           stockControl: !!s.stockControl,
@@ -263,13 +263,43 @@ export function ensureSeedInicialProductos(force = false): number {
         creados++;
       } else if (force) {
         const mergePayload = { ...(exist.payload && typeof exist.payload === 'object' ? exist.payload : {}), ...data.payload };
-        const updData = { ...data, payload: mergePayload, id: undefined };
+        const updData: any = { ...data, payload: mergePayload };
+        delete updData.id;
         db.update<any>(KEY_PROD, s.id, updData);
         const final = { id: s.id, ...updData };
         (async () => { await _insertCatOrProd(KEY_PROD, s.id, final, 'update'); })().catch(() => {});
       }
     }
   }
+
+  if (force) {
+    const idsOficiales = new Set(SEED_PRODUCTOS_CARTA.map(x => x.id));
+    const idsCatsOficiales = new Set(SEED_CATEGORIAS.map(x => x.id));
+    for (const existente of existentes) {
+      if (!idsOficiales.has(existente.id)) {
+        try {
+          db.remove(KEY_PROD, existente.id);
+          (async () => {
+            try { await dbRemota.removeAsync(KEY_PROD, existente.id); } catch (_) {}
+          })().catch(() => {});
+        } catch (_) {}
+      }
+    }
+    try {
+      const catsExistentes = db.all<any>(KEY_CAT) || [];
+      for (const catExistente of catsExistentes) {
+        if (!idsCatsOficiales.has(catExistente.id)) {
+          try {
+            db.remove(KEY_CAT, catExistente.id);
+            (async () => {
+              try { await dbRemota.removeAsync(KEY_CAT, catExistente.id); } catch (_) {}
+            })().catch(() => {});
+          } catch (_) {}
+        }
+      }
+    } catch (_) {}
+  }
+
   return creados;
 }
 

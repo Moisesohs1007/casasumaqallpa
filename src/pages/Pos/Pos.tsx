@@ -103,25 +103,32 @@ const PosPage: React.FC = () => {
   const mostrarToast = (t: string) => { setToast(t); setTimeout(() => setToast(''), 2200); };
 
   // ===== DATOS DESDE CATÁLOGO OFICIAL (seed o Supabase) =====
-  const categoriasCartaList = useMemo(() => {
+  const categoriasObjList = useMemo(() => {
     try {
-      const cats = (CatalogoFBService.listarCategorias?.() || []).filter(x => x.estado === 'ACTIVO' || x.estado === undefined).sort((a, b) => (a.orden ?? 0) - (b.orden ?? 0));
-      const nombres = cats.map(c => c.nombre);
-      const unicos = ['Todos', ...Array.from(new Set(nombres))];
-      return unicos;
+      return (CatalogoFBService.listarCategorias?.() || [])
+        .filter(x => x.estado === 'ACTIVO' || x.estado === undefined)
+        .sort((a, b) => (a.orden ?? 0) - (b.orden ?? 0));
     } catch {
-      return ['Todos', 'Desayunos', 'Jugos', 'Bebidas Calientes', 'Sándwiches', 'Entradas', 'Platos Principales', 'Pizzas', 'Postres'];
+      return [] as any[];
     }
   }, [refreshTick]);
 
+  const categoriasCartaList = useMemo(() => {
+    const nombres = categoriasObjList.map((c: any) => c.nombre);
+    return ['Todos', ...Array.from(new Set(nombres))];
+  }, [categoriasObjList]);
+
   const catMapById = useMemo(() => {
-    try {
-      const cats = CatalogoFBService.listarCategorias?.() || [];
-      const map = new Map<string, any>();
-      for (const c of cats) map.set(c.id, c);
-      return map;
-    } catch { return new Map<string, any>(); }
-  }, [refreshTick]);
+    const map = new Map<string, any>();
+    for (const c of categoriasObjList) map.set(c.id, c);
+    return map;
+  }, [categoriasObjList]);
+
+  const catOrdenById = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const c of categoriasObjList) map.set(c.id, Number(c.orden ?? 0));
+    return map;
+  }, [categoriasObjList]);
 
   const productosTodos = useMemo(() => {
     try {
@@ -141,6 +148,7 @@ const PosPage: React.FC = () => {
           descripcion: p.descripcion || '',
           categoriaId: p.categoriaId,
           categoriaNombre: cat?.nombre || 'Sin categoría',
+          categoriaOrden: catOrdenById.get(p.categoriaId) ?? 9999,
           precioVentaBase: Number(p.precioVentaBase || 0),
           moneda: 'PEN',
           impuesto: 'IGV',
@@ -154,35 +162,37 @@ const PosPage: React.FC = () => {
           orden: p.orden ?? 0,
           _stock: plano.stockActual,
           _stockMin: plano.stockMinimo,
-        } as unknown as (ProductoFB & { _stock?: number; _stockMin?: number; categoriaNombre?: string; stockControl?: boolean; orden?: number });
-      }).sort((a, b) => ((a as any).orden ?? 0) - ((b as any).orden ?? 0));
+        } as unknown as (ProductoFB & { _stock?: number; _stockMin?: number; categoriaNombre?: string; categoriaOrden?: number; stockControl?: boolean; orden?: number });
+      }).sort((a, b) => {
+        const cA = (a as any).categoriaOrden ?? 999;
+        const cB = (b as any).categoriaOrden ?? 999;
+        if (cA !== cB) return cA - cB;
+        return ((a as any).orden ?? 0) - ((b as any).orden ?? 0);
+      });
     } catch {
       return [] as any[];
     }
-  }, [refreshTick, catMapById]);
-
-  const productosConStock = useMemo(
-    () => productosTodos.filter(p => !!p.stockControl && (p as any).estado !== 'INACTIVO'),
-    [productosTodos]
-  );
-
-  const productosCarta = useMemo(
-    () => productosTodos.filter(p => !p.stockControl && (p as any).estado !== 'INACTIVO'),
-    [productosTodos]
-  );
+  }, [refreshTick, catMapById, catOrdenById]);
 
   const cantidadesCarritoPorProducto = useMemo(() => {
     const map = new Map<string, number>();
     for (const l of carrito) {
-      if (l.tipo === 'STOCK' && l.productoId) {
+      if (l.productoId) {
         map.set(l.productoId, (map.get(l.productoId) || 0) + Number(l.cantidad || 0));
       }
     }
     return map;
   }, [carrito]);
 
-  const productosConStockFiltradosVisual = useMemo(() => {
-    return productosConStock.map(p => {
+  const productosFiltradosVisual = useMemo(() => {
+    let lista = productosTodos.filter(p =>
+      (p as any).estadoProducto !== 'INACTIVO' &&
+      (p as any).estadoProducto !== 'DESCONTINUADO'
+    );
+    if (categoriaCartaSel !== 'Todos') {
+      lista = lista.filter(p => (p as any).categoriaNombre === categoriaCartaSel);
+    }
+    return lista.map(p => {
       const reservado = cantidadesCarritoPorProducto.get(p.id) || 0;
       return {
         ...p,
@@ -190,18 +200,7 @@ const PosPage: React.FC = () => {
         _reservadoEnCarrito: reservado,
       };
     });
-  }, [productosConStock, cantidadesCarritoPorProducto]);
-
-  const productosStockFiltradosPorCat = useMemo(() => {
-    const lista = productosConStockFiltradosVisual.filter(p => (p as any).estadoProducto !== 'INACTIVO' && (p as any).estadoProducto !== 'DESCONTINUADO');
-    if (categoriaCartaSel === 'Todos') return lista;
-    return lista.filter(p => (p as any).categoriaNombre === categoriaCartaSel);
-  }, [productosConStockFiltradosVisual, categoriaCartaSel]);
-
-  const productosCartaFiltradosPorCat = useMemo(() => {
-    if (categoriaCartaSel === 'Todos') return productosCarta;
-    return productosCarta.filter(p => (p as any).categoriaNombre === categoriaCartaSel);
-  }, [productosCarta, categoriaCartaSel]);
+  }, [productosTodos, categoriaCartaSel, cantidadesCarritoPorProducto]);
 
   const openNuevoRoomService = () => {
     setPreMesaId(undefined); setPreHabitacionId(undefined); setPreTipoConsumo('MESA');
@@ -248,21 +247,26 @@ const PosPage: React.FC = () => {
   useIonViewWillEnter(() => { cargar(); });
 
   // --- Cart helpers ---
-  const agregarCarta = (p: any) => {
+  const agregarProducto = (p: any) => {
+    const esStock = !!p.stockControl;
+    const stkReal = Number(p._stock ?? 0);
+    if (esStock && stkReal <= 0 && !p.permiteInventarioNegativo) {
+      mostrarToast(`${p.nombre}: sin stock disponible`);
+      return;
+    }
     setCarrito(c => {
-      const existente = c.find(l => l.productoId === p.id);
+      const existente = c.find(l => l.productoId === p.id && (esStock ? l.tipo === 'STOCK' : l.tipo === 'CARTA'));
       if (existente) return c.map(l => l.id === existente.id ? { ...l, cantidad: l.cantidad + 1 } : l);
-      const icono = p.stockControl ? '🥤' : '🍽️';
-      return [...c, { id: uid(), tipo: 'CARTA', productoId: p.id, nombre: p.nombre, cantidad: 1, precioUnit: Number(p.precioVentaBase || p.precio || 0), icon: icono }];
-    });
-  };
-  const agregarStock = (p: any) => {
-    const stkReal = Number((p as any)._stock ?? 0);
-    if (stkReal <= 0 && !(p as any).permiteInventarioNegativo) { mostrarToast(`${p.nombre}: sin stock disponible`); return; }
-    setCarrito(c => {
-      const existente = c.find(l => l.productoId === p.id && l.tipo === 'STOCK');
-      if (existente) return c.map(l => l.id === existente.id ? { ...l, cantidad: l.cantidad + 1 } : l);
-      return [...c, { id: uid(), tipo: 'STOCK', productoId: p.id, nombre: p.nombre, cantidad: 1, precioUnit: Number(p.precioVentaBase || 0) }];
+      const icono = esStock ? '🥤' : '🍽️';
+      return [...c, {
+        id: uid(),
+        tipo: esStock ? 'STOCK' : 'CARTA',
+        productoId: p.id,
+        nombre: p.nombre,
+        cantidad: 1,
+        precioUnit: Number(p.precioVentaBase || p.precio || 0),
+        icon: icono,
+      }];
     });
   };
   const modificarCantidad = (id: string, delta: number) => {
@@ -273,11 +277,15 @@ const PosPage: React.FC = () => {
       if (nuevaCant <= 0) {
         return c.filter(l => l.id !== id);
       }
-      // Validar stock si es stock + delta > 0 (pedimos más)
-      if (delta > 0 && linea.tipo === 'STOCK' && linea.productoId) {
-        const p = productosConStockFiltradosVisual.find(pp => pp.id === linea.productoId);
-        if (p && !p.permiteInventarioNegativo && Number((p as any)._stock ?? 0) <= 0) {
-          mostrarToast(`${p.nombre}: sin stock`); return c;
+      // Validar stock si delta > 0 y producto es con stock (stockControl=true)
+      if (delta > 0 && linea.productoId) {
+        const pp = productosTodos.find(px => px.id === linea.productoId);
+        if (pp && !!pp.stockControl) {
+          const reservado = cantidadesCarritoPorProducto.get(linea.productoId) || 0;
+          const stockDisp = Math.max(0, Number(pp.stockActual ?? 0) - reservado);
+          if (!pp.permiteInventarioNegativo && stockDisp <= 0) {
+            mostrarToast(`${pp.nombre}: sin stock`); return c;
+          }
         }
       }
       return c.map(l => l.id === id ? { ...l, cantidad: nuevaCant } : l);
@@ -430,60 +438,59 @@ const PosPage: React.FC = () => {
                   ))}
                 </div>
 
-                {/* Stock (Bebidas, Snacks con inventario) */}
-                {productosStockFiltradosPorCat.length > 0 && (
-                  <div className="seccion-prod">
-                    <h4 className="tit-seccion">🥤 Productos con Stock (bebidas / snacks / extras)</h4>
-                    <div className="grid-prod-sm">
-                      {productosStockFiltradosPorCat.map(p => {
-                        const stk = Number((p as any)._stock ?? 0);
-                        const min = Number((p as any)._stockMin ?? (p as any).stockMinimo ?? 0);
-                        const agotado = stk <= 0;
-                        const bajo = stk <= min;
-                        return (
-                          <IonCard className={`prod-card ${agotado ? 'prod-agotado' : ''}`} key={p.id} button onClick={() => agregarStock(p)}>
-                            <IonCardContent style={{ padding: '10px 10px 12px 10px' }}>
-                              <div style={{ fontWeight: 700, fontSize: 14, lineHeight: 1.1, minHeight: 36 }}>{p.nombre}</div>
-                              <div style={{ fontSize: 11, opacity: 0.85, margin: '3px 0 8px 0' }}>{(p as any).categoriaNombre || 'General'} · Disp: <b>{stk}</b></div>
-                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-                                <div style={{ fontSize: 11, color: agotado ? '#dc2626' : (bajo ? '#d97706' : 'inherit') }}>{agotado ? '⛔ AGOTADO' : (bajo ? '⚠️ STOCK BAJO' : '')}</div>
-                                <div style={{ fontWeight: 900, fontSize: 17 }}>{fmtSoles(Number((p as any).precioVentaBase || 0))}</div>
-                              </div>
-                            </IonCardContent>
-                          </IonCard>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-
-                {/* Carta */}
+                {/* ====== PRODUCTOS UNIFICADOS (1 GRID PROFESIONAL) ====== */}
                 <div className="seccion-prod">
-                  <h4 className="tit-seccion">🍽️ Carta · Alimentos preparados</h4>
                   {(() => {
-                    const lista = productosCartaFiltradosPorCat;
+                    const lista = productosFiltradosVisual;
                     if (!lista || lista.length === 0) {
-                      if (categoriaCartaSel !== 'Todos' && productosStockFiltradosPorCat.length > 0) {
-                        return <IonNote color="tertiary" style={{padding:'12px', display:'block'}}>Esta categoría contiene productos con stock físico (mostrados arriba).</IonNote>;
-                      }
-                      return <IonNote color="warning" style={{padding:'12px', display:'block'}}>No hay productos en esta categoría.</IonNote>;
+                      return <IonNote color="warning" style={{padding:'16px 12px', display:'block', fontSize:13}}>No hay productos en esta categoría.</IonNote>;
                     }
                     return (
                       <div className="grid-prod-md">
-                        {lista.map(p => (
-                          <IonCard className="prod-card" key={p.id} button onClick={() => agregarCarta(p)}>
-                            <IonCardContent style={{ padding: '10px 10px 12px 10px' }}>
-                              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
-                                <div style={{ fontSize: 24 }}>{(p as any).requierePreparacion === false ? '🥤' : '🍴'}</div>
-                                <div style={{ flex: 1, minWidth: 0 }}>
-                                  <div style={{ fontWeight: 800, fontSize: 14 }}>{p.nombre}</div>
-                                  <div style={{ fontSize: 11, opacity: 0.8, marginTop: 2 }}>{(p as any).categoriaNombre || 'Carta'}</div>
+                        {lista.map(p => {
+                          const esStock = !!p.stockControl;
+                          const stk = Number(p._stock ?? 0);
+                          const min = Number(p._stockMin ?? p.stockMinimo ?? 0);
+                          const agotado = esStock && stk <= 0;
+                          const bajo = esStock && !agotado && stk <= min;
+                          return (
+                            <IonCard
+                              className={`prod-card ${agotado ? 'prod-agotado' : ''}`}
+                              key={p.id}
+                              button
+                              onClick={() => agregarProducto(p)}
+                              style={{ minHeight: 108 }}
+                            >
+                              <IonCardContent style={{ padding: '10px 12px 12px 12px' }}>
+                                <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
+                                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, flex: 1, minWidth: 0 }}>
+                                    <div style={{ fontSize: 22, lineHeight: 1, marginTop: 2, flexShrink: 0 }}>{esStock ? '🥤' : '🍽️'}</div>
+                                    <div style={{ flex: 1, minWidth: 0 }}>
+                                      <div style={{ fontWeight: 800, fontSize: 14, lineHeight: 1.15 }}>{p.nombre}</div>
+                                      <div style={{ fontSize: 11, opacity: 0.78, marginTop: 4 }}>
+                                        {p.categoriaNombre || 'General'}
+                                        {esStock && (
+                                          <>
+                                            {' · '}
+                                            <span style={{
+                                              fontWeight: 700,
+                                              color: agotado ? '#dc2626' : (bajo ? '#d97706' : '#374151'),
+                                            }}>
+                                              {agotado ? '⛔ AGOTADO' : (bajo ? `⚠️ Disp: ${stk}` : `Disp: ${stk}`)}
+                                            </span>
+                                          </>
+                                        )}
+                                      </div>
+                                    </div>
+                                  </div>
+                                  <div style={{ fontWeight: 900, fontSize: 17, whiteSpace: 'nowrap', color: '#1f2937', alignSelf: 'baseline' }}>
+                                    {fmtSoles(Number(p.precioVentaBase || 0))}
+                                  </div>
                                 </div>
-                                <div style={{ fontWeight: 900, fontSize: 17, whiteSpace: 'nowrap' }}>{fmtSoles(Number((p as any).precioVentaBase || 0))}</div>
-                              </div>
-                            </IonCardContent>
-                          </IonCard>
-                        ))}
+                              </IonCardContent>
+                            </IonCard>
+                          );
+                        })}
                       </div>
                     );
                   })()}
