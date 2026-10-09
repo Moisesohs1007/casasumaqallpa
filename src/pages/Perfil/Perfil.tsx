@@ -32,6 +32,7 @@ import {
   useIonViewWillEnter,
   IonSearchbar,
   IonChip,
+  useIonAlert,
 } from '@ionic/react';
 import {
   add, create, trash, save, close, bedOutline, buildOutline, pricetag,
@@ -132,7 +133,7 @@ const PerfilPage: React.FC = () => {
   const [busqProd, setBusqProd] = useState('');
   const [filtroCatId, setFiltroCatId] = useState<string>('');
   const [tabStock, setTabStock] = useState<'CATEGORIAS' | 'PRODUCTOS'>('PRODUCTOS');
-  const [prodFormTab, setProdFormTab] = useState<'DATOS' | 'INVENTARIO'>('DATOS');
+  const [presentarCatAlert, cerrarCatAlertPlaceholder_deprecated] = useIonAlert();
 
   const [modalCatAbierto, setModalCatAbierto] = useState(false);
   const [editandoCatId, setEditandoCatId] = useState<string | null>(null);
@@ -1260,326 +1261,377 @@ const PerfilPage: React.FC = () => {
           </IonContent>
         </IonModal>
 
-        {/* ============ MODAL: Nueva / Editar PRODUCTO (PROFESIONAL 2 TABS) ============ */}
-        <IonModal isOpen={modalProdAbierto} onDidDismiss={() => setModalProdAbierto(false)} initialBreakpoint={0.98} breakpoints={[0, 0.7, 0.98, 1]}>
+        {/* ============ MODAL: Nueva / Editar PRODUCTO · COMPACTO 1 PANTALLA (sin segment, fusionado) ============ */}
+        <IonModal
+          isOpen={modalProdAbierto}
+          onDidDismiss={() => setModalProdAbierto(false)}
+          style={{ '--height': 'calc(100vh - 24px)', '--width': 'min(720px, 97vw)', '--border-radius': '12px', '--box-shadow': '0 10px 40px rgba(0,0,0,.18)' }}
+        >
           <IonHeader className="ion-no-border">
-            <IonToolbar color={editandoProdId ? 'primary' : 'success'}>
+            <IonToolbar color={editandoProdId ? 'primary' : 'success'} style={{ '--min-height': '44px' }}>
               <IonButtons slot="start">
                 <IonButton onClick={() => setModalProdAbierto(false)}>
                   <IonIcon slot="icon-only" icon={close} />
                 </IonButton>
               </IonButtons>
-              <IonTitle>
-                <IonIcon icon={cube} />
-                &nbsp;{editandoProdId ? 'Editar producto' : 'Nuevo producto'}
+              <IonTitle style={{ fontSize: 15 }}>
+                <IonIcon icon={cube} />&nbsp;{editandoProdId ? 'Editar producto' : 'Nuevo producto'}
               </IonTitle>
               <IonButtons slot="end">
-                <IonButton color="light" onClick={() => setModalProdAbierto(false)}>Cancelar</IonButton>
-                <IonButton strong onClick={guardarProd}>
+                <IonButton color="light" size="small" onClick={() => setModalProdAbierto(false)}>Cancelar</IonButton>
+                <IonButton strong size="small" onClick={guardarProd}>
                   <IonIcon slot="start" icon={save} /> Guardar
                 </IonButton>
               </IonButtons>
             </IonToolbar>
-            <IonToolbar className="modal-subtoolbar">
-              <IonSegment value={prodFormTab} onIonChange={(e: any) => setProdFormTab(e.target.value)} className="modal-inner-segment">
-                <IonSegmentButton value="DATOS" type="button">
-                  <IonIcon icon={documentText} />
-                  <IonLabel>Datos generales</IonLabel>
-                </IonSegmentButton>
-                <IonSegmentButton value="INVENTARIO" type="button">
-                  <IonIcon icon={archive} />
-                  <IonLabel>Inventario &amp; Stock</IonLabel>
-                </IonSegmentButton>
-              </IonSegment>
-            </IonToolbar>
           </IonHeader>
-          <IonContent className="ion-padding modal-padding">
-            {prodFormTab === 'DATOS' && (
-              <>
-                <div className="modal-section">
-                  <div className="modal-section-title"><IonIcon icon={barcode} /> Identificación</div>
-                  <IonGrid>
-                    <IonRow>
-                      <IonCol size="12" sizeMd="4">
-                        <IonItem className="form-item">
-                          <IonInput
-                            label="Código"
-                            labelPlacement="stacked"
-                            placeholder="Ej: CER-001"
-                            value={formProd.codigo}
-                            onIonInput={(e: any) => setFormProd({ ...formProd, codigo: String(e.target.value || '') })}
-                          />
-                        </IonItem>
-                      </IonCol>
-                      <IonCol size="12" sizeMd="8">
-                        <IonItem className="form-item">
-                          <IonInput
-                            label="Nombre del producto *"
-                            labelPlacement="stacked"
-                            placeholder="Ej: Cusqueña Trigo 620ml"
-                            value={formProd.nombre}
-                            onIonInput={(e: any) => setFormProd({ ...formProd, nombre: String(e.target.value || '') })}
-                          />
-                        </IonItem>
-                      </IonCol>
-                    </IonRow>
-                  </IonGrid>
-                  <IonItem className="form-item" lines="none">
-                    <IonTextarea
-                      label="Descripción"
-                      labelPlacement="stacked"
-                      rows={2}
-                      placeholder="Descripción visible para carta o POS"
-                      value={formProd.descripcion}
-                      onIonInput={(e: any) => setFormProd({ ...formProd, descripcion: String(e.target.value || '') })}
-                    />
-                  </IonItem>
-                </div>
+          <IonContent style={{ '--background': '#f7f9fc', padding: 10, overflowY: 'auto' }} scrollEvents>
+            {/* ===== SECCIÓN 1 · IDENTIFICACIÓN ===== */}
+            <div className="modal-section" style={{ marginBottom: 8, padding: 10, background: '#fff', borderRadius: 10 }}>
+              <div className="modal-section-title" style={{ fontSize: 11, marginBottom: 8, marginTop: 0 }}>
+                <IonIcon icon={barcode} style={{ fontSize: 13 }} />&nbsp;IDENTIFICACIÓN
+              </div>
+              <IonGrid style={{ padding: 0 }}>
+                <IonRow>
+                  <IonCol size="12" sizeMd="4">
+                    <IonItem className="form-item" lines="none" style={{ '--min-height': '40px', '--padding-start': 4, '--padding-end': 4 }}>
+                      <IonInput
+                        label="Código"
+                        labelPlacement="stacked"
+                        placeholder="Ej: CER-001"
+                        value={formProd.codigo}
+                        onIonInput={(e: any) => setFormProd({ ...formProd, codigo: String(e.target.value || '') })}
+                      />
+                    </IonItem>
+                  </IonCol>
+                  <IonCol size="12" sizeMd="8">
+                    <IonItem className="form-item" lines="none" style={{ '--min-height': '40px', '--padding-start': 4, '--padding-end': 4 }}>
+                      <IonInput
+                        label="Nombre del producto *"
+                        labelPlacement="stacked"
+                        placeholder="Ej: Cusqueña Trigo 620ml"
+                        value={formProd.nombre}
+                        onIonInput={(e: any) => setFormProd({ ...formProd, nombre: String(e.target.value || '') })}
+                      />
+                    </IonItem>
+                  </IonCol>
+                </IonRow>
+              </IonGrid>
+              <IonItem className="form-item" lines="none" style={{ '--min-height': '52px', '--padding-start': 4, '--padding-end': 4 }}>
+                <IonTextarea
+                  label="Descripción"
+                  labelPlacement="stacked"
+                  rows={1.5}
+                  placeholder="Descripción visible para carta o POS"
+                  value={formProd.descripcion}
+                  onIonInput={(e: any) => setFormProd({ ...formProd, descripcion: String(e.target.value || '') })}
+                />
+              </IonItem>
+            </div>
 
-                <div className="modal-section">
-                  <div className="modal-section-title"><IonIcon icon={layers} /> Categoría y estado</div>
-                  <IonGrid>
-                    <IonRow>
-                      <IonCol size="12" sizeMd="6">
-                        <IonItem className="form-item">
-                          <IonSelect
-                            label="Categoría *"
-                            labelPlacement="stacked"
-                            value={formProd.categoriaId}
-                            placeholder="Selecciona categoría"
-                            onIonChange={(e: any) => {
-                              const nuevaCatId = e.target.value;
-                              const catPrevia = categoriasFB.find(c => c.id === formProd.categoriaId);
-                              const prefijoPrevio = catPrevia ? String((catPrevia.payload?.codigo) || catPrevia.codigo || '').replace(/^CAT-/, '').slice(0, 6).toUpperCase() : '';
-                              const codigoActual = String(formProd.codigo || '').toUpperCase();
-                              const debeRegenerar = !formProd.codigo.trim() || (prefijoPrevio && codigoActual.startsWith(`${prefijoPrevio}-`));
-                              const nuevoCodigo = (debeRegenerar && nuevaCatId) ? generarCodigoProdAuto(nuevaCatId) : formProd.codigo;
-                              setFormProd({ ...formProd, categoriaId: nuevaCatId, codigo: nuevoCodigo });
-                            }}
-                            interface="action-sheet"
-                          >
-                            {(categoriasFB || []).map((c) => (
-                              <IonSelectOption key={c.id} value={c.id}>{c.nombre}</IonSelectOption>
-                            ))}
-                          </IonSelect>
-                        </IonItem>
-                      </IonCol>
-                      <IonCol size="12" sizeMd="6">
-                        <IonItem className="form-item">
-                          <IonSelect
-                            label="Estado"
-                            labelPlacement="stacked"
-                            value={formProd.estado}
-                            onIonChange={(e: any) => setFormProd({ ...formProd, estado: e.target.value as any })}
-                          >
-                            <IonSelectOption value="ACTIVO">✅ ACTIVO (visible en POS y carta)</IonSelectOption>
-                            <IonSelectOption value="INACTIVO">⛔ INACTIVO (oculto)</IonSelectOption>
-                          </IonSelect>
-                        </IonItem>
-                      </IonCol>
-                    </IonRow>
-                  </IonGrid>
-                </div>
-
-                <div className="modal-section">
-                  <div className="modal-section-title"><IonIcon icon={cash} /> Precios y costo</div>
-                  <IonGrid>
-                    <IonRow>
-                      <IonCol size="12" sizeMd="4">
-                        <IonItem className="form-item">
-                          <IonInput
-                            label="Precio venta (S/) *"
-                            labelPlacement="stacked"
-                            type="number" step="0.01" inputMode="decimal"
-                            placeholder="Ej: 18.00"
-                            value={formProd.precioVentaBase}
-                            onIonInput={(e: any) => setFormProd({ ...formProd, precioVentaBase: Number(e.target.value || 0) })}
-                          />
-                        </IonItem>
-                      </IonCol>
-                      <IonCol size="12" sizeMd="4">
-                        <IonItem className="form-item">
-                          <IonInput
-                            label="Precio costo (S/)"
-                            labelPlacement="stacked"
-                            type="number" step="0.01" inputMode="decimal"
-                            placeholder="Ej: 9.50"
-                            value={formProd.costoAproximado}
-                            onIonInput={(e: any) => setFormProd({ ...formProd, costoAproximado: Number(e.target.value || 0) })}
-                          />
-                        </IonItem>
-                      </IonCol>
-                      <IonCol size="12" sizeMd="4">
-                        <IonItem className="form-item">
-                          <IonSelect
-                            label="Unidad de medida"
-                            labelPlacement="stacked"
-                            value={formProd.unidadMedida}
-                            placeholder="Selecciona unidad"
-                            interface="action-sheet"
-                            onIonChange={(e: any) => setFormProd({ ...formProd, unidadMedida: e.target.value })}
-                          >
-                            <IonSelectOption value="UND">UND (Unidad)</IonSelectOption>
-                            <IonSelectOption value="L">L (Litros)</IonSelectOption>
-                            <IonSelectOption value="ML">ML (Mililitros)</IonSelectOption>
-                            <IonSelectOption value="KG">KG (Kilogramos)</IonSelectOption>
-                            <IonSelectOption value="G">G (Gramos)</IonSelectOption>
-                            <IonSelectOption value="DOC">DOC (Docena)</IonSelectOption>
-                            <IonSelectOption value="CAJ">CAJ (Caja)</IonSelectOption>
-                            <IonSelectOption value="PAQ">PAQ (Paquete)</IonSelectOption>
-                          </IonSelect>
-                        </IonItem>
-                      </IonCol>
-                    </IonRow>
-                  </IonGrid>
-                  {Number(formProd.precioVentaBase || 0) > 0 && (
-                    <div className="modal-summary">
-                      <div className="summary-row">
-                        <span>Margen unitario estimado:</span>
-                        <strong className="summary-value">{fmtSoles(Number(formProd.precioVentaBase || 0) - Number(formProd.costoAproximado || 0))}</strong>
-                      </div>
-                      <div className="summary-row">
-                        <span>% rentabilidad:</span>
-                        <strong className="summary-value" style={{
-                          color: Number(formProd.precioVentaBase || 0) > 0
-                            ? (((Number(formProd.precioVentaBase || 0) - Number(formProd.costoAproximado || 0)) / Number(formProd.precioVentaBase || 1)) * 100) >= 40
-                              ? '#2dd36f'
-                              : (((Number(formProd.precioVentaBase || 0) - Number(formProd.costoAproximado || 0)) / Number(formProd.precioVentaBase || 1)) * 100) >= 20
-                                ? '#ffc409'
-                                : '#eb445a'
-                            : '#999'
-                        }}>
-                          {Number(formProd.precioVentaBase || 0) > 0
-                            ? Math.round(((Number(formProd.precioVentaBase || 0) - Number(formProd.costoAproximado || 0)) / Number(formProd.precioVentaBase || 1)) * 100)
-                            : 0}%
-                        </strong>
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                <div className="modal-section">
-                  <div className="modal-section-title"><IonIcon icon={documentText} /> Notas internas</div>
-                  <IonItem lines="none" className="form-item">
-                    <IonTextarea
-                      label="Observaciones"
-                      labelPlacement="stacked"
-                      rows={2}
-                      placeholder="Proveedor, códigos internos, etc. (opcional)"
-                      value={formProd.observaciones}
-                      onIonInput={(e: any) => setFormProd({ ...formProd, observaciones: String(e.target.value || '') })}
-                    />
-                  </IonItem>
-                </div>
-              </>
-            )}
-
-            {prodFormTab === 'INVENTARIO' && (
-              <>
-                <div className="modal-section">
-                  <div className="modal-section-title"><IonIcon icon={cube} /> Control de inventario</div>
-
-                  <div className="stock-control-wrap">
-                    <div className="stock-control-question">¿Controlar stock y alertar mínimo?</div>
-                    <IonSegment
-                      value={formProd.stockControl ? 'SI' : 'NO'}
-                      onIonChange={(e: any) => setFormProd({ ...formProd, stockControl: e.target.value === 'SI' })}
-                      className="stock-segment-big"
+            {/* ===== SECCIÓN 2 · CATEGORÍA Y ESTADO + NUEVA CAT ON THE FLY ===== */}
+            <div className="modal-section" style={{ marginBottom: 8, padding: 10, background: '#fff', borderRadius: 10 }}>
+              <div className="modal-section-title" style={{ fontSize: 11, marginBottom: 8, marginTop: 0 }}>
+                <IonIcon icon={layers} style={{ fontSize: 13 }} />&nbsp;CATEGORÍA Y ESTADO
+              </div>
+              <IonGrid style={{ padding: 0 }}>
+                <IonRow>
+                  <IonCol size="12" sizeMd="8">
+                    <IonItem className="form-item" lines="none" style={{ '--min-height': '40px', '--padding-start': 4, '--padding-end': 4 }}>
+                      <IonSelect
+                        label="Categoría *"
+                        labelPlacement="stacked"
+                        value={formProd.categoriaId}
+                        placeholder="Selecciona categoría"
+                        onIonChange={(e: any) => {
+                          const nuevaCatId = e.target.value;
+                          const catPrevia = categoriasFB.find(c => c.id === formProd.categoriaId);
+                          const prefijoPrevio = catPrevia ? String((catPrevia.payload?.codigo) || catPrevia.codigo || '').replace(/^CAT-/, '').slice(0, 6).toUpperCase() : '';
+                          const codigoActual = String(formProd.codigo || '').toUpperCase();
+                          const debeRegenerar = !formProd.codigo.trim() || (prefijoPrevio && codigoActual.startsWith(`${prefijoPrevio}-`));
+                          const nuevoCodigo = (debeRegenerar && nuevaCatId) ? generarCodigoProdAuto(nuevaCatId) : formProd.codigo;
+                          setFormProd({ ...formProd, categoriaId: nuevaCatId, codigo: nuevoCodigo });
+                        }}
+                        interface="action-sheet"
+                      >
+                        {([...categoriasFB].sort((a, b) => Number(a.orden || 0) - Number(b.orden || 0))).map((c) => (
+                          <IonSelectOption key={c.id} value={c.id}>{c.nombre}</IonSelectOption>
+                        ))}
+                      </IonSelect>
+                    </IonItem>
+                  </IonCol>
+                  <IonCol size="12" sizeMd="4" className="ion-align-self-end">
+                    <IonButton
+                      expand="block"
+                      size="default"
+                      color="tertiary"
+                      style={{ marginBottom: 2, fontSize: 13, fontWeight: 800 }}
+                      onClick={() => {
+                        try {
+                          const maxOrden = categoriasFB.reduce((m, c) => Math.max(m, Number(c.orden || 0)), 0);
+                          presentarCatAlert({
+                            header: '➕ Nueva categoría',
+                            subHeader: 'Se agregará sobre la marcha al selector',
+                            cssClass: 'alert-compact',
+                            inputs: [
+                              { name: 'nombre', type: 'text', placeholder: 'Nombre categoría * (ej: Ensaladas)', value: '' },
+                              { name: 'orden', type: 'number', placeholder: `Orden (default ${maxOrden + 10})`, value: String(maxOrden + 10) },
+                            ],
+                            buttons: [
+                              { text: 'Cancelar', role: 'cancel', cssClass: 'secondary' },
+                              {
+                                text: '✅ Tipo COCINA (sin stock)',
+                                handler: (d: any) => {
+                                  const nombre = String(d?.nombre || '').trim();
+                                  if (!nombre) { mostrarToast('Nombre categoría es obligatorio'); return false; }
+                                  const orden = Number(d?.orden || (maxOrden + 10));
+                                  try {
+                                    const catCreada = CatalogoFBService.crearCategoria({
+                                      nombre, descripcion: nombre, orden, estado: 'ACTIVO',
+                                      codigo: 'CAT-' + nombre.substring(0, 6).toUpperCase(),
+                                      color: '#374151', payload: { defaultStockControl: false, sistema: false },
+                                    }, usuario.id);
+                                    try { setCategoriasFB(CatalogoFBService.listarCategorias() || []); } catch {}
+                                    if (catCreada?.id) {
+                                      const catPrevia2 = categoriasFB.find(c => c.id === formProd.categoriaId);
+                                      const prefijoPrevio = catPrevia2 ? String((catPrevia2.payload?.codigo) || catPrevia2.codigo || '').replace(/^CAT-/, '').slice(0, 6).toUpperCase() : '';
+                                      const codigoActual2 = String(formProd.codigo || '').toUpperCase();
+                                      const debeRegenerar2 = !formProd.codigo.trim() || (prefijoPrevio && codigoActual2.startsWith(`${prefijoPrevio}-`));
+                                      setFormProd({
+                                        ...formProd,
+                                        categoriaId: catCreada.id,
+                                        codigo: (debeRegenerar2 ? generarCodigoProdAuto(catCreada.id) : formProd.codigo)
+                                      });
+                                    }
+                                    mostrarToast(`✅ Categoría "${nombre}" creada y seleccionada`);
+                                    return true;
+                                  } catch (e2: any) { mostrarToast(e2?.message || 'Error al crear categoría'); return false; }
+                                }
+                              },
+                              {
+                                text: '📦 Tipo FÍSICO (con stock)',
+                                handler: (d: any) => {
+                                  const nombre = String(d?.nombre || '').trim();
+                                  if (!nombre) { mostrarToast('Nombre categoría es obligatorio'); return false; }
+                                  const orden = Number(d?.orden || (maxOrden + 10));
+                                  try {
+                                    const catCreada = CatalogoFBService.crearCategoria({
+                                      nombre, descripcion: nombre, orden, estado: 'ACTIVO',
+                                      codigo: 'CAT-' + nombre.substring(0, 6).toUpperCase(),
+                                      color: '#065f46', payload: { defaultStockControl: true, sistema: false },
+                                    }, usuario.id);
+                                    try { setCategoriasFB(CatalogoFBService.listarCategorias() || []); } catch {}
+                                    if (catCreada?.id) {
+                                      const catPrevia2 = categoriasFB.find(c => c.id === formProd.categoriaId);
+                                      const prefijoPrevio = catPrevia2 ? String((catPrevia2.payload?.codigo) || catPrevia2.codigo || '').replace(/^CAT-/, '').slice(0, 6).toUpperCase() : '';
+                                      const codigoActual2 = String(formProd.codigo || '').toUpperCase();
+                                      const debeRegenerar2 = !formProd.codigo.trim() || (prefijoPrevio && codigoActual2.startsWith(`${prefijoPrevio}-`));
+                                      setFormProd({
+                                        ...formProd,
+                                        categoriaId: catCreada.id,
+                                        codigo: (debeRegenerar2 ? generarCodigoProdAuto(catCreada.id) : formProd.codigo),
+                                        stockControl: true, stockActual: 0, stockMinimo: Math.max(3, Number(formProd.stockMinimo || 0) || 3),
+                                      });
+                                    }
+                                    mostrarToast(`✅ Categoría "${nombre}" creada y seleccionada (con stock)`);
+                                    return true;
+                                  } catch (e2: any) { mostrarToast(e2?.message || 'Error al crear categoría'); return false; }
+                                }
+                              }
+                            ]
+                          });
+                        } catch (er1) { console.error(er1); }
+                      }}
                     >
-                      <IonSegmentButton value="NO" type="button" color="medium">
-                        <IonLabel>NO (platos / bebidas preparación)</IonLabel>
-                      </IonSegmentButton>
-                      <IonSegmentButton value="SI" type="button" color="success">
-                        <IonLabel>SÍ (productos embotellados / insumos)</IonLabel>
-                      </IonSegmentButton>
-                    </IonSegment>
-                  </div>
-                </div>
+                      <IonIcon slot="start" icon={add} />&nbsp;Nueva
+                    </IonButton>
+                  </IonCol>
+                  <IonCol size="12" sizeMd="12">
+                    <IonItem className="form-item" lines="none" style={{ '--min-height': '40px', '--padding-start': 4, '--padding-end': 4 }}>
+                      <IonSelect
+                        label="Estado"
+                        labelPlacement="stacked"
+                        value={formProd.estado}
+                        onIonChange={(e: any) => setFormProd({ ...formProd, estado: e.target.value as any })}
+                      >
+                        <IonSelectOption value="ACTIVO">✅ ACTIVO (visible en POS y carta)</IonSelectOption>
+                        <IonSelectOption value="INACTIVO">⛔ INACTIVO (oculto)</IonSelectOption>
+                      </IonSelect>
+                    </IonItem>
+                  </IonCol>
+                </IonRow>
+              </IonGrid>
+            </div>
 
-                {formProd.stockControl ? (
-                  <>
-                    <div className="modal-section">
-                      <div className="modal-section-title"><IonIcon icon={archive} /> Niveles de stock</div>
-                      <IonGrid>
-                        <IonRow>
-                          <IonCol size="12" sizeMd="6">
-                            <div className="stock-input-card stock-input-success">
-                              <div className="stock-input-label">Stock actual</div>
-                              <IonItem lines="none" className="stock-input-item">
-                                <IonInput
-                                  type="number" step="1" min="0" inputMode="numeric"
-                                  placeholder="Ej: 0"
-                                  value={formProd.stockActual}
-                                  onIonInput={(e: any) => setFormProd({ ...formProd, stockActual: Number(e.target.value || 0) })}
-                                />
-                              </IonItem>
-                              <div className="stock-input-hint">Unidades disponibles físicamente.</div>
-                            </div>
-                          </IonCol>
-                          <IonCol size="12" sizeMd="6">
-                            <div className="stock-input-card stock-input-warning">
-                              <div className="stock-input-label">Stock mínimo (alerta)</div>
-                              <IonItem lines="none" className="stock-input-item">
-                                <IonInput
-                                  type="number" step="1" min="0" inputMode="numeric"
-                                  placeholder="Ej: 6"
-                                  value={formProd.stockMinimo}
-                                  onIonInput={(e: any) => setFormProd({ ...formProd, stockMinimo: Number(e.target.value || 0) })}
-                                />
-                              </IonItem>
-                              <div className="stock-input-hint">Si baja de este número se alerta en panel.</div>
-                            </div>
-                          </IonCol>
-                        </IonRow>
-                      </IonGrid>
-
-                      <div className="stock-status-preview">
-                        {editandoProdId && (() => {
-                          const status =
-                            formProd.stockActual < 0 ? { color: 'danger', label: 'Stock NEGATIVO', icon: warning }
-                            : formProd.stockMinimo > 0 && formProd.stockActual < formProd.stockMinimo ? { color: 'warning', label: formProd.stockActual === 0 ? 'Stock CERO' : 'Stock BAJO MÍNIMO', icon: warning }
-                            : { color: 'success', label: 'Stock OK', icon: checkmarkCircle };
-                          return (
-                            <>
-                              <IonBadge color={status.color as any} className="stock-status-badge">
-                                <IonIcon icon={status.icon} />
-                                &nbsp;{status.label}
-                              </IonBadge>
-                              <span className="stock-status-text">
-                                Actual: <strong>{fmtNum(formProd.stockActual)}</strong> · Mínimo: <strong>{fmtNum(formProd.stockMinimo)}</strong>
-                              </span>
-                            </>
-                          );
-                        })()}
-                      </div>
+            {/* ===== SECCIÓN 3 · PRECIOS Y COSTO + INVENTARIO FUSIONADOS ===== */}
+            <div className="modal-section" style={{ marginBottom: 8, padding: 10, background: '#fff', borderRadius: 10 }}>
+              <div className="modal-section-title" style={{ fontSize: 11, marginBottom: 8, marginTop: 0 }}>
+                <IonIcon icon={cash} style={{ fontSize: 13 }} />&nbsp;PRECIOS · COSTO · INVENTARIO
+              </div>
+              <IonGrid style={{ padding: 0 }}>
+                <IonRow>
+                  <IonCol size="12" sizeMd="4">
+                    <IonItem className="form-item" lines="none" style={{ '--min-height': '40px', '--padding-start': 4, '--padding-end': 4 }}>
+                      <IonInput
+                        label="Precio venta (S/) *"
+                        labelPlacement="stacked"
+                        type="number" step="0.01" inputMode="decimal"
+                        placeholder="Ej: 18.00"
+                        value={formProd.precioVentaBase}
+                        onIonInput={(e: any) => setFormProd({ ...formProd, precioVentaBase: Number(e.target.value || 0) })}
+                      />
+                    </IonItem>
+                  </IonCol>
+                  <IonCol size="12" sizeMd="4">
+                    <IonItem className="form-item" lines="none" style={{ '--min-height': '40px', '--padding-start': 4, '--padding-end': 4 }}>
+                      <IonInput
+                        label="Precio costo (S/)"
+                        labelPlacement="stacked"
+                        type="number" step="0.01" inputMode="decimal"
+                        placeholder="Ej: 9.50"
+                        value={formProd.costoAproximado}
+                        onIonInput={(e: any) => setFormProd({ ...formProd, costoAproximado: Number(e.target.value || 0) })}
+                      />
+                    </IonItem>
+                  </IonCol>
+                  <IonCol size="12" sizeMd="4">
+                    <IonItem className="form-item" lines="none" style={{ '--min-height': '40px', '--padding-start': 4, '--padding-end': 4 }}>
+                      <IonSelect
+                        label="Unidad de medida"
+                        labelPlacement="stacked"
+                        value={formProd.unidadMedida}
+                        placeholder="Selecciona unidad"
+                        interface="action-sheet"
+                        onIonChange={(e: any) => setFormProd({ ...formProd, unidadMedida: e.target.value })}
+                      >
+                        <IonSelectOption value="UND">UND (Unidad)</IonSelectOption>
+                        <IonSelectOption value="L">L (Litros)</IonSelectOption>
+                        <IonSelectOption value="ML">ML (Mililitros)</IonSelectOption>
+                        <IonSelectOption value="KG">KG (Kilogramos)</IonSelectOption>
+                        <IonSelectOption value="G">G (Gramos)</IonSelectOption>
+                        <IonSelectOption value="DOC">DOC (Docena)</IonSelectOption>
+                        <IonSelectOption value="CAJ">CAJ (Caja)</IonSelectOption>
+                        <IonSelectOption value="PAQ">PAQ (Paquete)</IonSelectOption>
+                      </IonSelect>
+                    </IonItem>
+                  </IonCol>
+                </IonRow>
+                {Number(formProd.precioVentaBase || 0) > 0 && (
+                  <div className="modal-summary" style={{ marginTop: 4, padding: 8, borderRadius: 8 }}>
+                    <div className="summary-row" style={{ marginBottom: 2 }}>
+                      <span style={{ fontSize: 12 }}>Margen unitario estimado:</span>
+                      <strong className="summary-value" style={{ fontSize: 13 }}>
+                        {fmtSoles(Number(formProd.precioVentaBase || 0) - Number(formProd.costoAproximado || 0))}
+                      </strong>
                     </div>
-
-                    <div className="modal-tip-box modal-tip-info">
-                      <IonIcon icon={informationCircle} />
-                      <div>
-                        <strong>Tip:</strong> Los movimientos de stock se generan automáticamente al vender en POS/RoomService (-1 por unidad) y manualmente con los botones <strong>+Agregar</strong> / <strong>-Quitar</strong>.
-                      </div>
-                    </div>
-                  </>
-                ) : (
-                  <div className="modal-tip-box modal-tip-neutral">
-                    <IonIcon icon={informationCircle} />
-                    <div>
-                      Este producto <strong>NO controla stock</strong>. Úsalo para platos, bebidas preparadas, servicios o alimentos que se producen al momento.
+                    <div className="summary-row">
+                      <span style={{ fontSize: 12 }}>% rentabilidad:</span>
+                      <strong className="summary-value" style={{ fontSize: 13,
+                        color: Number(formProd.precioVentaBase || 0) > 0
+                          ? (((Number(formProd.precioVentaBase || 0) - Number(formProd.costoAproximado || 0)) / Number(formProd.precioVentaBase || 1)) * 100) >= 40
+                            ? '#2dd36f'
+                            : (((Number(formProd.precioVentaBase || 0) - Number(formProd.costoAproximado || 0)) / Number(formProd.precioVentaBase || 1)) * 100) >= 20
+                              ? '#ffc409'
+                              : '#eb445a'
+                          : '#999'
+                      }}>
+                        {Number(formProd.precioVentaBase || 0) > 0
+                          ? Math.round(((Number(formProd.precioVentaBase || 0) - Number(formProd.costoAproximado || 0)) / Number(formProd.precioVentaBase || 1)) * 100)
+                          : 0}%
+                      </strong>
                     </div>
                   </div>
                 )}
-              </>
-            )}
 
-            <div className="modal-actions-footer">
-              <IonButton size="default" color="medium" fill="outline" expand="block" onClick={() => setModalProdAbierto(false)}>
-                <IonIcon slot="start" icon={close} /> Cancelar
-              </IonButton>
-              <IonButton size="default" color={editandoProdId ? 'primary' : 'success'} expand="block" onClick={guardarProd}>
-                <IonIcon slot="start" icon={save} />
-                {editandoProdId ? 'Guardar cambios' : 'Crear producto'}
-              </IonButton>
+                {/* CONTROL STOCK FUSIONADO (antes tab INVENTARIO) · 2 fila compacta */}
+                <div style={{ marginTop: 8 }}>
+                  <div className="stock-control-question" style={{ fontSize: 12, fontWeight: 800, marginBottom: 4 }}>
+                    <IonIcon icon={cube} />&nbsp;Control de inventario y stock:
+                  </div>
+                  <IonSegment
+                    value={formProd.stockControl ? 'SI' : 'NO'}
+                    onIonChange={(e: any) => setFormProd({ ...formProd, stockControl: e.target.value === 'SI' })}
+                    className="stock-segment-big"
+                    style={{ width: '100%' }}
+                  >
+                    <IonSegmentButton value="NO" type="button" color="medium" style={{ fontSize: 12 }}>
+                      <IonLabel>🍽️ Preparación sin stock</IonLabel>
+                    </IonSegmentButton>
+                    <IonSegmentButton value="SI" type="button" color="success" style={{ fontSize: 12 }}>
+                      <IonLabel>📦 Físico con stock</IonLabel>
+                    </IonSegmentButton>
+                  </IonSegment>
+                </div>
+              </IonGrid>
+
+              {formProd.stockControl && (
+                <IonGrid style={{ padding: 0, marginTop: 6 }}>
+                  <IonRow>
+                    <IonCol size="12" sizeMd="6">
+                      <div className="stock-input-card stock-input-success" style={{ padding: 6, borderRadius: 8 }}>
+                        <div className="stock-input-label" style={{ fontSize: 11, marginBottom: 2 }}>Stock actual</div>
+                        <IonItem lines="none" className="stock-input-item" style={{ '--min-height': '36px', '--padding-start': 4, '--padding-end': 4 }}>
+                          <IonInput
+                            type="number" step="1" min="0" inputMode="numeric"
+                            placeholder="Ej: 0"
+                            value={formProd.stockActual}
+                            onIonInput={(e: any) => setFormProd({ ...formProd, stockActual: Number(e.target.value || 0) })}
+                          />
+                        </IonItem>
+                      </div>
+                    </IonCol>
+                    <IonCol size="12" sizeMd="6">
+                      <div className="stock-input-card stock-input-warning" style={{ padding: 6, borderRadius: 8 }}>
+                        <div className="stock-input-label" style={{ fontSize: 11, marginBottom: 2 }}>Stock mínimo (alerta)</div>
+                        <IonItem lines="none" className="stock-input-item" style={{ '--min-height': '36px', '--padding-start': 4, '--padding-end': 4 }}>
+                          <IonInput
+                            type="number" step="1" min="0" inputMode="numeric"
+                            placeholder="Ej: 6"
+                            value={formProd.stockMinimo}
+                            onIonInput={(e: any) => setFormProd({ ...formProd, stockMinimo: Number(e.target.value || 0) })}
+                          />
+                        </IonItem>
+                      </div>
+                    </IonCol>
+                  </IonRow>
+                </IonGrid>
+              )}
+            </div>
+
+            {/* ===== SECCIÓN 4 · NOTAS (muy compacta) ===== */}
+            <div className="modal-section" style={{ marginBottom: 12, padding: 10, background: '#fff', borderRadius: 10 }}>
+              <div className="modal-section-title" style={{ fontSize: 11, marginBottom: 4, marginTop: 0 }}>
+                <IonIcon icon={documentText} style={{ fontSize: 13 }} />&nbsp;NOTAS INTERNAS
+              </div>
+              <IonItem lines="none" className="form-item" style={{ '--min-height': '46px', '--padding-start': 4, '--padding-end': 4 }}>
+                <IonTextarea
+                  label="Observaciones"
+                  labelPlacement="stacked"
+                  rows={1.5}
+                  placeholder="Proveedor, códigos internos... (opcional)"
+                  value={formProd.observaciones}
+                  onIonInput={(e: any) => setFormProd({ ...formProd, observaciones: String(e.target.value || '') })}
+                />
+              </IonItem>
+            </div>
+
+            {/* Footer botones */}
+            <div style={{ paddingBottom: 4 }}>
+              <IonGrid style={{ padding: 0 }}>
+                <IonRow>
+                  <IonCol size="6">
+                    <IonButton color="medium" fill="outline" expand="block" onClick={() => setModalProdAbierto(false)}>
+                      <IonIcon slot="start" icon={close} /> Cancelar
+                    </IonButton>
+                  </IonCol>
+                  <IonCol size="6">
+                    <IonButton color={editandoProdId ? 'primary' : 'success'} expand="block" onClick={guardarProd}>
+                      <IonIcon slot="start" icon={save} />
+                      {editandoProdId ? 'Guardar cambios' : 'Crear producto'}
+                    </IonButton>
+                  </IonCol>
+                </IonRow>
+              </IonGrid>
             </div>
           </IonContent>
         </IonModal>
