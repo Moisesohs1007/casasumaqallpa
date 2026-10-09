@@ -1,15 +1,15 @@
-import React, { useMemo, useState, useEffect, useRef } from 'react';
+import React, { useMemo, useState, useEffect, useRef, useCallback } from 'react';
 import {
   IonContent, IonHeader, IonPage, IonTitle, IonToolbar,
   IonGrid, IonRow, IonCol, IonCard, IonCardHeader, IonCardTitle, IonCardSubtitle, IonCardContent,
   IonBadge, IonSkeletonText, IonAlert,
-  IonButton, IonIcon, IonLabel, IonItem, IonInput, IonTextarea, IonSelect, IonSelectOption, IonList, IonNote,
-  useIonViewWillEnter, useIonActionSheet,
+  IonButton, IonIcon, IonLabel, IonItem, IonInput, IonTextarea, IonSelect, IonSelectOption, IonList, IonNote, IonButtons,
+  useIonViewWillEnter, useIonActionSheet, IonRefresher, IonRefresherContent,
 } from '@ionic/react';
 import type { Color } from '@ionic/core';
-import { add, remove, trash, close, save, receiptOutline, wallet, cart, person, restaurant, bed, cash, pricetag } from 'ionicons/icons';
+import { add, remove, trash, close, save, receiptOutline, wallet, cart, person, restaurant, bed, cash, pricetag, refresh } from 'ionicons/icons';
 import { Habitacion, EstadoHabitacion, ProductoFB, Reserva } from '../../types';
-import { HabitacionService, ReservaService, CatalogoFBService, InventarioService, seedProductos, FolioService } from '../../services';
+import { HabitacionService, ReservaService, CatalogoFBService, InventarioService, seedProductos, FolioService, pendingSync } from '../../services';
 import { supabase } from '../../services/__supabase_db__';
 import CheckinModal from '../../components/modals/CheckinModal';
 import CheckoutModal from '../../components/modals/CheckoutModal';
@@ -17,6 +17,9 @@ import TomarComanda from '../../components/modals/TomarComanda';
 import PagoForm, { PagoFormValue } from '../../components/PagoForm';
 import { METODOS_PAGO_LISTA } from '../../types/etapa2';
 import './Habitaciones.css';
+
+const EVENTO_REFRESCAR = 'lodge:refrescarAhora' as const;
+const AUTO_REFRESH_MS = 8000;
 
 const estadoLabel: Record<EstadoHabitacion, string> = {
   LIBRE: 'LIBRE',
@@ -101,6 +104,7 @@ const HabitacionesPage: React.FC = () => {
   const [alertMsg, setAlertMsg] = useState<{ header: string; sub?: string }>({ header: '', sub: '' });
   const [toast, setToast] = useState('');
   const mostrarToast = (t: string) => { setToast(t); setTimeout(() => setToast(''), 2200); };
+  const refreshingRef = useRef(false);
 
   const [checkinOpen, setCheckinOpen] = useState(false);
   const [checkinReservaId, setCheckinReservaId] = useState<string | null>(null);
@@ -110,11 +114,9 @@ const HabitacionesPage: React.FC = () => {
   const [tomarComandaOpen, setTomarComandaOpen] = useState(false);
   const [habPedidoId, setHabPedidoId] = useState<string>('');
 
-  // Props precargadas para TomarComanda (POS unificado)
   const [preHabSeleccionadaId, setPreHabSeleccionadaId] = useState<string>('');
   const [preTipoConsumoHab, setPreTipoConsumo] = useState<'MESA' | 'CARGO_A_HABITACION'>('CARGO_A_HABITACION');
 
-  // Nuevos modals gestion huésped
   const [habSeleccionada, setHabSeleccionada] = useState<Habitacion | null>(null);
   const [modalVerFolio, setModalVerFolio] = useState(false);
   const [modalDatosHuesped, setModalDatosHuesped] = useState(false);
@@ -124,10 +126,124 @@ const HabitacionesPage: React.FC = () => {
   const [notaVentaCheckout, setNotaVentaCheckout] = useState<{ folio: any; habId: string } | null>(null);
   const [refreshTick, setRefreshTick] = useState<number>(0);
 
-  // Estado de lineas/pagos del folio (DEPRECATED legacy para compatibilidad con modals antiguos. La fuente ÚNICA = obtenerFolioHab())
   const [foliosLocal, setFoliosLocal] = useState<typeof FOLIOS_MOCK>(JSON.parse(JSON.stringify(FOLIOS_MOCK)));
-  // Cantidades seleccionadas para vender stock (DECLARADO ANTES para dep useMemo que lo usa
   const [cantidadesVenta, setCantidadesVenta] = useState<Record<string, number>>({});
+
+  // =================== REFRESCO GENERAL ===================
+  const refrescarFuerza = useCallback(async (postFlush = false) => {
+    if (refreshingRef.current) return;
+    refreshingRef.current = true;
+    try {
+      setLoading(true);
+      try {
+        await Promise.all([
+          (HabitacionService as any).hidratarDesdeSupabase?.(true),
+          (ReservaService as any).hidratarDesdeSupabase?.(true),
+          FolioService.hidratarDesdeSupabase?.(true),
+        ]);
+      } catch (_) {}
+      try { pendingSync.applyPendingLocal?.(); } catch (_) {}
+      try {
+        const lista = await HabitacionService.listarTodas();
+        setHabitaciones(lista);
+      } catch { setHabitaciones([]); }
+      setRefreshTick(t => t + 1);
+    } finally {
+      setLoading(false);
+      refreshingRef.current = false;
+      if (postFlush) {
+        try { await pendingSync.processQueue?.(false); } catch (_) {}
+        try {
+          const lista = await HabitacionService.listarTodas();
+          setHabitaciones(lista);
+        } catch {}
+        setRefreshTick(t => t + 1);
+      }
+    }
+  }, []);
+
+  const cargar = async () => {
+    try {
+      const lista = await HabitacionService.listarTodas();
+      setHabitaciones(lista);
+    } catch { setHabitaciones([]); }
+  };
+
+  useIonViewWillEnter(() => { refrescarFuerza(); });
+
+  // Listener evento global refresh
+  useEffect(() => {
+    const handler = (e: any) => {
+      const quien = (e as any)?.detail?.page;
+      if (!quien || quien === 'HABITACIONES' || quien === 'TODAS') refrescarFuerza();
+    };
+    window.addEventListener(EVENTO_REFRESCAR, handler as any);
+    return () => window.removeEventListener(EVENTO_REFRESCAR, handler as any);
+  }, [refrescarFuerza]);
+
+  // Auto-refresh silencioso 8s
+  useEffect(() => {
+    const id = window.setInterval(() => { refrescarFuerza(); }, AUTO_REFRESH_MS);
+    return () => window.clearInterval(id);
+  }, [refrescarFuerza]);
+
+  // Realtime Channels debounce 200ms (sin guard clause)
+  useEffect(() => {
+    let alive = true;
+    let debounceId: any;
+    const TABLAS = ['habitaciones', 'reservas', 'folios', 'cargos_folio', 'pagos_folio', 'comandas', 'comandas_detalles', 'huespedes'];
+
+    const recargarDebounced = () => {
+      if (!alive) return;
+      clearTimeout(debounceId);
+      debounceId = setTimeout(async () => {
+        if (!alive) return;
+        try {
+          await Promise.all([
+            (HabitacionService as any).hidratarDesdeSupabase?.(true),
+            (ReservaService as any).hidratarDesdeSupabase?.(true),
+            FolioService.hidratarDesdeSupabase?.(true),
+          ]);
+        } catch (_) {}
+        try { pendingSync.applyPendingLocal?.(); } catch (_) {}
+        try { cargar(); } catch (_) {}
+        try { setRefreshTick(t => t + 1); } catch (_) {}
+      }, 200);
+    };
+
+    const canales: any[] = [];
+    try {
+      const sb = (supabase as any)?.channel ? (supabase as any) : null;
+      if (sb) {
+        for (const t of TABLAS) {
+          try {
+            const ch = sb.channel(`rt-hab-${t}-${Math.random().toString(36).slice(2,7)}`)
+              .on('postgres_changes', { event: '*' as any, schema: 'public', table: t }, recargarDebounced)
+              .subscribe();
+            canales.push(ch);
+          } catch (_) {}
+        }
+      }
+    } catch (_) {}
+
+    const seguro = window.setTimeout(() => { if (alive) refrescarFuerza(); }, 400);
+    return () => {
+      alive = false;
+      clearTimeout(seguro);
+      clearTimeout(debounceId);
+      try {
+        const sb = (supabase as any);
+        Promise.all(canales.map(c => sb?.removeChannel?.(c))).catch(()=>{});
+      } catch (_) {}
+    };
+  }, [refrescarFuerza]);
+
+  // Pull-refresh handler
+  const onPullRefresh = async (event: any) => {
+    try { await refrescarFuerza(true); } finally {
+      try { event?.detail?.complete?.(); } catch (_) {}
+    }
+  };
 
   // ===== DATOS STOCK DESDE CATÁLOGO OFICIAL (seed o Supabase) =====
   const catMapByIdHab = useMemo(() => {
@@ -173,7 +289,6 @@ const HabitacionesPage: React.FC = () => {
         } as unknown as (ProductoFB & { _stock?: number; _stockMin?: number; categoriaNombre?: string; stockControl?: boolean; orden?: number });
       }).filter((p: any) => !!p.stockControl && p.estado !== 'INACTIVO')
         .sort((a, b) => ((a as any).orden ?? 0) - ((b as any).orden ?? 0));
-      // Aplicar cantidades seleccionadas en venta como "reservado" visual
       return prods.map(p => {
         const sel = Number(cantidadesVenta[p.id] || 0);
         return { ...p, _stock: Math.max(0, Number((p as any)._stock ?? 0) - sel) };
@@ -182,95 +297,10 @@ const HabitacionesPage: React.FC = () => {
       return [] as any[];
     }
   }, [refreshTick, catMapByIdHab, cantidadesVenta]);
-  // Servicio extra form
+
   const [servExtraForm, setServExtraForm] = useState({ nombre: '', precio: 0, cantidad: 1, observaciones: '' });
-  // Pago form
   const [pagoForm, setPagoForm] = useState<PagoFormValue | undefined>();
-  // Editar datos huésped
   const [editHuesped, setEditHuesped] = useState<any>({});
-
-  const cargar = async () => {
-    setLoading(true);
-    try {
-      const lista = await HabitacionService.listarTodas();
-      setHabitaciones(lista);
-    } catch {
-      setHabitaciones([]);
-    } finally {
-      setLoading(false);
-    }
-  };
-  useIonViewWillEnter(() => { cargar(); });
-
-  // ============ REFRESH POST HIDRATACION BOOT ============
-  // Patron: polling 1s x 5s + listener evento custom 'lodge:hidratacion-listo'
-  // (doble seguridad: App hidrata async después del primer render)
-  const refrescosMax = 5;
-  const intentosRef = useRef(0);
-  useEffect(() => {
-    let alive = true;
-    const onHidratado = (e: any) => {
-      if (!alive) return;
-      const g = (e?.detail?.grupo || '') as string;
-      if (g === 'habitaciones' || g === 'todos') cargar();
-    };
-    try { window.addEventListener('lodge:hidratacion-listo', onHidratado as EventListener); } catch {}
-    const id = window.setInterval(() => {
-      if (!alive) return;
-      intentosRef.current++;
-      if (intentosRef.current >= refrescosMax) {
-        window.clearInterval(id);
-        return;
-      }
-      cargar();
-    }, 1000);
-    return () => {
-      alive = false;
-      window.clearInterval(id);
-      try { window.removeEventListener('lodge:hidratacion-listo', onHidratado as EventListener); } catch {}
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  useEffect(() => {
-    let alive = true;
-    let debounceId: any;
-    const TABLAS = ['habitaciones', 'reservas', 'folios', 'cargos_folio', 'pagos_folio', 'comandas', 'comandas_detalles', 'huespedes'];
-
-    const recargarDebounced = () => {
-      if (!alive) return;
-      clearTimeout(debounceId);
-      debounceId = setTimeout(async () => {
-        if (!alive) return;
-        try {
-          await Promise.all([
-            HabitacionService.hidratarDesdeSupabase?.(true),
-            (ReservaService as any).hidratarDesdeSupabase?.(true),
-            FolioService.hidratarDesdeSupabase?.(true),
-          ]);
-        } catch (_) {}
-        try { cargar(); } catch (_) {}
-        try { setRefreshTick(t => t + 1); } catch (_) {}
-      }, 700);
-    };
-
-    if (!supabase) return;
-    const canales: any[] = [];
-    try {
-      for (const t of TABLAS) {
-        const ch = (supabase as any).channel(`rt-hab-${t}-${Math.random().toString(36).slice(2,7)}`)
-          .on('postgres_changes', { event: '*' as any, schema: 'public', table: t }, recargarDebounced)
-          .subscribe();
-        canales.push(ch);
-      }
-    } catch (_) {}
-
-    return () => {
-      alive = false;
-      clearTimeout(debounceId);
-      try { Promise.all(canales.map(c => (supabase as any)?.removeChannel?.(c))).catch(()=>{}); } catch (_) {}
-    };
-  }, []);
 
   const mostrarAlerta = (header: string, sub?: string) => { setAlertMsg({ header, sub }); setAlertOpen(true); };
 
@@ -303,6 +333,8 @@ const HabitacionesPage: React.FC = () => {
   };
 
   const onClickHab = async (h: Habitacion) => {
+    // PRE-REFRESH SILENCIOSO: hidratar datos de nube y pending antes de abrir menú
+    try { await refrescarFuerza(); } catch (_) {}
     const est = h.estado;
     const headerAccion = `${h.codigo} · ${estadoLabel[est]}`;
     const opciones: any[] = [];
@@ -311,6 +343,7 @@ const HabitacionesPage: React.FC = () => {
       opciones.push({
         text: '🔑 Check-in (solo si la reserva está confirmada)',
         handler: async () => {
+          try { await refrescarFuerza(true); } catch(_){}
           const reservaId = await buscarReservaActivaHab(h.id);
           if (!reservaId) { mostrarAlerta('Sin reserva activa', `No se encontró una reserva para ${h.codigo}. Ve a Reservas y confirma una primero.`); return; }
           setCheckinReservaId(reservaId);
@@ -322,7 +355,6 @@ const HabitacionesPage: React.FC = () => {
 
     if (est === 'OCUPADA') {
       setHabSeleccionada(h);
-      // Inicializar folio demo si no existe
       if (!foliosLocal[h.id]) {
         const tipoHabNombre = (h as any).tipoHabitacion?.nombre || 'Habitación';
         const precioNoche = Number((h as any).tipoHabitacion?.precioBaseNoche ?? (h as any).tipoPrecio ?? 180);
@@ -336,21 +368,27 @@ const HabitacionesPage: React.FC = () => {
       }
       setCantidadesVenta({});
 
-      // OPCIONES 5 (3 anteriores fusionados en uno: POS unificado)
-      opciones.push({ text: '👥 Datos del Huésped', handler: () => { const f = obtenerFolioHab(h); setEditHuesped({ ...(f?.huesped || { nombres: '', apellidos: '', dni: '' }) }); setModalDatosHuesped(true); } });
-      opciones.push({ text: '💰 Ver Folio / Resumen Cuenta', handler: () => setModalVerFolio(true) });
+      opciones.push({ text: '👥 Datos del Huésped', handler: async () => {
+        try { await refrescarFuerza(); } catch(_){}
+        const f = obtenerFolioHab(h); setEditHuesped({ ...(f?.huesped || { nombres: '', apellidos: '', dni: '' }) }); setModalDatosHuesped(true);
+      } });
+      opciones.push({ text: '💰 Ver Folio / Resumen Cuenta', handler: async () => {
+        try { await refrescarFuerza(true); } catch(_){}
+        setModalVerFolio(true);
+      } });
       opciones.push({
         text: '🛒 POS · Agregar Consumo al Folio',
-        handler: () => {
+        handler: async () => {
+          try { await refrescarFuerza(); } catch(_){}
           setHabPedidoId(h.id);
           setCantidadesVenta({});
-          // Se pasan props preseleccionadas a TomarComanda via state
           setPreHabSeleccionadaId(h.id);
           setPreTipoConsumo('CARGO_A_HABITACION');
           setTomarComandaOpen(true);
         },
       });
-      opciones.push({ text: '💳 Registrar Pago', handler: () => {
+      opciones.push({ text: '💳 Registrar Pago', handler: async () => {
+        try { await refrescarFuerza(true); } catch(_){}
         const f = obtenerFolioHab(h);
         const totales = calcularTotales(f?.lineas || []);
         const totalPagos = calcularTotalPagos(f?.pagos || []);
@@ -692,9 +730,28 @@ const HabitacionesPage: React.FC = () => {
       <IonHeader>
         <IonToolbar color="primary">
           <IonTitle>Habitaciones ({habitaciones.length})</IonTitle>
+          <IonButtons slot="end">
+            <IonButton
+              size="small"
+              color="light"
+              onClick={() => {
+                try { window.dispatchEvent(new CustomEvent(EVENTO_REFRESCAR, { detail: { page:'HABITACIONES' }})); } catch(_){}
+              }}
+            >
+              <IonIcon icon={refresh} slot="icon-only" />
+            </IonButton>
+          </IonButtons>
         </IonToolbar>
       </IonHeader>
       <IonContent fullscreen className="ion-padding habitaciones-page">
+        <IonRefresher slot="fixed" onIonRefresh={onPullRefresh}>
+          <IonRefresherContent
+            pullingIcon={refresh as any}
+            pullingText="Desliza para actualizar habitaciones"
+            refreshingSpinner="crescent"
+            refreshingText="Actualizando..."
+          />
+        </IonRefresher>
         {toast && <div className="toast-flash">{toast}</div>}
         <IonAlert isOpen={alertOpen} header={alertMsg.header} subHeader={alertMsg.sub} buttons={['OK']} onDidDismiss={() => setAlertOpen(false)} />
 

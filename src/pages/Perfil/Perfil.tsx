@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   IonContent,
   IonHeader,
@@ -38,12 +38,15 @@ import {
   add, create, trash, save, close, bedOutline, buildOutline, pricetag,
   cube, addCircle, removeCircle, archive, restaurant,
   search, layers, fileTray, warning, checkmarkCircle,
-  informationCircle, documentText, barcode, cash, people,
+  informationCircle, documentText, barcode, cash, people, refresh,
 } from 'ionicons/icons';
 import { Usuario, Rol, RolUsuario, ModuloPermiso, Moneda, AuditFields, Habitacion, TipoHabitacion, EstadoHabitacion } from '../../types';
-import { HabitacionService, CatalogoFBService, InventarioService, seedProductos, type MoverStockResult, TarifaService, PosService } from '../../services';
+import { HabitacionService, CatalogoFBService, InventarioService, seedProductos, type MoverStockResult, TarifaService, PosService, pendingSync } from '../../services';
 import { supabase } from '../../services/__supabase_db__';
 import './Perfil.css';
+
+const EVENTO_REFRESCAR = 'lodge:refrescarAhora' as const;
+const AUTO_REFRESH_MS = 10000;
 
 const nowIso = new Date().toISOString();
 const audit: AuditFields = { createdAt: nowIso, updatedAt: nowIso };
@@ -176,7 +179,33 @@ const PerfilPage: React.FC = () => {
     setModalAbierto(true);
   };
 
+  const refreshingRefPerfil = useRef(false);
+  const refrescarFuerzaActual = useCallback(async (postFlush = false) => {
+    if (refreshingRefPerfil.current) return;
+    refreshingRefPerfil.current = true;
+    try {
+      try {
+        await Promise.all([
+          HabitacionService.hidratarDesdeSupabase?.(true),
+          TarifaService.hidratarDesdeSupabase?.(true),
+          PosService?.hidratarDesdeSupabase?.(true),
+        ]);
+      } catch (_) {}
+      try { pendingSync.applyPendingLocal?.(); } catch (_) {}
+      try { cargarHabs(); } catch (_) {}
+      try { cargarCatProd(); } catch (_) {}
+    } finally {
+      refreshingRefPerfil.current = false;
+      if (postFlush) {
+        try { pendingSync.processQueue?.(false); } catch (_) {}
+        cargarHabs(); cargarCatProd();
+      }
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const abrirEditar = (h: Habitacion) => {
+    refrescarFuerzaActual();
     const tipo = tiposHab.find((t) => t.id === h.tipoHabitacionId);
     const precio = Number(tipo?.precioBaseNoche ?? 0);
     const capTipo = tipo ? (Number(tipo.capacidadAdultos || 0) + Number(tipo.capacidadNinos || 0)) : 2;
@@ -270,37 +299,39 @@ const PerfilPage: React.FC = () => {
     try { setProductosFB(CatalogoFBService.listarProductos({ soloActivos: false }) || []); } catch { setProductosFB([]); }
   };
 
-  useIonViewWillEnter(() => { cargarHabs(); cargarCatProd(); });
+  useIonViewWillEnter(() => { refrescarFuerzaActual(); });
 
-  const intentosRefPerfil = useRef(0);
+  // === Hooks NUEVOS: Listener global + Auto-refresh 10s + Realtime 200ms sin guard ===
   useEffect(() => {
     let alive = true;
-    const recargarTodo = () => { try { cargarHabs(); } catch {} try { cargarCatProd(); } catch {} };
-    const onHidratado = (e: any) => {
+    const onEv = (e: any) => {
       if (!alive) return;
-      const g = String(e?.detail?.grupo || '');
-      if (g === 'habitaciones' || g === 'pos' || g === 'todos') recargarTodo();
+      const pg = String(e?.detail?.page || '');
+      if (pg === 'PERFIL' || pg === 'TODAS') { refrescarFuerzaActual(true); }
     };
-    try { window.addEventListener('lodge:hidratacion-listo', onHidratado as EventListener); } catch {}
-    const id = window.setInterval(() => {
-      if (!alive) return;
-      intentosRefPerfil.current++;
-      if (intentosRefPerfil.current >= 5) { window.clearInterval(id); return; }
-      recargarTodo();
-    }, 1000);
+    try { window.addEventListener(EVENTO_REFRESCAR, onEv as EventListener); } catch {}
     return () => {
       alive = false;
-      window.clearInterval(id);
-      try { window.removeEventListener('lodge:hidratacion-listo', onHidratado as EventListener); } catch {}
+      try { window.removeEventListener(EVENTO_REFRESCAR, onEv as EventListener); } catch {}
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    let alive = true;
+    const id = window.setInterval(() => {
+      if (!alive) return;
+      refrescarFuerzaActual();
+    }, AUTO_REFRESH_MS);
+    return () => { alive = false; window.clearInterval(id); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
     let alive = true;
     let debounceId: any;
-    const TABLAS = ['habitaciones', 'tipos_habitacion', 'categorias_fb', 'productos_fb', 'presentaciones_fb', 'tarifas', 'temporadas', 'politicas_cancelacion', 'codigos_promocionales', 'impuestos', 'mesas', 'puntos_venta'];
-
+    let initId: any;
+    const TABLAS_RT = ['habitaciones', 'tipos_habitacion', 'categorias_fb', 'productos_fb', 'presentaciones_fb', 'tarifas', 'temporadas', 'politicas_cancelacion', 'codigos_promocionales', 'impuestos', 'mesas', 'puntos_venta'];
     const recargarDebounced = () => {
       if (!alive) return;
       clearTimeout(debounceId);
@@ -313,27 +344,37 @@ const PerfilPage: React.FC = () => {
             PosService?.hidratarDesdeSupabase?.(true),
           ]);
         } catch (_) {}
+        try { pendingSync.applyPendingLocal?.(); } catch (_) {}
         try { cargarHabs(); } catch (_) {}
         try { cargarCatProd(); } catch (_) {}
-      }, 700);
+      }, 200);
     };
 
-    if (!supabase) return;
     const canales: any[] = [];
     try {
-      for (const t of TABLAS) {
-        const ch = (supabase as any).channel(`rt-per-${t}-${Math.random().toString(36).slice(2,7)}`)
-          .on('postgres_changes', { event: '*' as any, schema: 'public', table: t }, recargarDebounced)
-          .subscribe();
-        canales.push(ch);
+      const sb: any = (supabase as any)?.channel ? (supabase as any) : null;
+      if (sb) {
+        for (const t of TABLAS_RT) {
+          const ch = sb.channel(`rt-perf-${t}-${Math.random().toString(36).slice(2,7)}`)
+            .on('postgres_changes', { event: '*' as any, schema: 'public', table: t }, recargarDebounced)
+            .subscribe();
+          canales.push(ch);
+        }
       }
     } catch (_) {}
+
+    initId = window.setTimeout(() => { if (alive) refrescarFuerzaActual(); }, 500);
 
     return () => {
       alive = false;
       clearTimeout(debounceId);
-      try { Promise.all(canales.map(c => (supabase as any)?.removeChannel?.(c))).catch(()=>{}); } catch (_) {}
+      clearTimeout(initId);
+      try {
+        const sb: any = (supabase as any)?.removeChannel ? (supabase as any) : null;
+        if (sb) Promise.all(canales.map(c => sb.removeChannel?.(c))).catch(()=>{});
+      } catch (_) {}
     };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const generarCodigoProdAuto = (categoriaIdSel: string): string => {
@@ -420,7 +461,8 @@ const PerfilPage: React.FC = () => {
     });
     setModalProdAbierto(true);
   };
-  const abrirEditarProd = (p: any) => {
+  const abrirEditarProd = async (p: any) => {
+    await refrescarFuerzaActual();
     const plano = stockPlanoProd(p);
     setEditandoProdId(p.id);
     setFormProd({
@@ -555,6 +597,13 @@ const PerfilPage: React.FC = () => {
       <IonHeader>
         <IonToolbar color="primary">
           <IonTitle>Panel Admin</IonTitle>
+          <IonButtons slot="end">
+            <IonButton size="small" color="light" onClick={() => {
+              try { window.dispatchEvent(new CustomEvent(EVENTO_REFRESCAR, { detail: { page: 'PERFIL' } })); } catch(_){}
+            }}>
+              <IonIcon icon={refresh} />
+            </IonButton>
+          </IonButtons>
         </IonToolbar>
       </IonHeader>
       <IonContent fullscreen className="admin-content-page">

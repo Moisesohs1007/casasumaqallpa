@@ -276,6 +276,25 @@ export const ReservaService = {
       return { ...this.buscarPorId(existentePorCodigo.id)!, _syncStatus: (existentePorCodigo as any)._syncStatus || 'SYNCED' };
     }
 
+    // ===== RC3 ANTI-DOBLE-RESERVA (Overlap Validation INQUEBRANTABLE) =====
+    const habitacionesAsignadas = Array.isArray((payload as any).habitaciones) ? ((payload as any).habitaciones as Array<{ habitacionId: string }>) : [];
+    for (const rh of habitacionesAsignadas) {
+      if (!rh?.habitacionId) continue;
+      const conflictos = this.listarPorHabitacionYFechas({
+        habitacionId: rh.habitacionId,
+        checkinISO: (payload as any).fechaCheckin,
+        checkoutISO: (payload as any).fechaCheckout,
+      });
+      if (conflictos.length > 0) {
+        const hab = HabitacionService.buscarPorId(rh.habitacionId);
+        const codHab = hab?.codigo || hab?.nombre || rh.habitacionId;
+        const conflictStr = conflictos.map(c => `${c.codigoReserva || 'R-???'}(${String(c.estado || '').slice(0,3)})`).join(', ');
+        const errMsg = `⛔ CONFLICTO: La Suite ${codHab} YA ESTÁ RESERVADA en esas fechas por otra terminal (${conflictStr}). La reserva NO SE CREÓ. Elige otra habitación o cambia las fechas.`;
+        console.error('[ReservaService.crear] Overlap detectado (RC3):', errMsg);
+        throw new Error(errMsg);
+      }
+    }
+
     const historial = [agregarHistorial(idUnico, 'CREACION', null, payload, payload.usuarioResponsableId, 'Reserva creada en sistema')];
 
     const payloadFinal: any = {

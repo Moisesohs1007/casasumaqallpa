@@ -38,9 +38,10 @@ const EVENTO_HIDRATACION = 'lodge:hidratacion-listo' as const;
 
 type NetworkMode = 'ONLINE' | 'OFFLINE' | 'CHECKING';
 
-// ====== Helper PING REAL a Supabase (3 capas fallback, NO falso negativo) ======
-const PING_TIMEOUT_MS = 2200;
-const PING_CACHE_MS = 4500;
+// ====== Helper PING REAL a Supabase (3 capas + 3 retry + timeout 7s) ======
+const PING_TIMEOUT_MS = 7000;
+const PING_CACHE_MS = 5500;
+const PING_RETRY = 3;
 const SUPABASE_URL_FOR_PING =
   (typeof import.meta !== 'undefined' && (import.meta as any)?.env?.VITE_SUPABASE_URL) ||
   'https://yuoftlckoctrkkfajaii.supabase.co';
@@ -50,79 +51,82 @@ const SUPABASE_ANON_FOR_PING =
 let _pingCache: { ts: number; result: boolean } | null = null;
 let _pingEnCurso: Promise<boolean> | null = null;
 
+function timeoutPromise(ms: number, label: string) {
+  return new Promise<never>((_, rj) => setTimeout(() => rj(new Error(label)), ms));
+}
+
 async function _pingSupabaseReal(): Promise<boolean> {
   const ahora = Date.now();
   if (_pingCache && (ahora - _pingCache.ts) < PING_CACHE_MS) return _pingCache.result;
   if (_pingEnCurso) return _pingEnCurso;
 
   _pingEnCurso = (async (): Promise<boolean> => {
-    try {
-      // CAPA 1: Supabase client si existe
-      const client = dbRemota?.client;
-      let ok = false;
-      if (client && (client as any).from) {
-        const timeoutC1 = new Promise<never>((_, rj) =>
-          setTimeout(() => rj(new Error('C1_TIMEOUT')), PING_TIMEOUT_MS)
-        );
-        try {
-          const req = (client as any).from('impuestos').select('id', { count: 'exact', head: true }).limit(1);
-          const res = await Promise.race([req, timeoutC1]);
-          ok = !(res?.error);
-        } catch { ok = false; }
-      }
-      // CAPA 2: Fallback fetch() directo a REST API si capa1 falla / client no existe
-      if (!ok && typeof fetch === 'function') {
-        const timeoutC2 = new Promise<never>((_, rj) =>
-          setTimeout(() => rj(new Error('C2_TIMEOUT')), PING_TIMEOUT_MS)
-        );
-        try {
-          const req = fetch(
-            `${SUPABASE_URL_FOR_PING}/rest/v1/impuestos?select=id&limit=1`,
-            {
-              method: 'GET',
-              headers: {
-                apikey: SUPABASE_ANON_FOR_PING,
-                Authorization: `Bearer ${SUPABASE_ANON_FOR_PING}`,
-                Accept: 'application/json',
-                Range: '0-0',
-              },
-              credentials: 'omit' as RequestCredentials,
-              cache: 'no-store',
-            }
-          );
-          const res = await Promise.race([req, timeoutC2]) as Response;
-          ok = !!res && res.ok;
-        } catch { ok = false; }
-      }
-      // CAPA 3: Optimista si navigator.onLine=true (fallback extremo si Supabase está caído
-      //          PERO usuario SÍ tiene internet → mostrar VERDE igual, no bloquear UX)
-      if (!ok) {
-        const navOnline = typeof navigator !== 'undefined' ? !!navigator.onLine : true;
-        if (navOnline) {
+    let ultimoOk = false;
+    for (let intento = 1; intento <= PING_RETRY; intento++) {
+      try {
+        // CAPA 1: Supabase client si existe
+        const client = dbRemota?.client;
+        let ok = false;
+        if (client && (client as any).from) {
           try {
-            const timeoutC3 = new Promise<never>((_, rj) =>
-              setTimeout(() => rj(new Error('C3_TIMEOUT')), 900)
-            );
-            const tiny = await Promise.race([
-              fetch('https://httpbin.org/get', { method: 'HEAD', cache: 'no-store', credentials: 'omit' }),
-              timeoutC3,
-            ]) as any;
-            ok = !!tiny && (!!tiny.ok || !!tiny.status || !!tiny.type);
-          } catch { ok = navOnline; /* último recurso, creemos al navegador */ }
+            const req = (client as any).from('impuestos').select('id', { count: 'exact', head: true }).limit(1);
+            const res = await Promise.race([req, timeoutPromise(PING_TIMEOUT_MS, `C1_T${intento}`)]);
+            ok = !(res?.error);
+          } catch { ok = false; }
         }
+        // CAPA 2: Fallback fetch() directo a REST API
+        if (!ok && typeof fetch === 'function') {
+          try {
+            const req = fetch(
+              `${SUPABASE_URL_FOR_PING}/rest/v1/impuestos?select=id&limit=1`,
+              {
+                method: 'GET',
+                headers: {
+                  apikey: SUPABASE_ANON_FOR_PING,
+                  Authorization: `Bearer ${SUPABASE_ANON_FOR_PING}`,
+                  Accept: 'application/json',
+                  Range: '0-0',
+                },
+                credentials: 'omit' as RequestCredentials,
+                cache: 'no-store',
+              }
+            );
+            const res = await Promise.race([req, timeoutPromise(PING_TIMEOUT_MS, `C2_T${intento}`)]) as Response;
+            ok = !!res && res.ok;
+          } catch { ok = false; }
+        }
+        // CAPA 3: Optimista navigator.onLine + httpbin tiny HEAD
+        if (!ok) {
+          const navOnline = typeof navigator !== 'undefined' ? !!navigator.onLine : true;
+          if (navOnline) {
+            try {
+              const tiny = await Promise.race([
+                fetch('https://httpbin.org/get', { method: 'HEAD', cache: 'no-store', credentials: 'omit' }),
+                timeoutPromise(1800, `C3_T${intento}`),
+              ]) as any;
+              ok = !!tiny && (!!tiny.ok || !!tiny.status || !!tiny.type);
+            } catch { ok = navOnline; }
+          } else {
+            ok = false;
+          }
+        }
+        ultimoOk = !!ok;
+        if (ultimoOk) break;
+        // Entre intentos esperamos 400ms
+        if (intento < PING_RETRY) {
+          await new Promise((r) => setTimeout(r, 400));
+        }
+      } catch {
+        ultimoOk = false;
+        if (intento < PING_RETRY) await new Promise((r) => setTimeout(r, 400));
       }
-      _pingCache = { ts: Date.now(), result: !!ok };
-      return !!ok;
-    } catch (_e) {
-      const navOnline = typeof navigator !== 'undefined' ? !!navigator.onLine : true;
-      const res = !!navOnline;
-      _pingCache = { ts: Date.now(), result: res };
-      return res;
-    } finally {
-      _pingEnCurso = null;
     }
+    const navOnline = typeof navigator !== 'undefined' ? !!navigator.onLine : true;
+    const finalOk = ultimoOk || navOnline; // Último optimista: si navegador dice online = online
+    _pingCache = { ts: Date.now(), result: !!finalOk };
+    return !!finalOk;
   })();
-  return _pingEnCurso;
+  return _pingEnCurso.finally(() => { _pingEnCurso = null; });
 }
 const dispatchHidratado = (grupo: string, ok: boolean) => {
   try {

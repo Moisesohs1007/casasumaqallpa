@@ -1,18 +1,20 @@
-import React, { useState, useEffect } from 'react';
-import { IonContent, IonHeader, IonPage, IonTitle, IonToolbar, IonList, IonItem, IonLabel, IonBadge, IonFab, IonFabButton, IonIcon, useIonRouter, useIonViewWillEnter, IonButton, IonButtons } from '@ionic/react';
-import { addCircle, logIn, create } from 'ionicons/icons';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { IonContent, IonHeader, IonPage, IonTitle, IonToolbar, IonList, IonItem, IonLabel, IonBadge, IonFab, IonFabButton, IonIcon, useIonRouter, useIonViewWillEnter, IonButton, IonButtons, IonRefresher, IonRefresherContent } from '@ionic/react';
+import { addCircle, logIn, create, refresh } from 'ionicons/icons';
 import type { Color } from '@ionic/core';
 import {
   Reserva,
   EstadoReserva,
   OrigenReserva,
 } from '../../types';
-import { ReservaService } from '../../services';
+import { ReservaService, FolioService, HabitacionService, pendingSync } from '../../services';
 import { supabase } from '../../services/__supabase_db__';
 import CheckinModal from '../../components/modals/CheckinModal';
 import './Reservas.css';
 
 const USUARIO_ACTUAL = { id: 'USR-MOISES-0001', nombres: 'Moisés', apellidos: 'Ochoa' };
+const EVENTO_REFRESCAR = 'lodge:refrescarAhora' as const;
+const AUTO_REFRESH_MS = 8000;
 
 const estadoColor: Record<EstadoReserva, Color> = {
   PENDIENTE: 'warning',
@@ -45,13 +47,8 @@ const ReservasPage: React.FC = () => {
   const [reservas, setReservas] = useState<Reserva[]>([]);
   const [modalCheckinOpen, setModalCheckinOpen] = useState(false);
   const [reservaIdParaCheckin, setReservaIdParaCheckin] = useState<string | null>(null);
-
-  const abrirCheckin = (e: React.MouseEvent, id: string) => {
-    e.stopPropagation();
-    e.preventDefault();
-    setReservaIdParaCheckin(id);
-    setModalCheckinOpen(true);
-  };
+  const refreshingRef = useRef(false);
+  const tickRefresh = useRef(0);
 
   const cargarReservas = () => {
     try {
@@ -67,12 +64,52 @@ const ReservasPage: React.FC = () => {
     }
   };
 
-  useIonViewWillEnter(() => { cargarReservas(); });
+  const refrescarFuerza = useCallback(async (postFlush = false) => {
+    if (refreshingRef.current) return;
+    refreshingRef.current = true;
+    try {
+      try {
+        await Promise.all([
+          (ReservaService as any).hidratarDesdeSupabase?.(true),
+          (HabitacionService as any).hidratarDesdeSupabase?.(true),
+          (FolioService as any).hidratarDesdeSupabase?.(true),
+        ]);
+      } catch (_) {}
+      try { pendingSync.applyPendingLocal?.(); } catch (_) {}
+      cargarReservas();
+      tickRefresh.current++;
+    } finally {
+      refreshingRef.current = false;
+      if (postFlush) {
+        try { await pendingSync.processQueue?.(false); } catch (_) {}
+        cargarReservas();
+      }
+    }
+  }, []);
 
+  useIonViewWillEnter(() => { refrescarFuerza(); });
+
+  // Listener evento global 'lodge:refrescarAhora' (boton 🔄 / pre-accion / pull-refresh otros)
+  useEffect(() => {
+    const handler = (e: any) => {
+      const quien = (e as any)?.detail?.page;
+      if (!quien || quien === 'RESERVAS' || quien === 'TODAS') refrescarFuerza();
+    };
+    window.addEventListener(EVENTO_REFRESCAR, handler as any);
+    return () => window.removeEventListener(EVENTO_REFRESCAR, handler as any);
+  }, [refrescarFuerza]);
+
+  // Auto-refresh silencioso fondo cada 8s
+  useEffect(() => {
+    const id = window.setInterval(() => { refrescarFuerza(); }, AUTO_REFRESH_MS);
+    return () => window.clearInterval(id);
+  }, [refrescarFuerza]);
+
+  // Realtime Channels debounce 200ms (sin guard clause)
   useEffect(() => {
     let alive = true;
     let debounceId: any;
-    const TABLAS = ['reservas', 'huespedes', 'habitaciones'];
+    const TABLAS = ['reservas', 'huespedes', 'habitaciones', 'folios', 'cargos_folio', 'pagos_folio'];
 
     const recargarDebounced = () => {
       if (!alive) return;
@@ -80,38 +117,97 @@ const ReservasPage: React.FC = () => {
       debounceId = setTimeout(async () => {
         if (!alive) return;
         try { await Promise.all([ (ReservaService as any).hidratarDesdeSupabase?.(true) ]); } catch (_) {}
+        try { pendingSync.applyPendingLocal?.(); } catch (_) {}
         try { cargarReservas(); } catch (_) {}
-      }, 650);
+      }, 200);
     };
 
-    if (!supabase) return;
     const canales: any[] = [];
     try {
-      for (const t of TABLAS) {
-        const ch = (supabase as any).channel(`rt-res-${t}-${Math.random().toString(36).slice(2,7)}`)
-          .on('postgres_changes', { event: '*' as any, schema: 'public', table: t }, recargarDebounced)
-          .subscribe();
-        canales.push(ch);
+      const sb = (supabase as any)?.channel ? (supabase as any) : null;
+      if (sb) {
+        for (const t of TABLAS) {
+          try {
+            const ch = sb.channel(`rt-res-${t}-${Math.random().toString(36).slice(2,7)}`)
+              .on('postgres_changes', { event: '*' as any, schema: 'public', table: t }, recargarDebounced)
+              .subscribe();
+            canales.push(ch);
+          } catch (_) {}
+        }
       }
     } catch (_) {}
 
+    // Timeout seguridad: primer refresh 350ms después de montar
+    const seguro = window.setTimeout(() => { if (alive) refrescarFuerza(); }, 350);
     return () => {
       alive = false;
+      clearTimeout(seguro);
       clearTimeout(debounceId);
       try {
-        Promise.all(canales.map(c => (supabase as any)?.removeChannel?.(c))).catch(()=>{});
+        const sb = (supabase as any);
+        Promise.all(canales.map(c => sb?.removeChannel?.(c))).catch(()=>{});
       } catch (_) {}
     };
-  }, []);
+  }, [refrescarFuerza]);
+
+  // Pull-refresh handler (IonRefresher)
+  const onPullRefresh = async (event: any) => {
+    try {
+      await refrescarFuerza(true);
+    } finally {
+      try { event?.detail?.complete?.(); } catch (_) {}
+    }
+  };
+
+  // Pre-refresh ANTES de abrir Checkin modal (hidrata esa reserva + hab específica)
+  const abrirCheckin = async (e: React.MouseEvent, id: string) => {
+    e.stopPropagation();
+    e.preventDefault();
+    try {
+      // 1) Refresco general
+      await refrescarFuerza();
+      // 2) Re-hidrato específico ReservaService por id (force=true) - mejor 2 capas
+      try {
+        await Promise.all([
+          (ReservaService as any).hidratarDesdeSupabase?.(true),
+          (HabitacionService as any).hidratarDesdeSupabase?.(true),
+          (FolioService as any).hidratarDesdeSupabase?.(true),
+        ]);
+        await pendingSync.applyPendingLocal?.();
+      } catch (_) {}
+    } finally {
+      setReservaIdParaCheckin(id);
+      setModalCheckinOpen(true);
+    }
+  };
 
   return (
     <IonPage>
       <IonHeader>
         <IonToolbar color="primary">
           <IonTitle>Reservas</IonTitle>
+          <IonButtons slot="end">
+            <IonButton
+              size="small"
+              color="light"
+              onClick={() => {
+                try { window.dispatchEvent(new CustomEvent(EVENTO_REFRESCAR, { detail: { page:'RESERVAS' }})); } catch(_){}
+              }}
+            >
+              <IonIcon icon={refresh} slot="icon-only" />
+            </IonButton>
+          </IonButtons>
         </IonToolbar>
       </IonHeader>
       <IonContent fullscreen>
+        <IonRefresher slot="fixed" onIonRefresh={onPullRefresh}>
+          <IonRefresherContent
+            pullingIcon={refresh as any}
+            pullingText="Desliza para actualizar reservas"
+            refreshingSpinner="crescent"
+            refreshingText="Actualizando..."
+          />
+        </IonRefresher>
         <IonHeader collapse="condense">
           <IonToolbar>
             <IonTitle size="large">Reservas</IonTitle>

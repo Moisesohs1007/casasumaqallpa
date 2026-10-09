@@ -571,6 +571,29 @@ const NuevaReserva: React.FC = () => {
     if (!huespedFinal) { setErrorMsg('Paso 1: Selecciona o crea un huésped.'); return; }
     if (!habitacionSeleccionada || noches < 1) { setErrorMsg('Paso 2: Selecciona fechas válidas y una habitación.'); return; }
     if (!resumenTarifa) { setErrorMsg('Paso 3: Calcula tarifa antes de confirmar.'); return; }
+
+    // ===== RC3 (b) SEGUNDA VALIDACIÓN OVERLAP INMEDIATAMENTE ANTES DE GUARDAR =====
+    try {
+      const checkinISO = `${checkin}T15:00:00.000Z`;
+      const checkoutISO = `${checkout}T11:00:00.000Z`;
+      const conflictosLive = ReservaService.listarPorHabitacionYFechas({
+        habitacionId: habitacionSeleccionada.id,
+        checkinISO,
+        checkoutISO,
+      });
+      if (conflictosLive && conflictosLive.length > 0) {
+        const cods = conflictosLive.map((c: any) => `· ${String(c.codigoReserva||'R-????')} [${String(c.estado||'PEND')}]`).join('\n');
+        const bloqueoMsg = `⛔ CONFLICTO INMEDIATO — Suite OCUPADA por otra terminal\n\nLa Suite ${habitacionSeleccionada.codigo || habitacionSeleccionada.nombre} YA FUE RESERVADA hace segundos por otra persona/dispositivo. NO SE PUEDE guardar esta reserva.\n\nReservas en conflicto en esas fechas:\n${cods}\n\nSolución: Elige otra habitación o cambia las fechas.`;
+        try { window.confirm(bloqueoMsg); } catch(_){}
+        setErrorMsg(bloqueoMsg.replace(/\n/g, ' · ').slice(0, 220));
+        setToastColor('danger');
+        setToastMsg(`⛔ Habitación ocupada: reserva duplicada bloqueada.`);
+        setToastVisible(true);
+        setTimeout(() => setToastVisible(false), 4500);
+        return;
+      }
+    } catch (_) {}
+
     setSyncStatus('SAVING_CLOUD');
     setSyncErrorMsg(null);
     setCreandoReserva(true);

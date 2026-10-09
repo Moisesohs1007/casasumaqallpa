@@ -1,20 +1,23 @@
-import React, { useMemo, useState, useEffect } from 'react';
+import React, { useMemo, useState, useEffect, useRef, useCallback } from 'react';
 import {
   IonContent, IonHeader, IonPage, IonTitle, IonToolbar,
   IonGrid, IonRow, IonCol, IonCard, IonCardHeader, IonCardTitle, IonCardSubtitle, IonCardContent,
   IonBadge, IonLabel, IonChip, IonIcon, IonSkeletonText, IonSegment, IonSegmentButton,
-  IonButton, IonInput, IonTextarea, IonSelect, IonSelectOption, IonList, IonItem, IonNote, IonText,
+  IonButton, IonInput, IonTextarea, IonSelect, IonSelectOption, IonList, IonItem, IonNote, IonText, IonButtons,
   useIonViewWillEnter,
 } from '@ionic/react';
 import type { Color } from '@ionic/core';
-import { add, remove, cart, cash, pricetag, checkmarkCircle, receiptOutline, close, person } from 'ionicons/icons';
+import { add, remove, cart, cash, pricetag, checkmarkCircle, receiptOutline, close, person, refresh } from 'ionicons/icons';
 import TomarComanda from '../../components/modals/TomarComanda';
 import PagoForm, { PagoFormValue } from '../../components/PagoForm';
 import { METODOS_PAGO_LISTA } from '../../types/etapa2';
 import { Mesa, Comanda, ProductoFB } from '../../types';
-import { MesaService, ComandaService, CatalogoFBService, InventarioService, seedProductos, PosService } from '../../services';
+import { MesaService, ComandaService, CatalogoFBService, InventarioService, seedProductos, PosService, pendingSync } from '../../services';
 import { supabase } from '../../services/__supabase_db__';
 import './Pos.css';
+
+const EVENTO_REFRESCAR = 'lodge:refrescarAhora' as const;
+const AUTO_REFRESH_MS = 10000;
 
 type EstadoMesaLabel = 'libre' | 'ocupada' | 'sucia';
 type EstadoComandaLabel = 'abierta' | 'cocina' | 'lista' | 'cerrada';
@@ -107,6 +110,7 @@ const PosPage: React.FC = () => {
   const [preTipoConsumo, setPreTipoConsumo] = useState<'MESA' | 'CARGO_A_HABITACION' | undefined>(undefined);
   const [comandaAEditarId, setComandaAEditarId] = useState<string | undefined>(undefined);
   const [refreshTick, setRefreshTick] = useState<number>(0);
+  const refreshingRef = useRef(false);
 
   // ============== WALK-IN ==============
   const [categoriaCartaSel, setCategoriaCartaSel] = useState<string>('Todos');
@@ -122,6 +126,110 @@ const PosPage: React.FC = () => {
   const [toast, setToast] = useState('');
   const mostrarToast = (t: string) => { setToast(t); setTimeout(() => setToast(''), 2200); };
 
+  const refrescarFuerza = useCallback(async (postFlush = false) => {
+    if (refreshingRef.current) return;
+    refreshingRef.current = true;
+    try {
+      setLoading(true);
+      try {
+        await Promise.all([
+          PosService.hidratarDesdeSupabase?.(true),
+        ]);
+      } catch (_) {}
+      try { pendingSync.applyPendingLocal?.(); } catch (_) {}
+      try { await cargar(); } catch (_) {}
+      setRefreshTick(t => t + 1);
+    } finally {
+      setLoading(false);
+      refreshingRef.current = false;
+      if (postFlush) {
+        try { await pendingSync.processQueue?.(false); } catch (_) {}
+        try { await cargar(); } catch (_) {}
+        setRefreshTick(t => t + 1);
+      }
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useIonViewWillEnter(() => {
+    const catalogoVACIO_TOTAL = (() => {
+      try {
+        const cats = CatalogoFBService.listarCategorias?.() || [];
+        const prods = CatalogoFBService.listarProductos?.({ soloActivos: false }) || [];
+        return cats.length === 0 && prods.length === 0;
+      } catch { return false; }
+    })();
+    if (catalogoVACIO_TOTAL) {
+      try {
+        const semilla = seedProductos as any;
+        semilla?.ensureSeedInicialCompleto?.(true);
+        setTimeout(() => mostrarToast('🔄 Instalando catálogo oficial por primera vez...'), 200);
+      } catch (_) {}
+    }
+    refrescarFuerza();
+  });
+
+  // Listener evento global refresh
+  useEffect(() => {
+    const handler = (e: any) => {
+      const quien = (e as any)?.detail?.page;
+      if (!quien || quien === 'POS' || quien === 'TODAS') refrescarFuerza();
+    };
+    window.addEventListener(EVENTO_REFRESCAR, handler as any);
+    return () => window.removeEventListener(EVENTO_REFRESCAR, handler as any);
+  }, [refrescarFuerza]);
+
+  // Auto-refresh silencioso 10s
+  useEffect(() => {
+    const id = window.setInterval(() => { refrescarFuerza(); }, AUTO_REFRESH_MS);
+    return () => window.clearInterval(id);
+  }, [refrescarFuerza]);
+
+  // Realtime channels debounce 200ms (sin guard clause)
+  useEffect(() => {
+    let alive = true;
+    let debounceId: any;
+    const TABLAS = ['comandas', 'comandas_detalles', 'mesas', 'categorias_fb', 'productos_fb', 'presentaciones_fb', 'puntos_venta', 'habitaciones'];
+
+    const recargarDebounced = () => {
+      if (!alive) return;
+      clearTimeout(debounceId);
+      debounceId = setTimeout(async () => {
+        if (!alive) return;
+        try {
+          await Promise.all([ PosService.hidratarDesdeSupabase?.(true) ]);
+        } catch (_) {}
+        try { pendingSync.applyPendingLocal?.(); } catch (_) {}
+        try { cargar(); } catch (_) {}
+        try { setRefreshTick(t => t + 1); } catch (_) {}
+      }, 200);
+    };
+
+    const canales: any[] = [];
+    try {
+      const sb = (supabase as any)?.channel ? (supabase as any) : null;
+      if (sb) {
+        for (const t of TABLAS) {
+          try {
+            const ch = sb.channel(`rt-pos-${t}-${Math.random().toString(36).slice(2,7)}`)
+              .on('postgres_changes', { event: '*' as any, schema: 'public', table: t }, recargarDebounced)
+              .subscribe();
+            canales.push(ch);
+          } catch (_) {}
+        }
+      }
+    } catch (_) {}
+    const seguro = window.setTimeout(() => { if (alive) refrescarFuerza(); }, 450);
+    return () => {
+      alive = false;
+      clearTimeout(seguro);
+      clearTimeout(debounceId);
+      try {
+        const sb = (supabase as any);
+        Promise.all(canales.map(c => sb?.removeChannel?.(c))).catch(()=>{});
+      } catch (_) {}
+    };
+  }, [refrescarFuerza]);
   // ===== DATOS DESDE CATÁLOGO OFICIAL (seed o Supabase) =====
   const categoriasObjList = useMemo(() => {
     try {
@@ -300,24 +408,6 @@ const PosPage: React.FC = () => {
       setVistaMesas(rows);
     } catch { setVistaMesas([]); } finally { setLoading(false); }
   };
-  useIonViewWillEnter(() => {
-    setRefreshTick(t => t + 1);
-    setTimeout(() => {
-      try {
-        const prods = CatalogoFBService?.listarProductos?.({ soloActivos: false }) || [];
-        const cats = CatalogoFBService?.listarCategorias?.() || [];
-        const catalogoVACIO_TOTAL = cats.length === 0 && prods.length === 0;
-        if (catalogoVACIO_TOTAL) {
-          if (seedProductos?.ensureSeedInicialCompleto) {
-            seedProductos.ensureSeedInicialCompleto(true);
-            setRefreshTick(t => t + 2);
-            mostrarToast('🔄 Instalando catálogo oficial por primera vez...');
-          }
-        }
-      } catch {}
-    }, 300);
-    cargar();
-  });
 
   useEffect(() => {
     let alive = true;
@@ -498,6 +588,17 @@ const PosPage: React.FC = () => {
       <IonHeader>
         <IonToolbar color="primary">
           <IonTitle>POS · Comida y Bebida</IonTitle>
+          <IonButtons slot="end">
+            <IonButton
+              size="small"
+              color="light"
+              onClick={() => {
+                try { window.dispatchEvent(new CustomEvent(EVENTO_REFRESCAR, { detail: { page:'POS' }})); } catch(_){}
+              }}
+            >
+              <IonIcon icon={refresh} slot="icon-only" />
+            </IonButton>
+          </IonButtons>
         </IonToolbar>
         <IonToolbar>
           <IonSegment value={tab} onIonChange={e => setTab(e.detail.value as any)}>
