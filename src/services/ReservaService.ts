@@ -62,12 +62,14 @@ export const ReservaService = {
           netas = reservasRemotas.length - removidos;
           _hidratacionDone = true;
           log(`✅ reservas sync Supabase OK: +${ins} nuevas / ~${upd} actualizadas / 0 perdidas locales`);
+          try { const ap = pendingSync.applyPendingLocal?.(); if (ap) log(`↩️  applyPendingLocal aplicó ${ap} cambios reservas/huespedes/habs/folios luego hidratación.`); } catch (_) {}
           return true;
         } else {
           log('ℹ️  0 reservas en Supabase Cloud. InMemoryDB se MANTIENE con datos locales/pendientes.');
           const removidos = db.deduplicateBy<Reserva>(KEY, (r: any) => String(r.codigoReserva || r.id || '').trim(), 'FIRST');
           if (removidos > 0) log(`🧹 Limpieza: removidos ${removidos} duplicados residuales de reservas en RAM local.`);
           _hidratacionDone = true;
+          try { pendingSync.applyPendingLocal?.(); } catch (_) {}
           return true;
         }
       } catch (e) {

@@ -69,6 +69,9 @@ export const HabitacionService = {
         _hidratacionDone = ok;
         if (ok) log('✅ Hidratación OK. Ahora InMemoryDB sincronizado con Supabase Cloud.');
         else    log('⚠️  Ninguna tabla remota con datos. Se mantiene seed local InMemoryDB.');
+        // ===== CRÍTICO OFFLINE-FIRST: Después de upsertAll, RE-APLICAR pendingSync sobre local.
+        // De lo contrario, un remoto viejo pisa cambios locales que están en la cola pendiente.
+        try { const ap = pendingSync.applyPendingLocal?.(); if (ap) log(`↩️  applyPendingLocal aplicó ${ap} cambios sobre InMemoryDB después de hidratación.`); } catch (_) {}
         return ok;
       } catch (e) {
         console.error('[HabitacionService] Error hidratando desde Supabase:', (e as any)?.message || e);

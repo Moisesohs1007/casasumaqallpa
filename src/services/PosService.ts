@@ -47,6 +47,8 @@ async function _hidratarDesdeSupabasePos(force = false): Promise<boolean> {
           try { db.upsertAll<any>(k, rows, { matchKey: 'id' }); } catch (e) { console.warn('[PosService.hidratar] upsertAll fail key=', k, e); }
         }
       });
+      // RE-APLICAR pendientes luego de hidratar todo (nunca perder comandas/catalogo/prices locales agregadas offline)
+      try { pendingSync.applyPendingLocal?.(); } catch (_) {}
       _hidratadoPos = true;
       return true;
     } catch (e) {

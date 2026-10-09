@@ -104,14 +104,28 @@ export async function processQueue(force = false): Promise<[number, number, numb
       switch (op.method) {
         case 'add':
           r = await dbRemota.addAsync<any>(op.key, op.payload);
+          // Escribir InMemoryDB inmediato (no esperar Realtime roundtrip)
+          try {
+            if (op.payload && op.payload.id) {
+              const existente = dbLocal.getById<any>(op.key, op.payload.id);
+              if (!existente) dbLocal.add(op.key, { ...op.payload });
+              else dbLocal.update(op.key, op.payload.id, { ...op.payload });
+            }
+          } catch (_) {}
           break;
         case 'update':
           if (!op.matchId) throw new Error('update requiere matchId');
           r = await dbRemota.updateAsync<any>(op.key, op.matchId, op.payload || {});
+          // Escribir InMemoryDB inmediato (no esperar Realtime roundtrip)
+          try {
+            const existente = dbLocal.getById<any>(op.key, op.matchId);
+            if (existente) dbLocal.update(op.key, op.matchId, { ...(op.payload || {}) });
+          } catch (_) {}
           break;
         case 'remove':
           if (!op.matchId) throw new Error('remove requiere matchId');
           r = await dbRemota.removeAsync<any>(op.key, op.matchId);
+          try { dbLocal.remove(op.key, op.matchId); } catch (_) {}
           break;
       }
       toRemove.push(op.id);
@@ -145,9 +159,68 @@ export async function processQueue(force = false): Promise<[number, number, numb
   return [ok, fail, skip];
 }
 
+/** =============== CRÍTICO OFFLINE-FIRST: Replay local de la cola pendientes ===============
+ * Aplica TODOS los payloads de pendingSync DIRECTAMENTE sobre InMemoryDB (sin tocar Supabase).
+ * Motivo: después de una hidratación upsertAll, los datos locales "ganadores" (check-in OCUPADA, consumo, etc.)
+ *         pueden haber sido sobrescritos por un remoto viejo; este método vuelve a imponerlos desde la cola,
+ *         ya que la cola representa lo que el USUARIO REALMENTE HIZO (fuente verdad sus acciones).
+ * Invocar:
+ *   - 1 vez al boot después de InMemoryDB constructor+seed
+ *   - después de cada hidratarDesdeSupabase(force=true)
+ */
+export function applyPendingLocal(): number {
+  try {
+    const arr = _readLs();
+    if (!arr || arr.length === 0) return 0;
+    const sorted = [...arr].sort((a, b) => a.at - b.at);
+    let applied = 0;
+    for (const op of sorted) {
+      try {
+        if (op.method === 'update' && op.matchId && op.payload) {
+          const existente = dbLocal.getById<any>(op.key, op.matchId);
+          if (existente) {
+            dbLocal.update<any>(op.key, op.matchId, { ...(op.payload || {}) } as any);
+            applied++;
+          }
+        } else if (op.method === 'add' && op.payload && (op.payload.id || op.matchId)) {
+          const id = (op.payload.id || op.matchId) as string;
+          if (id) {
+            const existente = dbLocal.getById<any>(op.key, id);
+            if (!existente) {
+              dbLocal.add<any>(op.key, { ...op.payload });
+              applied++;
+            } else {
+              dbLocal.update<any>(op.key, id, { ...op.payload });
+              applied++;
+            }
+          }
+        } else if (op.method === 'remove' && op.matchId) {
+          const existente = dbLocal.getById<any>(op.key, op.matchId);
+          if (existente) {
+            dbLocal.remove(op.key, op.matchId);
+            applied++;
+          }
+        }
+      } catch (_) {}
+    }
+    // Notificar al UI que el estado local cambió para que re-renderice badges
+    try {
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent?.(new CustomEvent('lodge:pending:applied', { detail: { applied } }));
+      }
+    } catch (_) {}
+    return applied;
+  } catch (_) { return 0; }
+}
+
 /** Iniciar reintentos periódicos + listener online. Idempotente (solo 1 vez). */
 export function initSyncWorker(): void {
   if (typeof window === 'undefined') return;
+  // Aplicar replay local INMEDIATO después de boot (antes de cualquier hidratación async o flush remoto)
+  try { window.setTimeout(() => applyPendingLocal(), 0); } catch (_) {}
+  try { window.setTimeout(() => applyPendingLocal(), 800); } catch (_) {}
+  try { window.setTimeout(() => applyPendingLocal(), 2200); } catch (_) {}
+
   if (!_intervalStarted) {
     window.setInterval(() => { void processQueue(false); }, INTERVAL_MS);
     _intervalStarted = true;
@@ -155,8 +228,10 @@ export function initSyncWorker(): void {
   if (!_onlineListenerAttached) {
     try {
       window.addEventListener('online', () => {
-        console.info('[PendingSync] 🌐 on-line detectado → flush queue');
-        // Damos 2s de buffer para que la conexión se estabilice
+        console.info('[PendingSync] 🌐 on-line detectado → flush queue + replay local');
+        // Primero imponemos lo offline sobre local (por si upsertAll de hidratación lo borró)
+        applyPendingLocal();
+        // Luego intentamos subir
         window.setTimeout(() => { void processQueue(true); }, 2000);
       });
     } catch (_) {}

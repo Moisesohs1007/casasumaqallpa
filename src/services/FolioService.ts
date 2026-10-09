@@ -45,6 +45,8 @@ async function _hidratarDesdeSupabaseFolio(force = false): Promise<boolean> {
           try { db.upsertAll<any>(k, rows, { matchKey: 'id' }); } catch (e) { console.warn('[FolioService.hidratar] upsertAll fail key=', k, e); }
         }
       });
+      // RE-APLICAR pendientes luego de hidratar todo (no permitir que remoto viejo pise consumos/cargos locales)
+      try { pendingSync.applyPendingLocal?.(); } catch (_) {}
       _hidratadoFolio = true;
       return true;
     } catch (e) {

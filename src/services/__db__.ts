@@ -245,14 +245,34 @@ class InMemoryDB {
         inserted++;
         continue;
       }
-      const tsRem = (remote.updatedAt || remote.updated_at || remote.updatedAtTimestamp || '') as string;
-      const tsLoc = (local.updatedAt || (local as any).updated_at || '') as string;
-      const remEsMasActual = tsRem && tsLoc ? tsRem > tsLoc : (preferRemote ? true : !!tsLoc);
-      if (remEsMasActual || preferRemote) {
+      const tsRemRaw = (remote.updatedAt || (remote as any).updated_at || (remote as any).updatedAtTimestamp || '') as string;
+      const tsLocRaw = (local.updatedAt || (local as any).updated_at || '') as string;
+      const tsRem = tsRemRaw ? new Date(tsRemRaw).getTime() : NaN;
+      const tsLoc = tsLocRaw ? new Date(tsLocRaw).getTime() : NaN;
+
+      let remEsMasActual = false;
+      if (!Number.isNaN(tsRem) && !Number.isNaN(tsLoc)) {
+        // ======== CORRECCIÓN OFLINE-FIRST CRÍTICA =========
+        // Solo actualizamos local con remoto SI el remoto ES ESTRICTO MAYOR.
+        // Nunca por igual (empate). Nunca por "preferRemote default".
+        // Así check-in OFFLINE Suite=OCUPADA (ts más nuevo) NO se pisa por Supabase RESERVADA.
+        remEsMasActual = tsRem > tsLoc;
+        if (tsRem === tsLoc && preferRemote) remEsMasActual = true; // solo empate exacto usa preferRemote
+      } else if (!Number.isNaN(tsLoc) && Number.isNaN(tsRem)) {
+        // Local tiene TS, remoto NO → local gana (check-in offline escribió TS)
+        remEsMasActual = false;
+      } else if (Number.isNaN(tsLoc) && !Number.isNaN(tsRem)) {
+        // Remoto tiene TS, local NO → remoto gana
+        remEsMasActual = true;
+      } else {
+        // Ambos sin TS → usa preferRemote (empate)
+        remEsMasActual = !!preferRemote;
+      }
+      if (remEsMasActual) {
         const idx = arr.findIndex((x: any) => String(x[matchKey]) === String(k));
         if (idx >= 0) {
           const merged: any = { ...(arr[idx] as any), ...(remote as any) };
-          if (!merged.updatedAt) merged.updatedAt = tsRem || tsLoc || seedUtil.nowISO();
+          if (!merged.updatedAt) merged.updatedAt = tsRemRaw || tsLocRaw || seedUtil.nowISO();
           if (!merged.id) merged.id = (local as any).id || (remote as any).id;
           arr[idx] = merged;
           updated++;

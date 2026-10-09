@@ -49,6 +49,8 @@ async function hidratarTarifasGroup(force = false): Promise<boolean> {
       if (pols && pols.length) db.upsertAll<PoliticaCancelacion>(KEY_POL, pols);
       if (proms && proms.length) db.upsertAll<CodigoPromocional>(KEY_PROM, proms);
       if (tars && tars.length) db.upsertAll<Tarifa>(KEY_TAR, tars);
+      // RE-APLICAR pendientes luego de hidratar todo (promociones/usos tarifas offline nunca se pierdan)
+      try { pendingSync.applyPendingLocal?.(); } catch (_) {}
       _hidratado = true;
       return true;
     } catch (e) {

@@ -276,6 +276,13 @@ const App: React.FC = () => {
 
   useEffect(() => {
     checkNetworkAndQueue(true);
+    // ======= applyPendingLocal GARANTIZADO al boot y cada hidratación (Capa de protección CRÍTICA)
+    try { pendingSync.applyPendingLocal?.(); } catch (_) {}
+    try { window.setTimeout(() => { try { pendingSync.applyPendingLocal?.(); } catch (_){} }, 500); } catch (_) {}
+    try { window.setTimeout(() => { try { pendingSync.applyPendingLocal?.(); } catch (_){} }, 1500); } catch (_) {}
+    try { window.setTimeout(() => { try { pendingSync.applyPendingLocal?.(); } catch (_){} }, 3000); } catch (_) {}
+    try { window.setTimeout(() => { try { pendingSync.applyPendingLocal?.(); } catch (_){} }, 6000); } catch (_) {}
+    try { window.setTimeout(() => { try { pendingSync.applyPendingLocal?.(); } catch (_){} }, 12000); } catch (_) {}
     const t0 = window.setTimeout(() => {
       if (!bootDoneRef.current) {
         const navOnline = typeof navigator !== 'undefined' ? !!navigator.onLine : true;
@@ -284,6 +291,7 @@ const App: React.FC = () => {
     }, 1800);
     const t1 = window.setInterval(() => checkNetworkAndQueue(false), 6000);
     const t2 = window.setInterval(() => setRetryTick((t) => t + 1), 20000);
+    const t3 = window.setInterval(() => { try { pendingSync.applyPendingLocal?.(); } catch (_){} }, 15000); // replay cada 15s por si Realtime pisa
     const on = () => { _pingCache = null; checkNetworkAndQueue(true); };
     window.addEventListener?.('online', on);
     window.addEventListener?.('offline', on);
@@ -297,13 +305,16 @@ const App: React.FC = () => {
           else if (!dbRemota?.client || !(dbRemota.client as any)?.from) avisarGuardadoOffline();
         }, 60);
       };
+      const onAppHidratado = () => { setTimeout(() => { try { pendingSync.applyPendingLocal?.(); } catch (_){} }, 200); };
       window.addEventListener?.('lodge:db:mutated', onDBMutated);
       window.addEventListener?.('lodge:pending:enqueued', onEnqueued);
+      window.addEventListener?.(EVENTO_HIDRATACION, onAppHidratado);
     } catch (_) {}
     return () => {
       window.clearTimeout(t0);
       window.clearInterval(t1);
       window.clearInterval(t2);
+      window.clearInterval(t3);
       window.removeEventListener?.('online', on);
       window.removeEventListener?.('offline', on);
     };
