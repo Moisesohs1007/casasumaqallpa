@@ -133,7 +133,9 @@ const PerfilPage: React.FC = () => {
   const [busqProd, setBusqProd] = useState('');
   const [filtroCatId, setFiltroCatId] = useState<string>('');
   const [tabStock, setTabStock] = useState<'CATEGORIAS' | 'PRODUCTOS'>('PRODUCTOS');
-  const [presentarCatAlert, cerrarCatAlertPlaceholder_deprecated] = useIonAlert();
+  const [presentarCatAlert, _d1] = useIonAlert();
+  const [presentarCrudCatAlert, _d2] = useIonAlert();
+  const [presentarConfirmBorrarCatAlert, _d3] = useIonAlert();
 
   const [modalCatAbierto, setModalCatAbierto] = useState(false);
   const [editandoCatId, setEditandoCatId] = useState<string | null>(null);
@@ -353,8 +355,10 @@ const PerfilPage: React.FC = () => {
     try {
       const prodsUso = productosFB.filter((p) => p.categoriaId === confirmBorrarCat.id);
       if (prodsUso.length > 0) {
-        mostrarToast(`No se puede eliminar: ${prodsUso.length} producto(s) usan esta categoría.`);
+        mostrarToast(`⛔ ${prodsUso.length} productos usan "${confirmBorrarCat.nombre}". Redirigiendo...`);
         setConfirmBorrarCat(null);
+        setFiltroCatId(confirmBorrarCat.id);
+        setTabStock('PRODUCTOS');
         return;
       }
       CatalogoFBService.eliminarCategoria(confirmBorrarCat.id);
@@ -1361,103 +1365,201 @@ const PerfilPage: React.FC = () => {
                     </IonItem>
                   </IonCol>
                   <IonCol size="12" sizeMd="4" className="ion-align-self-end">
-                    <IonButton
-                      expand="block"
-                      size="default"
-                      color="tertiary"
-                      style={{ marginBottom: 2, fontSize: 13, fontWeight: 800 }}
-                      onClick={() => {
-                        try {
-                          const maxOrden = categoriasFB.reduce((m, c) => Math.max(m, Number(c.orden || 0)), 0);
-                          presentarCatAlert({
-                            header: '➕ Nueva categoría',
-                            subHeader: 'Se agregará sobre la marcha al selector',
-                            cssClass: 'alert-compact',
-                            inputs: [
-                              { name: 'nombre', type: 'text', placeholder: 'Nombre categoría * (ej: Ensaladas)', value: '' },
-                              { name: 'orden', type: 'number', placeholder: `Orden (default ${maxOrden + 10})`, value: String(maxOrden + 10) },
-                            ],
-                            buttons: [
-                              { text: 'Cancelar', role: 'cancel', cssClass: 'secondary' },
-                              {
-                                text: '✅ Tipo COCINA (sin stock)',
-                                handler: (d: any) => {
-                                  const nombre = String(d?.nombre || '').trim();
-                                  if (!nombre) { mostrarToast('Nombre categoría es obligatorio'); return false; }
-                                  const orden = Number(d?.orden || (maxOrden + 10));
-                                  try {
-                                    const catCreada = CatalogoFBService.crearCategoria({
-                                      nombre, descripcion: nombre, orden, estado: 'ACTIVO',
-                                      codigo: 'CAT-' + nombre.substring(0, 6).toUpperCase(),
-                                      color: '#374151', payload: { defaultStockControl: false, sistema: false },
-                                    }, usuario.id);
-                                    try { setCategoriasFB(CatalogoFBService.listarCategorias() || []); } catch {}
-                                    if (catCreada?.id) {
-                                      const catPrevia2 = categoriasFB.find(c => c.id === formProd.categoriaId);
-                                      const prefijoPrevio = catPrevia2 ? String((catPrevia2.payload?.codigo) || catPrevia2.codigo || '').replace(/^CAT-/, '').slice(0, 6).toUpperCase() : '';
-                                      const codigoActual2 = String(formProd.codigo || '').toUpperCase();
-                                      const debeRegenerar2 = !formProd.codigo.trim() || (prefijoPrevio && codigoActual2.startsWith(`${prefijoPrevio}-`));
-                                      setFormProd({
-                                        ...formProd,
-                                        categoriaId: catCreada.id,
-                                        codigo: (debeRegenerar2 ? generarCodigoProdAuto(catCreada.id) : formProd.codigo)
-                                      });
+                    <IonGrid style={{ padding: 0 }}>
+                      <IonRow>
+                        <IonCol size="4" style={{ padding: 2 }}>
+                          <IonButton
+                            expand="block"
+                            size="small"
+                            color="tertiary"
+                            style={{ fontSize: 11, fontWeight: 800, margin: 0 }}
+                            onClick={() => {
+                              try {
+                                const maxOrden = categoriasFB.reduce((m, c) => Math.max(m, Number(c.orden || 0)), 0);
+                                presentarCatAlert({
+                                  header: '➕ Nueva categoría',
+                                  subHeader: 'Se agregará sobre la marcha al selector',
+                                  cssClass: 'alert-compact',
+                                  inputs: [
+                                    { name: 'nombre', type: 'text', placeholder: 'Nombre categoría * (ej: Ensaladas)', value: '' },
+                                    { name: 'orden', type: 'number', placeholder: `Orden (default ${maxOrden + 10})`, value: String(maxOrden + 10) },
+                                  ],
+                                  buttons: [
+                                    { text: 'Cancelar', role: 'cancel', cssClass: 'secondary' },
+                                    {
+                                      text: '✅ Sin stock',
+                                      handler: (d: any) => {
+                                        const nombre = String(d?.nombre || '').trim();
+                                        if (!nombre) { mostrarToast('Nombre categoría es obligatorio'); return false; }
+                                        const orden = Number(d?.orden || (maxOrden + 10));
+                                        try {
+                                          const catCreada = CatalogoFBService.crearCategoria({
+                                            nombre, descripcion: nombre, orden, estado: 'ACTIVO',
+                                            codigo: 'CAT-' + nombre.substring(0, 6).toUpperCase(),
+                                            color: '#374151', payload: { defaultStockControl: false, sistema: false },
+                                          }, usuario.id);
+                                          try { setCategoriasFB(CatalogoFBService.listarCategorias() || []); cargarCatProd(); } catch {}
+                                          if (catCreada?.id) {
+                                            const catPrevia2 = categoriasFB.find(c => c.id === formProd.categoriaId);
+                                            const prefijoPrevio = catPrevia2 ? String((catPrevia2.payload?.codigo) || catPrevia2.codigo || '').replace(/^CAT-/, '').slice(0, 6).toUpperCase() : '';
+                                            const codigoActual2 = String(formProd.codigo || '').toUpperCase();
+                                            const debeRegenerar2 = !formProd.codigo.trim() || (prefijoPrevio && codigoActual2.startsWith(`${prefijoPrevio}-`));
+                                            setFormProd({
+                                              ...formProd,
+                                              categoriaId: catCreada.id,
+                                              codigo: (debeRegenerar2 ? generarCodigoProdAuto(catCreada.id) : formProd.codigo)
+                                            });
+                                          }
+                                          mostrarToast(`✅ Categoría "${nombre}" creada y seleccionada`);
+                                          return true;
+                                        } catch (e2: any) { mostrarToast(e2?.message || 'Error al crear categoría'); return false; }
+                                      }
+                                    },
+                                    {
+                                      text: '📦 Con stock',
+                                      handler: (d: any) => {
+                                        const nombre = String(d?.nombre || '').trim();
+                                        if (!nombre) { mostrarToast('Nombre categoría es obligatorio'); return false; }
+                                        const orden = Number(d?.orden || (maxOrden + 10));
+                                        try {
+                                          const catCreada = CatalogoFBService.crearCategoria({
+                                            nombre, descripcion: nombre, orden, estado: 'ACTIVO',
+                                            codigo: 'CAT-' + nombre.substring(0, 6).toUpperCase(),
+                                            color: '#065f46', payload: { defaultStockControl: true, sistema: false },
+                                          }, usuario.id);
+                                          try { setCategoriasFB(CatalogoFBService.listarCategorias() || []); cargarCatProd(); } catch {}
+                                          if (catCreada?.id) {
+                                            const catPrevia2 = categoriasFB.find(c => c.id === formProd.categoriaId);
+                                            const prefijoPrevio = catPrevia2 ? String((catPrevia2.payload?.codigo) || catPrevia2.codigo || '').replace(/^CAT-/, '').slice(0, 6).toUpperCase() : '';
+                                            const codigoActual2 = String(formProd.codigo || '').toUpperCase();
+                                            const debeRegenerar2 = !formProd.codigo.trim() || (prefijoPrevio && codigoActual2.startsWith(`${prefijoPrevio}-`));
+                                            setFormProd({
+                                              ...formProd,
+                                              categoriaId: catCreada.id,
+                                              codigo: (debeRegenerar2 ? generarCodigoProdAuto(catCreada.id) : formProd.codigo),
+                                              stockControl: true, stockActual: 0, stockMinimo: Math.max(3, Number(formProd.stockMinimo || 0) || 3),
+                                            });
+                                          }
+                                          mostrarToast(`✅ Categoría "${nombre}" creada y seleccionada (con stock)`);
+                                          return true;
+                                        } catch (e2: any) { mostrarToast(e2?.message || 'Error al crear categoría'); return false; }
+                                      }
                                     }
-                                    mostrarToast(`✅ Categoría "${nombre}" creada y seleccionada`);
-                                    return true;
-                                  } catch (e2: any) { mostrarToast(e2?.message || 'Error al crear categoría'); return false; }
-                                }
-                              },
-                              {
-                                text: '📦 Tipo FÍSICO (con stock)',
-                                handler: (d: any) => {
-                                  const nombre = String(d?.nombre || '').trim();
-                                  if (!nombre) { mostrarToast('Nombre categoría es obligatorio'); return false; }
-                                  const orden = Number(d?.orden || (maxOrden + 10));
-                                  try {
-                                    const catCreada = CatalogoFBService.crearCategoria({
-                                      nombre, descripcion: nombre, orden, estado: 'ACTIVO',
-                                      codigo: 'CAT-' + nombre.substring(0, 6).toUpperCase(),
-                                      color: '#065f46', payload: { defaultStockControl: true, sistema: false },
-                                    }, usuario.id);
-                                    try { setCategoriasFB(CatalogoFBService.listarCategorias() || []); } catch {}
-                                    if (catCreada?.id) {
-                                      const catPrevia2 = categoriasFB.find(c => c.id === formProd.categoriaId);
-                                      const prefijoPrevio = catPrevia2 ? String((catPrevia2.payload?.codigo) || catPrevia2.codigo || '').replace(/^CAT-/, '').slice(0, 6).toUpperCase() : '';
-                                      const codigoActual2 = String(formProd.codigo || '').toUpperCase();
-                                      const debeRegenerar2 = !formProd.codigo.trim() || (prefijoPrevio && codigoActual2.startsWith(`${prefijoPrevio}-`));
-                                      setFormProd({
-                                        ...formProd,
-                                        categoriaId: catCreada.id,
-                                        codigo: (debeRegenerar2 ? generarCodigoProdAuto(catCreada.id) : formProd.codigo),
-                                        stockControl: true, stockActual: 0, stockMinimo: Math.max(3, Number(formProd.stockMinimo || 0) || 3),
-                                      });
+                                  ]
+                                });
+                              } catch (er1) { console.error(er1); }
+                            }}
+                          >
+                            <IonIcon slot="icon-only" icon={add} />
+                          </IonButton>
+                        </IonCol>
+                        <IonCol size="4" style={{ padding: 2 }}>
+                          <IonButton
+                            expand="block"
+                            size="small"
+                            color="primary"
+                            disabled={!formProd.categoriaId}
+                            style={{ fontSize: 11, fontWeight: 800, margin: 0 }}
+                            onClick={() => {
+                              try {
+                                const cat = categoriasFB.find(c => c.id === formProd.categoriaId);
+                                if (!cat) { mostrarToast('Selecciona categoría primero'); return; }
+                                presentarCrudCatAlert({
+                                  header: `✏️ Editar: ${cat.nombre}`,
+                                  inputs: [
+                                    { name: 'nombre', type: 'text', placeholder: 'Nombre categoría *', value: cat.nombre },
+                                    { name: 'orden', type: 'number', placeholder: 'Orden', value: String(Number(cat.orden || 0)) },
+                                    { name: 'descripcion', type: 'text', placeholder: 'Descripción', value: cat.descripcion || '' },
+                                  ],
+                                  buttons: [
+                                    { text: 'Cancelar', role: 'cancel' },
+                                    {
+                                      text: '💾 Guardar',
+                                      handler: (d: any) => {
+                                        const nombre = String(d?.nombre || '').trim();
+                                        if (!nombre) { mostrarToast('Nombre es obligatorio'); return false; }
+                                        try {
+                                          CatalogoFBService.actualizarCategoria(cat.id, {
+                                            ...cat,
+                                            nombre,
+                                            orden: Number(d?.orden || cat.orden || 0),
+                                            descripcion: String(d?.descripcion || '').trim(),
+                                          }, usuario.id);
+                                          try { setCategoriasFB(CatalogoFBService.listarCategorias() || []); cargarCatProd(); } catch {}
+                                          mostrarToast(`✅ Categoría actualizada`);
+                                          return true;
+                                        } catch (e2: any) { mostrarToast(e2?.message || 'Error al actualizar'); return false; }
+                                      }
                                     }
-                                    mostrarToast(`✅ Categoría "${nombre}" creada y seleccionada (con stock)`);
-                                    return true;
-                                  } catch (e2: any) { mostrarToast(e2?.message || 'Error al crear categoría'); return false; }
+                                  ]
+                                });
+                              } catch (err) { console.error(err); }
+                            }}
+                          >
+                            <IonIcon slot="icon-only" icon={create} />
+                          </IonButton>
+                        </IonCol>
+                        <IonCol size="4" style={{ padding: 2 }}>
+                          <IonButton
+                            expand="block"
+                            size="small"
+                            color="danger"
+                            disabled={!formProd.categoriaId}
+                            style={{ fontSize: 11, fontWeight: 800, margin: 0 }}
+                            onClick={() => {
+                              try {
+                                const cat = categoriasFB.find(c => c.id === formProd.categoriaId);
+                                if (!cat) { mostrarToast('Selecciona categoría primero'); return; }
+                                const prodsUso = productosFB.filter((p) => p.categoriaId === cat.id).length;
+                                if (prodsUso > 0) {
+                                  mostrarToast(`⛔ ${prodsUso} productos usan "${cat.nombre}". Ve a Productos para migrarlos.`);
+                                  setFiltroCatId(cat.id); setTabStock('PRODUCTOS');
+                                  return;
                                 }
-                              }
-                            ]
-                          });
-                        } catch (er1) { console.error(er1); }
-                      }}
-                    >
-                      <IonIcon slot="start" icon={add} />&nbsp;Nueva
-                    </IonButton>
-                  </IonCol>
-                  <IonCol size="12" sizeMd="12">
-                    <IonItem className="form-item" lines="none" style={{ '--min-height': '40px', '--padding-start': 4, '--padding-end': 4 }}>
-                      <IonSelect
-                        label="Estado"
-                        labelPlacement="stacked"
-                        value={formProd.estado}
-                        onIonChange={(e: any) => setFormProd({ ...formProd, estado: e.target.value as any })}
-                      >
-                        <IonSelectOption value="ACTIVO">✅ ACTIVO (visible en POS y carta)</IonSelectOption>
-                        <IonSelectOption value="INACTIVO">⛔ INACTIVO (oculto)</IonSelectOption>
-                      </IonSelect>
-                    </IonItem>
+                                presentarConfirmBorrarCatAlert({
+                                  header: `🗑️ Eliminar "${cat.nombre}"`,
+                                  subHeader: `Categoría con ${prodsUso} productos (SIN USO).`,
+                                  message: `Se eliminará permanentemente la categoría. No se puede deshacer.`,
+                                  buttons: [
+                                    { text: 'Cancelar', role: 'cancel' },
+                                    {
+                                      text: 'SÍ, ELIMINAR',
+                                      role: 'destructive',
+                                      handler: () => {
+                                        try {
+                                          CatalogoFBService.eliminarCategoria(cat.id);
+                                          try { setCategoriasFB(CatalogoFBService.listarCategorias() || []); cargarCatProd(); } catch {}
+                                          setFormProd((prev: any) => ({ ...prev, categoriaId: '', codigo: '' }));
+                                          mostrarToast(`✅ Categoría "${cat.nombre}" eliminada`);
+                                          return true;
+                                        } catch (e2: any) { mostrarToast(e2?.message || 'Error al eliminar'); return false; }
+                                      }
+                                    }
+                                  ]
+                                });
+                              } catch (err) { console.error(err); }
+                            }}
+                          >
+                            <IonIcon slot="icon-only" icon={trash} />
+                          </IonButton>
+                        </IonCol>
+                      </IonRow>
+                      <IonRow>
+                        <IonCol size="12" sizeMd="12">
+                          <IonItem className="form-item" lines="none" style={{ '--min-height': '40px', '--padding-start': 4, '--padding-end': 4 }}>
+                            <IonSelect
+                              label="Estado"
+                              labelPlacement="stacked"
+                              value={formProd.estado}
+                              onIonChange={(e: any) => setFormProd({ ...formProd, estado: e.target.value as any })}
+                            >
+                              <IonSelectOption value="ACTIVO">✅ ACTIVO (visible en POS y carta)</IonSelectOption>
+                              <IonSelectOption value="INACTIVO">⛔ INACTIVO (oculto)</IonSelectOption>
+                            </IonSelect>
+                          </IonItem>
+                        </IonCol>
+                      </IonRow>
+                    </IonGrid>
                   </IonCol>
                 </IonRow>
               </IonGrid>
