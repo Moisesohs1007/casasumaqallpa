@@ -198,133 +198,69 @@ function TabBarCondicional() {
   );
 }
 
-function BannerEstadoConexion({
-  networkMode,
-  pendientesCount,
-  onReintentar,
-}: {
-  networkMode: NetworkMode;
-  pendientesCount: number;
-  onReintentar: () => void;
-}) {
-  const [toastOk, setToastOk] = useState<{ show: boolean; msg: string }>({ show: false, msg: '' });
-  const [loadingRetry, setLoadingRetry] = useState(false);
-
-  const fondoBanner = useMemo(() => {
-    if (networkMode === 'OFFLINE') return '#fde68a';
-    if (pendientesCount > 0) return '#dbeafe';
-    return '#dcfce7';
-  }, [networkMode, pendientesCount]);
-  const colorTexto = useMemo(() => {
-    if (networkMode === 'OFFLINE') return '#78350f';
-    if (pendientesCount > 0) return '#1e3a8a';
-    return '#14532d';
-  }, [networkMode, pendientesCount]);
-  const icono = useMemo(() => {
-    if (networkMode === 'OFFLINE') return cloudOffline;
-    if (networkMode === 'CHECKING') return alertCircle;
-    return pendientesCount > 0 ? cloud : checkmarkCircle;
-  }, [networkMode, pendientesCount]);
-  const label = useMemo(() => {
-    if (networkMode === 'OFFLINE') return '⚠️ Sin internet · Modo offline (se guarda local, luego se sincroniza)';
-    if (pendientesCount > 0) return `🟡 ${pendientesCount} cambios pendientes de sincronizar a la nube`;
-    if (networkMode === 'CHECKING') return '🔄 Verificando conexión...';
-    return '✅ Conectado · Todo sincronizado';
-  }, [networkMode, pendientesCount]);
-
-  const reintentar = useCallback(async () => {
-    setLoadingRetry(true);
-    try {
-      const [ok, fail] = (await pendingSync.processQueue?.(true)) || [0, 0, 0];
-      const total = Number(ok || 0) + Number(fail || 0);
-      if (total === 0 && networkMode === 'ONLINE') {
-        setToastOk({ show: true, msg: 'No hay cambios pendientes de sincronizar' });
-      } else if (fail === 0) {
-        setToastOk({ show: true, msg: `✅ ${ok} cambios sincronizados a la nube` });
-      } else {
-        setToastOk({ show: true, msg: `⚠️ ${ok} OK / ${fail} fallidos · Reintenta en 30s o con Wi-Fi` });
-      }
-    } catch (e: any) {
-      setToastOk({ show: true, msg: e?.message || 'Error al reintentar' });
-    } finally {
-      setTimeout(() => setLoadingRetry(false), 400);
-    }
-  }, [networkMode]);
-
-  return (
-    <>
-      <div
-        onClick={() => { if (networkMode !== 'ONLINE' || pendientesCount > 0) reintentar(); }}
-        style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          zIndex: 99999,
-          padding: '6px 14px',
-          display: 'flex',
-          alignItems: 'center',
-          gap: 10,
-          background: fondoBanner,
-          color: colorTexto,
-          fontSize: 13,
-          fontWeight: 600,
-          borderBottom: `1px solid ${colorTexto}33`,
-          userSelect: 'none',
-          cursor: (networkMode !== 'ONLINE' || pendientesCount > 0) ? 'pointer' : 'default',
-        }}
-      >
-        <IonIcon icon={icono} style={{ fontSize: 18 }} />
-        <div style={{ flex: 1, minWidth: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{label}</div>
-        {(networkMode !== 'ONLINE' || pendientesCount > 0) && (
-          <IonButton
-            size="small"
-            color={networkMode === 'OFFLINE' ? 'warning' : 'primary'}
-            onClick={(e) => { e.stopPropagation(); onReintentar(); }}
-            disabled={loadingRetry}
-            style={{ marginInline: 0, marginBlock: 0, minHeight: 30 }}
-          >
-            <IonIcon slot="start" icon={refreshCircle} />
-            Reintentar
-          </IonButton>
-        )}
-        {pendientesCount > 0 && (
-          <IonBadge color={networkMode === 'OFFLINE' ? 'warning' : 'primary'} style={{ fontSize: 12 }}>{pendientesCount}</IonBadge>
-        )}
-      </div>
-      <IonToast
-        isOpen={toastOk.show}
-        onDidDismiss={() => setToastOk({ show: false, msg: '' })}
-        message={toastOk.msg}
-        duration={2400}
-        position="top"
-        style={{ marginTop: 42 }}
-      />
-    </>
-  );
-}
-
 const App: React.FC = () => {
-  const [networkMode, setNetworkMode] = useState<NetworkMode>('CHECKING');
+  const [networkMode, setNetworkMode] = useState<NetworkMode>('ONLINE');
   const [pendientesCount, setPendientesCount] = useState<number>(0);
   const [retryTick, setRetryTick] = useState(0);
   const checkingRef = React.useRef(false);
   const bootDoneRef = React.useRef(false);
+  const prevPendientesRef = React.useRef<number>(0);
+  const procesandoRef = React.useRef(false);
+  const [toastOfflineGuardado, setToastOfflineGuardado] = useState<{ show: boolean; msg: string }>({ show: false, msg: '' });
+  const [toastSyncOk, setToastSyncOk] = useState<{ show: boolean; msg: string }>({ show: false, msg: '' });
+
+  // ==== Toasts contextuales ====
+  const avisarGuardadoOffline = useCallback(() => {
+    setToastOfflineGuardado({ show: true, msg: '💾 Guardado local · Cuando tengas internet se sincronizará solo' });
+    window.setTimeout(() => setToastOfflineGuardado((p) => ({ ...p, show: false })), 2800);
+  }, []);
+  const avisarSyncOk = useCallback((n: number) => {
+    if (n <= 0) return;
+    setToastSyncOk({ show: true, msg: `☁️ +${n} cambios sincronizados a la nube ✅` });
+    window.setTimeout(() => setToastSyncOk((p) => ({ ...p, show: false })), 3000);
+  }, []);
+  const reintentarPendientes = useCallback(async () => {
+    if (procesandoRef.current) return;
+    procesandoRef.current = true;
+    try {
+      const [ok, fail] = (await pendingSync.processQueue?.(true)) || [0, 0, 0];
+      const total = Number(ok || 0) + Number(fail || 0);
+      if (total === 0) {
+        setToastSyncOk({ show: true, msg: 'No había cambios pendientes de sincronizar' });
+        window.setTimeout(() => setToastSyncOk((p) => ({ ...p, show: false })), 2200);
+      } else if (Number(fail || 0) > 0) {
+        setToastSyncOk({ show: true, msg: `⚠️ ${ok} OK · ${fail} fallidos · Reintenta luego` });
+        window.setTimeout(() => setToastSyncOk((p) => ({ ...p, show: false })), 3200);
+      } else {
+        avisarSyncOk(Number(ok || 0));
+      }
+    } catch {
+      setToastSyncOk({ show: true, msg: 'No se pudo sincronizar · Intenta en 30s' });
+      window.setTimeout(() => setToastSyncOk((p) => ({ ...p, show: false })), 2800);
+    } finally {
+      procesandoRef.current = false;
+      _pingCache = null;
+      checkNetworkAndQueueRef.current?.(true);
+    }
+  }, [avisarSyncOk]);
+  const checkNetworkAndQueueRef = React.useRef<(f?: boolean) => Promise<void>>();
 
   const checkNetworkAndQueue = useCallback(async (force = false) => {
     if (checkingRef.current && !force) return;
     checkingRef.current = true;
     try {
-      // 1. Actualizar contador pendientes SIEMPRE
       const n = Number(pendingSync.countPendientes?.() || 0);
-      setPendientesCount(Number.isFinite(n) ? n : 0);
-      // 2. Ping 3 capas Supabase/fetch/httpbin -> dentro ya tiene fallback navOnline optimista
+      const nFin = Number.isFinite(n) ? n : 0;
+      // Detectar bajada (sync completado) antes de setear nuevo state
+      const prevN = prevPendientesRef.current;
+      if (nFin < prevN) avisarSyncOk(prevN - nFin);
+      prevPendientesRef.current = nFin;
+      setPendientesCount(nFin);
       const pingOk = await _pingSupabaseReal();
-      const finalOnline = !!pingOk;
-      setNetworkMode(finalOnline ? 'ONLINE' : 'OFFLINE');
-      // 3. Si volvemos ONLINE con pendientes → auto-flush suave
-      if (finalOnline && pendingSync.countPendientes?.() > 0) {
-        pendingSync.processQueue?.(false).catch(() => {});
+      setNetworkMode(!!pingOk ? 'ONLINE' : 'OFFLINE');
+      if (!!pingOk && nFin > 0 && !procesandoRef.current) {
+        procesandoRef.current = true;
+        pendingSync.processQueue?.(false).catch(() => {}).finally(() => { procesandoRef.current = false; });
       }
     } catch {
       setNetworkMode('ONLINE');
@@ -332,26 +268,37 @@ const App: React.FC = () => {
       checkingRef.current = false;
       bootDoneRef.current = true;
     }
-  }, []);
+  }, [avisarSyncOk]);
+
+  useEffect(() => {
+    checkNetworkAndQueueRef.current = checkNetworkAndQueue;
+  }, [checkNetworkAndQueue]);
 
   useEffect(() => {
     checkNetworkAndQueue(true);
-    // Primer boot: si a los 2s sigue CHECKING y navigator.onLine=true, mostrar ONLINE
     const t0 = window.setTimeout(() => {
       if (!bootDoneRef.current) {
         const navOnline = typeof navigator !== 'undefined' ? !!navigator.onLine : true;
         if (navOnline) setNetworkMode('ONLINE');
       }
-    }, 2000);
+    }, 1800);
     const t1 = window.setInterval(() => checkNetworkAndQueue(false), 6000);
     const t2 = window.setInterval(() => setRetryTick((t) => t + 1), 20000);
     const on = () => { _pingCache = null; checkNetworkAndQueue(true); };
     window.addEventListener?.('online', on);
     window.addEventListener?.('offline', on);
     try {
-      const onDBMutated = () => setTimeout(() => checkNetworkAndQueue(false), 350);
+      const onDBMutated = () => setTimeout(() => checkNetworkAndQueue(false), 400);
+      const onEnqueued = () => {
+        // Hay un pending nuevo encolado = guardado offline → toast
+        setTimeout(() => {
+          checkNetworkAndQueue(false);
+          if (networkMode !== 'ONLINE' || pendientesCount > 0) avisarGuardadoOffline();
+          else if (!dbRemota?.client || !(dbRemota.client as any)?.from) avisarGuardadoOffline();
+        }, 60);
+      };
       window.addEventListener?.('lodge:db:mutated', onDBMutated);
-      window.addEventListener?.('lodge:pending:enqueued', onDBMutated);
+      window.addEventListener?.('lodge:pending:enqueued', onEnqueued);
     } catch (_) {}
     return () => {
       window.clearTimeout(t0);
@@ -360,7 +307,8 @@ const App: React.FC = () => {
       window.removeEventListener?.('online', on);
       window.removeEventListener?.('offline', on);
     };
-  }, [checkNetworkAndQueue]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [checkNetworkAndQueue, avisarGuardadoOffline, networkMode, pendientesCount]);
 
   useEffect(() => { checkNetworkAndQueue(true); }, [retryTick, checkNetworkAndQueue]);
 
@@ -459,12 +407,7 @@ const App: React.FC = () => {
   }, []);
 
   return (
-    <IonApp style={{ paddingTop: 36 }}>
-      <BannerEstadoConexion
-        networkMode={networkMode}
-        pendientesCount={pendientesCount}
-        onReintentar={() => { checkNetworkAndQueue(); setRetryTick((t) => t + 1); }}
-      />
+    <IonApp>
       <IonReactRouter basename="/casasumaqallpa">
         <ControlPestanaPersistente />
         <IonTabs>
@@ -501,6 +444,66 @@ const App: React.FC = () => {
           <TabBarCondicional />
         </IonTabs>
       </IonReactRouter>
+
+      {/* BADGE FLOTANTE Pendientes N>0: inf-dcha, sobre TabBar. Click = Reintentar sync */}
+      {pendientesCount > 0 && (
+        <div
+          title={`${pendientesCount} cambios pendientes — Toca para sincronizar`}
+          onClick={reintentarPendientes}
+          style={{
+            position: 'fixed',
+            right: 14,
+            bottom: 72,
+            width: 44,
+            height: 44,
+            borderRadius: 22,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 99998,
+            cursor: 'pointer',
+            boxShadow: '0 4px 14px rgba(0,0,0,0.2)',
+            color: '#fff',
+            fontSize: 14,
+            fontWeight: 800,
+            userSelect: 'none',
+            background: networkMode === 'OFFLINE'
+              ? 'linear-gradient(135deg, #f59e0b, #d97706)'
+              : 'linear-gradient(135deg, #3b82f6, #1d4ed8)',
+          }}
+        >
+          <IonIcon slot="icon-only" icon={networkMode === 'OFFLINE' ? cloudOffline : cloud} style={{ fontSize: 16, marginRight: 2 }} />
+          <IonBadge color="danger" style={{ position: 'absolute', top: -4, right: -4, fontSize: 11 }}>
+            {pendientesCount > 999 ? '999+' : pendientesCount}
+          </IonBadge>
+        </div>
+      )}
+
+      {/* TOAST 1: Guardado offline (cuando encolas un pending) */}
+      <IonToast
+        isOpen={toastOfflineGuardado.show}
+        onDidDismiss={() => setToastOfflineGuardado({ show: false, msg: '' })}
+        message={toastOfflineGuardado.msg}
+        duration={2800}
+        color="warning"
+        position="top"
+        buttons={[
+          {
+            side: 'end',
+            text: 'OK',
+            handler: () => setToastOfflineGuardado({ show: false, msg: '' })
+          }
+        ]}
+      />
+      {/* TOAST 2: Sync ok a nube completado */}
+      <IonToast
+        isOpen={toastSyncOk.show}
+        onDidDismiss={() => setToastSyncOk({ show: false, msg: '' })}
+        message={toastSyncOk.msg}
+        duration={3000}
+        color="success"
+        position="bottom"
+      />
     </IonApp>
   );
 };

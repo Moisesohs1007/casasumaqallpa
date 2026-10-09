@@ -84,10 +84,11 @@ const ReservasPage: React.FC = () => {
       }, 650);
     };
 
+    if (!supabase) return;
     const canales: any[] = [];
     try {
       for (const t of TABLAS) {
-        const ch = supabase.channel(`rt-res-${t}-${Math.random().toString(36).slice(2,7)}`)
+        const ch = (supabase as any).channel(`rt-res-${t}-${Math.random().toString(36).slice(2,7)}`)
           .on('postgres_changes', { event: '*' as any, schema: 'public', table: t }, recargarDebounced)
           .subscribe();
         canales.push(ch);
@@ -98,7 +99,7 @@ const ReservasPage: React.FC = () => {
       alive = false;
       clearTimeout(debounceId);
       try {
-        Promise.all(canales.map(c => supabase.removeChannel(c))).catch(()=>{});
+        Promise.all(canales.map(c => (supabase as any)?.removeChannel?.(c))).catch(()=>{});
       } catch (_) {}
     };
   }, []);

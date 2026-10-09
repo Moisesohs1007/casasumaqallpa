@@ -254,10 +254,11 @@ const HabitacionesPage: React.FC = () => {
       }, 700);
     };
 
+    if (!supabase) return;
     const canales: any[] = [];
     try {
       for (const t of TABLAS) {
-        const ch = supabase.channel(`rt-hab-${t}-${Math.random().toString(36).slice(2,7)}`)
+        const ch = (supabase as any).channel(`rt-hab-${t}-${Math.random().toString(36).slice(2,7)}`)
           .on('postgres_changes', { event: '*' as any, schema: 'public', table: t }, recargarDebounced)
           .subscribe();
         canales.push(ch);
@@ -267,7 +268,7 @@ const HabitacionesPage: React.FC = () => {
     return () => {
       alive = false;
       clearTimeout(debounceId);
-      try { Promise.all(canales.map(c => supabase.removeChannel(c))).catch(()=>{}); } catch (_) {}
+      try { Promise.all(canales.map(c => (supabase as any)?.removeChannel?.(c))).catch(()=>{}); } catch (_) {}
     };
   }, []);
 
