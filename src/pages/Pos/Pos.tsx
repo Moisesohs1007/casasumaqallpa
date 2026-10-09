@@ -157,17 +157,47 @@ const PosPage: React.FC = () => {
         if (seed?.ensureSeedInicialCompleto) seed.ensureSeedInicialCompleto(false);
         lista = (CatalogoFBService.listarProductos?.({ soloActivos: true }) || []) as any[];
       }
+      // FIX CACHE: Recargar categorías al vuelo para MAPEAR POR NOMBRE si categoriaId es huérfano (muy común después wipe force)
+      let categoriasVuelo: any[] = [];
+      try { categoriasVuelo = CatalogoFBService.listarCategorias?.() || []; } catch {}
+      const catNombreToOrden = new Map<string, number>();
+      for (const cc of categoriasVuelo) catNombreToOrden.set(String(cc.nombre || '').toUpperCase().trim(), Number(cc.orden ?? 9000));
+
       return lista.map((p: any) => {
         const plano = _planoStockProducto(p);
-        const cat = catMapById.get(p.categoriaId);
+        const catId = p.categoriaId;
+        let cat = catMapById.get(catId);
+        let ordenCat = catOrdenById.get(catId);
+
+        // FALLBACK ROBUSTO: Si categoriaId no existe en mapa (id huérfano o borrado), buscar categoría POR NOMBRE DEL PRODUCTO / catNombre anterior
+        if (!cat || ordenCat === undefined) {
+          const catNameGuess = (p.categoriaNombre || p.categoria || '').toString().toUpperCase().trim();
+          if (catNameGuess && catNombreToOrden.has(catNameGuess)) {
+            ordenCat = catNombreToOrden.get(catNameGuess) as number;
+          }
+          // Intento 2: buscar categoría más probable por nombre producto
+          if (ordenCat === undefined) {
+            const nombreProducto = String(p.nombre || '').toUpperCase();
+            for (const [nom, ord] of catNombreToOrden.entries()) {
+              if (nom && (nombreProducto.includes(nom.slice(0, 4)) || nom.includes(nombreProducto.slice(0, 4)))) {
+                ordenCat = ord; break;
+              }
+            }
+          }
+          if (ordenCat === undefined) ordenCat = 9999;
+        }
+        const catNombreFinal = cat?.nombre
+          || (Array.from(catNombreToOrden.entries()).find(([, o]) => o === ordenCat)?.[0])
+          || 'Sin categoría';
+
         return {
           id: p.id,
           sku: p.codigo,
           nombre: p.nombre,
           descripcion: p.descripcion || '',
-          categoriaId: p.categoriaId,
-          categoriaNombre: cat?.nombre || 'Sin categoría',
-          categoriaOrden: catOrdenById.get(p.categoriaId) ?? 9999,
+          categoriaId: catId,
+          categoriaNombre: catNombreFinal,
+          categoriaOrden: ordenCat,
           precioVentaBase: Number(p.precioVentaBase || 0),
           moneda: 'PEN',
           impuesto: 'IGV',
@@ -182,11 +212,17 @@ const PosPage: React.FC = () => {
           _stock: plano.stockActual,
           _stockMin: plano.stockMinimo,
         } as unknown as (ProductoFB & { _stock?: number; _stockMin?: number; categoriaNombre?: string; categoriaOrden?: number; stockControl?: boolean; orden?: number });
-      }).sort((a, b) => {
-        const cA = (a as any).categoriaOrden ?? 999;
-        const cB = (b as any).categoriaOrden ?? 999;
+      }).sort((a: any, b: any) => {
+        // NIVEL 1: Prioridad categoriaOrden (10 Desayunos, 20 Jugos... 9999 Sin categoría)
+        const cA = Number(a.categoriaOrden ?? 9999);
+        const cB = Number(b.categoriaOrden ?? 9999);
         if (cA !== cB) return cA - cB;
-        return ((a as any).orden ?? 0) - ((b as any).orden ?? 0);
+        // NIVEL 2 (FALLBACK): Si ambos tienen =9999 → ordenar POR categoriaNombre ALFABETICO para agrupar iguales
+        const nA = String(a.categoriaNombre || '').toUpperCase();
+        const nB = String(b.categoriaNombre || '').toUpperCase();
+        if (nA !== nB) return nA < nB ? -1 : 1;
+        // NIVEL 3: Orden producto dentro de la misma categoría
+        return Number(a.orden ?? 0) - Number(b.orden ?? 0);
       });
     } catch {
       return [] as any[];
@@ -263,7 +299,25 @@ const PosPage: React.FC = () => {
       setVistaMesas(rows);
     } catch { setVistaMesas([]); } finally { setLoading(false); }
   };
-  useIonViewWillEnter(() => { cargar(); });
+  useIonViewWillEnter(() => {
+    setRefreshTick(t => t + 1);
+    // FIX Auto-detectar catalogo corrupto (muchos "Sin categoría") → forzar reset seed oficial automatico
+    setTimeout(() => {
+      try {
+        const prods = CatalogoFBService?.listarProductos?.({ soloActivos: true }) || [];
+        const cats = CatalogoFBService?.listarCategorias?.() || [];
+        const sinCat = prods.filter((p: any) => !cats.find((c: any) => c.id === p.categoriaId)).length;
+        if (cats.length < 10 || sinCat > 5 || prods.length < 50) {
+          if (seedProductos?.ensureSeedInicialCompleto) {
+            seedProductos.ensureSeedInicialCompleto(true);
+            setRefreshTick(t => t + 2);
+            mostrarToast('🔄 Sincronizando catálogo oficial...');
+          }
+        }
+      } catch {}
+    }, 300);
+    cargar();
+  });
 
   // --- Cart helpers ---
   const agregarProducto = (p: any) => {
