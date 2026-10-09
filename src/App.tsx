@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback, useMemo } from 'react';
+import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import {
   IonApp,
   IonBadge,
@@ -213,16 +213,62 @@ const App: React.FC = () => {
   const [toastOfflineGuardado, setToastOfflineGuardado] = useState<{ show: boolean; msg: string }>({ show: false, msg: '' });
   const [toastSyncOk, setToastSyncOk] = useState<{ show: boolean; msg: string }>({ show: false, msg: '' });
 
-  // ==== Toasts contextuales ====
-  const avisarGuardadoOffline = useCallback(() => {
-    setToastOfflineGuardado({ show: true, msg: '💾 Guardado local · Cuando tengas internet se sincronizará solo' });
-    window.setTimeout(() => setToastOfflineGuardado((p) => ({ ...p, show: false })), 2800);
-  }, []);
-  const avisarSyncOk = useCallback((n: number) => {
+  // ===== PATRÓN REFs ESTABLES GLOBAL INQUEBRANTABLE =====
+  // Cualquier state/setter/function que usemos dentro de useEffect global
+  // se guarda en useRef actualizado cada render → useEffect deps = [] NUNCA SE RE-MONTA
+  // → no hay remoción/suscripción constante listeners → no hay bucle infinito por dependencia variable!
+  const networkModeRef = useRef<NetworkMode>('ONLINE');
+  networkModeRef.current = networkMode;
+  const pendientesCountRef = useRef(0);
+  pendientesCountRef.current = pendientesCount;
+  const setNetworkModeRef = useRef<typeof setNetworkMode>(() => {});
+  setNetworkModeRef.current = setNetworkMode;
+  const setPendientesCountRef = useRef<typeof setPendientesCount>(() => {});
+  setPendientesCountRef.current = setPendientesCount;
+  const setRetryTickRef = useRef<typeof setRetryTick>(() => {});
+  setRetryTickRef.current = setRetryTick;
+  const setToastOfflineRef = useRef<typeof setToastOfflineGuardado>(() => {});
+  setToastOfflineRef.current = setToastOfflineGuardado;
+  const setToastSyncOkRef = useRef<typeof setToastSyncOk>(() => {});
+  setToastSyncOkRef.current = setToastSyncOk;
+  // --- Helpers toasts implementados sobre refs ---
+  const avisarGuardadoOfflineRef = useRef(() => {
+    setToastOfflineRef.current({ show: true, msg: '💾 Guardado local · Cuando tengas internet se sincronizará solo' });
+    window.setTimeout(() => setToastOfflineRef.current((p) => ({ ...p, show: false })), 2800);
+  });
+  const avisarSyncOkRef = useRef((n: number) => {
     if (n <= 0) return;
-    setToastSyncOk({ show: true, msg: `☁️ +${n} cambios sincronizados a la nube ✅` });
-    window.setTimeout(() => setToastSyncOk((p) => ({ ...p, show: false })), 3000);
+    setToastSyncOkRef.current({ show: true, msg: `☁️ +${n} cambios sincronizados a la nube ✅` });
+    window.setTimeout(() => setToastSyncOkRef.current((p) => ({ ...p, show: false })), 3000);
+  });
+  const checkNetworkAndQueueRef = React.useRef<(f?: boolean) => Promise<void>>();
+
+  // checkNetworkAndQueue NO tiene state deps → NO SE RECREA. Usa 100% refs estables.
+  const checkNetworkAndQueue = useCallback(async (force = false) => {
+    if (checkingRef.current && !force) return;
+    checkingRef.current = true;
+    try {
+      const n = Number(pendingSync.countPendientes?.() || 0);
+      const nFin = Number.isFinite(n) ? n : 0;
+      const prevN = prevPendientesRef.current;
+      if (nFin < prevN) avisarSyncOkRef.current(prevN - nFin);
+      prevPendientesRef.current = nFin;
+      setPendientesCountRef.current(nFin);
+      const pingOk = await _pingSupabaseReal();
+      setNetworkModeRef.current(!!pingOk ? 'ONLINE' : 'OFFLINE');
+      if (!!pingOk && nFin > 0 && !procesandoRef.current) {
+        procesandoRef.current = true;
+        pendingSync.processQueue?.(false).catch(() => {}).finally(() => { procesandoRef.current = false; });
+      }
+    } catch {
+      setNetworkModeRef.current('ONLINE');
+    } finally {
+      checkingRef.current = false;
+      bootDoneRef.current = true;
+    }
   }, []);
+  checkNetworkAndQueueRef.current = checkNetworkAndQueue;
+  // reintentarPendientes (acción botón Badge flotante) usa las refs también
   const reintentarPendientes = useCallback(async () => {
     if (procesandoRef.current) return;
     procesandoRef.current = true;
@@ -230,59 +276,33 @@ const App: React.FC = () => {
       const [ok, fail] = (await pendingSync.processQueue?.(true)) || [0, 0, 0];
       const total = Number(ok || 0) + Number(fail || 0);
       if (total === 0) {
-        setToastSyncOk({ show: true, msg: 'No había cambios pendientes de sincronizar' });
-        window.setTimeout(() => setToastSyncOk((p) => ({ ...p, show: false })), 2200);
+        setToastSyncOkRef.current({ show: true, msg: 'No había cambios pendientes de sincronizar' });
+        window.setTimeout(() => setToastSyncOkRef.current((p) => ({ ...p, show: false })), 2200);
       } else if (Number(fail || 0) > 0) {
-        setToastSyncOk({ show: true, msg: `⚠️ ${ok} OK · ${fail} fallidos · Reintenta luego` });
-        window.setTimeout(() => setToastSyncOk((p) => ({ ...p, show: false })), 3200);
+        setToastSyncOkRef.current({ show: true, msg: `⚠️ ${ok} OK · ${fail} fallidos · Reintenta luego` });
+        window.setTimeout(() => setToastSyncOkRef.current((p) => ({ ...p, show: false })), 3200);
       } else {
-        avisarSyncOk(Number(ok || 0));
+        avisarSyncOkRef.current(Number(ok || 0));
       }
     } catch {
-      setToastSyncOk({ show: true, msg: 'No se pudo sincronizar · Intenta en 30s' });
-      window.setTimeout(() => setToastSyncOk((p) => ({ ...p, show: false })), 2800);
+      setToastSyncOkRef.current({ show: true, msg: 'No se pudo sincronizar · Intenta en 30s' });
+      window.setTimeout(() => setToastSyncOkRef.current((p) => ({ ...p, show: false })), 2800);
     } finally {
       procesandoRef.current = false;
       _pingCache = null;
       checkNetworkAndQueueRef.current?.(true);
     }
-  }, [avisarSyncOk]);
-  const checkNetworkAndQueueRef = React.useRef<(f?: boolean) => Promise<void>>();
+  }, []);
 
-  const checkNetworkAndQueue = useCallback(async (force = false) => {
-    if (checkingRef.current && !force) return;
-    checkingRef.current = true;
-    try {
-      const n = Number(pendingSync.countPendientes?.() || 0);
-      const nFin = Number.isFinite(n) ? n : 0;
-      // Detectar bajada (sync completado) antes de setear nuevo state
-      const prevN = prevPendientesRef.current;
-      if (nFin < prevN) avisarSyncOk(prevN - nFin);
-      prevPendientesRef.current = nFin;
-      setPendientesCount(nFin);
-      const pingOk = await _pingSupabaseReal();
-      setNetworkMode(!!pingOk ? 'ONLINE' : 'OFFLINE');
-      if (!!pingOk && nFin > 0 && !procesandoRef.current) {
-        procesandoRef.current = true;
-        pendingSync.processQueue?.(false).catch(() => {}).finally(() => { procesandoRef.current = false; });
-      }
-    } catch {
-      setNetworkMode('ONLINE');
-    } finally {
-      checkingRef.current = false;
-      bootDoneRef.current = true;
-    }
-  }, [avisarSyncOk]);
-
+  // ======================= useEffect GLOBAL SOLO UNA VEZ =======================
+  // deps = [] VACÍO INQUEBRANTABLE → NUNCA SE RE-MONTA → listeners NO se destruyen/suscriben cada render.
+  // NO HAY DEPENDENCIAS DE NINGÚN STATE/SETTER/FUNCIÓN → se evita el LOOP INFINITO anterior!
   useEffect(() => {
-    checkNetworkAndQueueRef.current = checkNetworkAndQueue;
-  }, [checkNetworkAndQueue]);
-
-  useEffect(() => {
-    checkNetworkAndQueue(true);
-    // ======= applyPendingLocal SOLO 1 VEZ al boot (NO en loop — evita parpadeo) =======
+    // 1) Inicio boot 1 sola vez
+    checkNetworkAndQueueRef.current?.(true);
+    // 2) applyPendingLocal SÓLO 1 VEZ al inicio. NUNCA repetir porque muta DB → db:mutated → bucle.
     try { pendingSync.applyPendingLocal?.(); } catch (_) {}
-    // applyPending SOLO si hay hidden: hidden (pageshow = caché bfcache)
+    // 3) bfcache pageshow: SOLO si volvimos desde atrás, restaurar queue
     try {
       window.addEventListener?.('pageshow', (_e: any) => {
         try { pendingSync.applyPendingLocal?.(); } catch (_){}
@@ -291,46 +311,47 @@ const App: React.FC = () => {
     const t0 = window.setTimeout(() => {
       if (!bootDoneRef.current) {
         const navOnline = typeof navigator !== 'undefined' ? !!navigator.onLine : true;
-        if (navOnline) setNetworkMode('ONLINE');
+        if (navOnline) setNetworkModeRef.current('ONLINE');
       }
     }, 1800);
-    // ==== ELIMINADOS TODOS LOS INTERVALOS QUE PROVOCAN PARPADEO:
-    //      ❌ setInterval 6s checkNetworkAndQueue (cada 6s refrescaba todo)
-    //      ❌ setInterval 15s applyPending cada 15s (cada 15s mutaba db)
-    //      ❌ setInterval 20s setRetryTick cada 20s (cada 20s re-hidrataba todo)
-    //      ❌ 5 setTimeouts 500/1500/3000/6000/12000 applyPending (parpadeo 12 primeros segundos)
-    // ==== AHORA checkNetwork + processQueue SOLO se dispara si pasa ALGO REAL:
-    //      1) online/offline (evento ventana nativo)
-    //      2) lodge:db:mutated (usuario presionó botón y guardó algo) = cada 400ms
-    //      3) lodge:pending:enqueued (nuevo pending en queue offline)
-    //      4) EVENTO_HIDRATACION = post-hidratar
-    //      5) click usuario en badge flotante (handleBadgeClick arriba)
-    //      6) pre-refresh botones clave (cada página refrescarFuerza dispara processQueue postFlush)
-    const on = () => { _pingCache = null; checkNetworkAndQueue(true); };
+
+    // 4) EVENTOS NATIVOS online/offline SÓLO si cambia red real
+    const on = () => { _pingCache = null; checkNetworkAndQueueRef.current?.(true); };
     window.addEventListener?.('online', on);
     window.addEventListener?.('offline', on);
+
+    // 5) lodge:pending:enqueued — usuario guardó offline → toast + checkQueue
     try {
-      const onDBMutated = () => setTimeout(() => checkNetworkAndQueue(false), 400);
       const onEnqueued = () => {
-        // Hay un pending nuevo encolado = guardado offline → toast
         setTimeout(() => {
-          checkNetworkAndQueue(false);
-          if (networkMode !== 'ONLINE' || pendientesCount > 0) avisarGuardadoOffline();
-          else if (!dbRemota?.client || !(dbRemota.client as any)?.from) avisarGuardadoOffline();
+          checkNetworkAndQueueRef.current?.(false);
+          const nm = networkModeRef.current;
+          const pc = pendientesCountRef.current;
+          if (nm !== 'ONLINE' || pc > 0) avisarGuardadoOfflineRef.current?.();
+          else if (!dbRemota?.client || !(dbRemota.client as any)?.from) avisarGuardadoOfflineRef.current?.();
         }, 60);
       };
-      const onAppHidratado = () => { setTimeout(() => { try { pendingSync.applyPendingLocal?.(); } catch (_){} }, 200); };
-      window.addEventListener?.('lodge:db:mutated', onDBMutated);
+      // 6) EVENTO_HIDRATACION — post-hidratacion services al iniciar; SÓLO re-aplica pending queue NUNCA applyPendingLocal (evitar bucle)
+      const onAppHidratado = () => { setTimeout(() => { checkNetworkAndQueueRef.current?.(false); }, 200); };
+
+      // ✅ IMPORTANTÍSIMO: ELIMINADO COMPLETAMENTE `lodge:db:mutated` listener!
+      //    Por qué? db:mutated se dispara CADA VEZ que pendingSync.processQueue() upsertAll un registro remoto correcto.
+      //    Y antes habíamos puesto: db:mutated → checkNetworkAndQueue() → processQueue() → otro db:mutated → BUCLE INFINITO 400ms.
+      //    Resultado en móvil: setState cada 0.5s sin tocar botón = PARPADEO PERMANENTE como si "aparece y desaparece solo".
+      //    processQueue SOLO debe dispararse si: online/offline, pending:enqueued (nuevo guardado), badge click usuario, postFlush botón, hidratado boot.
+      //    NUNCA por db mutated (efecto colateral!) — eso era el loop raíz.
+
       window.addEventListener?.('lodge:pending:enqueued', onEnqueued);
       window.addEventListener?.(EVENTO_HIDRATACION, onAppHidratado);
     } catch (_) {}
+
     return () => {
       window.clearTimeout(t0);
       window.removeEventListener?.('online', on);
       window.removeEventListener?.('offline', on);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [checkNetworkAndQueue, avisarGuardadoOffline, networkMode, pendientesCount]);
+  }, []);
 
   // 1 vez al boot: hidratar InMemoryDB con datos reales de Supabase Cloud
   useEffect(() => {
