@@ -192,6 +192,12 @@ const PosPage: React.FC = () => {
     });
   }, [productosConStock, cantidadesCarritoPorProducto]);
 
+  const productosStockFiltradosPorCat = useMemo(() => {
+    const lista = productosConStockFiltradosVisual.filter(p => (p as any).estadoProducto !== 'INACTIVO' && (p as any).estadoProducto !== 'DESCONTINUADO');
+    if (categoriaCartaSel === 'Todos') return lista;
+    return lista.filter(p => (p as any).categoriaNombre === categoriaCartaSel);
+  }, [productosConStockFiltradosVisual, categoriaCartaSel]);
+
   const productosCartaFiltradosPorCat = useMemo(() => {
     if (categoriaCartaSel === 'Todos') return productosCarta;
     return productosCarta.filter(p => (p as any).categoriaNombre === categoriaCartaSel);
@@ -425,36 +431,43 @@ const PosPage: React.FC = () => {
                 </div>
 
                 {/* Stock (Bebidas, Snacks con inventario) */}
-                <div className="seccion-prod">
-                  <h4 className="tit-seccion">🥤 Productos con Stock (bebidas / snacks / extras)</h4>
-                  <div className="grid-prod-sm">
-                    {productosConStockFiltradosVisual.filter(p => (p as any).estadoProducto !== 'INACTIVO' && (p as any).estadoProducto !== 'DESCONTINUADO').map(p => {
-                      const stk = Number((p as any)._stock ?? 0);
-                      const min = Number((p as any)._stockMin ?? (p as any).stockMinimo ?? 0);
-                      const agotado = stk <= 0;
-                      const bajo = stk <= min;
-                      return (
-                        <IonCard className={`prod-card ${agotado ? 'prod-agotado' : ''}`} key={p.id} button onClick={() => agregarStock(p)}>
-                          <IonCardContent style={{ padding: '10px 10px 12px 10px' }}>
-                            <div style={{ fontWeight: 700, fontSize: 14, lineHeight: 1.1, minHeight: 36 }}>{p.nombre}</div>
-                            <div style={{ fontSize: 11, opacity: 0.85, margin: '3px 0 8px 0' }}>{(p as any).categoriaNombre || 'General'} · Disp: <b>{stk}</b></div>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-                              <div style={{ fontSize: 11, color: agotado ? '#dc2626' : (bajo ? '#d97706' : 'inherit') }}>{agotado ? '⛔ AGOTADO' : (bajo ? '⚠️ STOCK BAJO' : '')}</div>
-                              <div style={{ fontWeight: 900, fontSize: 17 }}>{fmtSoles(Number((p as any).precioVentaBase || 0))}</div>
-                            </div>
-                          </IonCardContent>
-                        </IonCard>
-                      );
-                    })}
+                {productosStockFiltradosPorCat.length > 0 && (
+                  <div className="seccion-prod">
+                    <h4 className="tit-seccion">🥤 Productos con Stock (bebidas / snacks / extras)</h4>
+                    <div className="grid-prod-sm">
+                      {productosStockFiltradosPorCat.map(p => {
+                        const stk = Number((p as any)._stock ?? 0);
+                        const min = Number((p as any)._stockMin ?? (p as any).stockMinimo ?? 0);
+                        const agotado = stk <= 0;
+                        const bajo = stk <= min;
+                        return (
+                          <IonCard className={`prod-card ${agotado ? 'prod-agotado' : ''}`} key={p.id} button onClick={() => agregarStock(p)}>
+                            <IonCardContent style={{ padding: '10px 10px 12px 10px' }}>
+                              <div style={{ fontWeight: 700, fontSize: 14, lineHeight: 1.1, minHeight: 36 }}>{p.nombre}</div>
+                              <div style={{ fontSize: 11, opacity: 0.85, margin: '3px 0 8px 0' }}>{(p as any).categoriaNombre || 'General'} · Disp: <b>{stk}</b></div>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+                                <div style={{ fontSize: 11, color: agotado ? '#dc2626' : (bajo ? '#d97706' : 'inherit') }}>{agotado ? '⛔ AGOTADO' : (bajo ? '⚠️ STOCK BAJO' : '')}</div>
+                                <div style={{ fontWeight: 900, fontSize: 17 }}>{fmtSoles(Number((p as any).precioVentaBase || 0))}</div>
+                              </div>
+                            </IonCardContent>
+                          </IonCard>
+                        );
+                      })}
+                    </div>
                   </div>
-                </div>
+                )}
 
                 {/* Carta */}
                 <div className="seccion-prod">
                   <h4 className="tit-seccion">🍽️ Carta · Alimentos preparados</h4>
                   {(() => {
                     const lista = productosCartaFiltradosPorCat;
-                    if (!lista || lista.length === 0) return <IonNote color="warning" style={{padding:'12px', display:'block'}}>No hay productos en esta categoría.</IonNote>;
+                    if (!lista || lista.length === 0) {
+                      if (categoriaCartaSel !== 'Todos' && productosStockFiltradosPorCat.length > 0) {
+                        return <IonNote color="tertiary" style={{padding:'12px', display:'block'}}>Esta categoría contiene productos con stock físico (mostrados arriba).</IonNote>;
+                      }
+                      return <IonNote color="warning" style={{padding:'12px', display:'block'}}>No hay productos en esta categoría.</IonNote>;
+                    }
                     return (
                       <div className="grid-prod-md">
                         {lista.map(p => (
