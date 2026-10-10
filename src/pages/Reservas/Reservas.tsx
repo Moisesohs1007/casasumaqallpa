@@ -72,21 +72,47 @@ const ReservasPage: React.FC = () => {
   const setReservasRef = useRef<typeof setReservas>(() => {});
   setReservasRef.current = setReservas;
 
+  // ===== NORMALIZADOR estado RESERVA (mismo patrón helper overlap) =====
+  // Convierte variantes: "Check-in" / "check_in" / "Check In" / "CHECK-IN" → CHECKIN
+  // "Check out" / "Checked_Out" / "CHECKED-OUT" → CHECKEDOUT
+  // "No Show" / "NO-SHOW" → NOSHOW
+  const _normEst = (est: any): string =>
+    String(est || 'PENDIENTE')
+      .toUpperCase()
+      .replace(/[\s_-]+/g, '');
+
   // ESTADOS = RESERVA "ACTIVA" (no debe desaparecer del tab principal)
-  //   PENDIENTE / CONFIRMADA / EN_ESPERA / MODIFICADA / CHECKIN / CHECKED_IN / CHECKOUT
-  // HISTÓRICO (solo en tab Histórico):
-  //   CHECKED_OUT / CANCELADA / NO_SHOW
-  const ESTADOS_ACTIVOS = new Set<EstadoReserva>([
-    'PENDIENTE','CONFIRMADA','EN_ESPERA','MODIFICADA',
-    'CHECKIN','CHECKED_IN','CHECKOUT',
+  // Claves NORMALIZADAS.
+  const ESTADOS_ACTIVOS_NORM = new Set([
+    'PENDIENTE','CONFIRMADA','ENESPERA','MODIFICADA',
+    'CHECKIN','CHECKEDIN','CHECKOUT',
+  ]);
+
+  // ESTADOS = HISTÓRICO (solo tab Histórico). Claves NORMALIZADAS.
+  // Todo lo que NO está en ACTIVOS se muestra en Histórico (por defecto). Este set se usa solo para depurar.
+  const ESTADOS_HISTORICO_NORM = new Set([
+    'CHECKEDOUT','CANCELADA','CANCELADO','NOSHOW',
   ]);
 
   const reservasVisibles = useMemo(() => {
     try {
       const todos = Array.isArray(reservas) ? reservas : [];
       const filtrados = vistaReservas === 'ACTIVAS'
-        ? todos.filter((r: any) => ESTADOS_ACTIVOS.has((r?.estado || 'PENDIENTE') as EstadoReserva))
-        : todos.filter((r: any) => !ESTADOS_ACTIVOS.has((r?.estado || 'PENDIENTE') as EstadoReserva));
+        ? todos.filter((r: any) => {
+            const n = _normEst(r?.estado);
+            // Si está en activos → OK. Si está en históricos claros → NO.
+            if (ESTADOS_ACTIVOS_NORM.has(n)) return true;
+            if (ESTADOS_HISTORICO_NORM.has(n)) return false;
+            // Estado desconocido: MANTENER EN ACTIVAS para no perder de vista.
+            return true;
+          })
+        : todos.filter((r: any) => {
+            const n = _normEst(r?.estado);
+            if (ESTADOS_HISTORICO_NORM.has(n)) return true;
+            if (ESTADOS_ACTIVOS_NORM.has(n)) return false;
+            // Estado desconocido → NO se manda a Histórico; para Histórico SOLO los claramente terminados.
+            return false;
+          });
       return filtrados.sort((a: any, b: any) => {
         const fa = new Date(a.fechaCreacion || a.createdAt || 0).getTime();
         const fb = new Date(b.fechaCreacion || b.createdAt || 0).getTime();
