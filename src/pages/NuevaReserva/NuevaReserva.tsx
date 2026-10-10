@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useEffect } from 'react';
+import React, { useMemo, useState, useEffect, useRef } from 'react';
 import {
   IonBackButton, IonButton, IonButtons, IonCard, IonCardContent, IonCardHeader, IonCardSubtitle,
   IonCardTitle, IonCol, IonContent, IonDatetime, IonGrid, IonHeader, IonIcon, IonInput,
@@ -108,7 +108,9 @@ const NuevaReserva: React.FC = () => {
         if (!isNaN(factorPct)) precioBase = Number((precioBase * (1 + factorPct / 100)).toFixed(2));
       } catch { /* ignore */ }
     }
-    return precioBase || 350;
+    // NUEVA REGLA USUARIO: NUNCA forzar precio por defecto "350" si habitacion no tiene tarifario.
+    // Si no hay dato (precioBase=0) => dejar 0 (input vacío para que el operador ponga manualmente).
+    return Number(precioBase) > 0 ? Number(precioBase) : 0;
   };
 
   const calcularNochesRango = (r: { fechaInicio: string; fechaFin: string }): number => {
@@ -121,24 +123,37 @@ const NuevaReserva: React.FC = () => {
     return Number((calcularNochesRango(r) * Number(r.precioPorNoche || 0)).toFixed(2));
   };
 
-  // Efecto: (a) la primera vez, inicializa 1 solo bloque = todo el rango checkin→checkout
-  //         (b) si cambian checkin/checkout y hay rangos INCONSISTENTES (fecha fin o inicio fuera), extiende/ajusta automáticamente el 1er bloque
+  // Efecto: (a) primera vez o CAMBIO HABITACIÓN / RANGO FECHAS INCOMPATIBLE → RESET a 1 solo bloque VACÍO (precio 0 manual)
+  //         (b) fechas compatibles pero bloque 1 inicio < checkin o ultimo bloque fin > checkout: ajustar suavemente fechas limites
+  const habIdRef = useRef<string>('');
+  const fechasKeyRef = useRef<string>('');
   useEffect(() => {
     if (!checkin || !checkout || noches < 1) return;
+    const fechasKey = `${checkin}__${checkout}`;
+    const habitacionCambio = habitacionSeleccionada?.id !== habIdRef.current;
+    const rangoIncompatible = fechasKey !== fechasKeyRef.current;
+    habIdRef.current = habitacionSeleccionada?.id || '';
+    fechasKeyRef.current = fechasKey;
     setRangosTarifarios((prev) => {
-      if (prev.length === 0) {
-        const pb = calcularPrecioBaseSugerido();
-        return [{ id: seedUtil.generateUUID(), fechaInicio: checkin, fechaFin: checkout, precioPorNoche: pb }];
+      // RESET COMPLETO si cambió habitación O si el rango general NO coincide con rangos que tenemos (fechas completamente distintas)
+      const ultFin = prev[prev.length - 1]?.fechaFin;
+      const primerIni = prev[0]?.fechaInicio;
+      const fechasCompatiblesConPrev = Array.isArray(prev) && prev.length > 0 &&
+        ultFin && primerIni &&
+        new Date(primerIni) >= new Date(checkin) && new Date(ultFin) <= new Date(checkout);
+      const needsReset = habitacionCambio || (rangoIncompatible && !fechasCompatiblesConPrev);
+      if (needsReset) {
+        // NUEVO: siempre inicializa bloque SIN PRECIO (precioPorNoche=0) para que operador ponga el monto manualmente.
+        return [{ id: seedUtil.generateUUID(), fechaInicio: checkin, fechaFin: checkout, precioPorNoche: 0 }];
       }
+      // Ajuste suave (sin reset): bloques 1 y ultimo ajustar bordes para coincidir con general; no tocar precio.
       let cambiado = false;
       const next = prev.map((r, i) => {
         let { fechaInicio, fechaFin, precioPorNoche } = r;
         if (i === 0 && new Date(fechaInicio) > new Date(checkin)) { fechaInicio = checkin; cambiado = true; }
         if (i === prev.length - 1 && new Date(fechaFin) < new Date(checkout)) { fechaFin = checkout; cambiado = true; }
-        if (!precioPorNoche || Number(precioPorNoche) <= 0) {
-          const pb = calcularPrecioBaseSugerido(`${fechaInicio}T15:00:00.000Z`);
-          if (pb && pb > 0) { precioPorNoche = pb; cambiado = true; }
-        }
+        if (i === 0 && new Date(fechaInicio) < new Date(checkin)) { fechaInicio = checkin; cambiado = true; }
+        if (i === prev.length - 1 && new Date(fechaFin) > new Date(checkout)) { fechaFin = checkout; cambiado = true; }
         return { ...r, fechaInicio, fechaFin, precioPorNoche };
       });
       return cambiado ? next : prev;
@@ -148,9 +163,8 @@ const NuevaReserva: React.FC = () => {
 
   const agregarNuevoRango = () => {
     if (rangosTarifarios.length === 0) {
-      // No hay rangos: crear 1er rango = rango general completo
-      const pb = calcularPrecioBaseSugerido();
-      setRangosTarifarios([{ id: seedUtil.generateUUID(), fechaInicio: checkin, fechaFin: checkout, precioPorNoche: pb }]);
+      // No hay rangos: crear 1er rango = rango general completo VACÍO (precio 0)
+      setRangosTarifarios([{ id: seedUtil.generateUUID(), fechaInicio: checkin, fechaFin: checkout, precioPorNoche: 0 }]);
       return;
     }
     // Hay rangos: tomar último rango, crear uno nuevo 1 día después del fin del último (para encadenar sin huecos por defecto)
@@ -158,14 +172,12 @@ const NuevaReserva: React.FC = () => {
     const siguienteInicio = (() => {
       if (!ult.fechaFin) return checkin;
       const d = new Date(ult.fechaFin);
-      d.setDate(d.getDate());
       const iso = d.toISOString().slice(0, 10);
       if (new Date(iso) > new Date(checkout)) return checkout;
       return iso;
     })();
     const siguienteFin = (() => {
       if (new Date(siguienteInicio) >= new Date(checkout)) {
-        // Corregir: si siguienteInicio >= checkout, ajustar ultimo rango para que termine en checkout y crear rango nuevo = checkin +1día + checkout
         return checkout;
       }
       return checkout;
@@ -174,8 +186,8 @@ const NuevaReserva: React.FC = () => {
       // Ya no hay más días libres para agregar rangos (todos cubiertos). No crear bloque hueco.
       return;
     }
-    const pb = calcularPrecioBaseSugerido(`${siguienteInicio}T15:00:00.000Z`);
-    const nr: RangoTarifario = { id: seedUtil.generateUUID(), fechaInicio: siguienteInicio, fechaFin: siguienteFin, precioPorNoche: pb };
+    // NUEVO: Rango nuevo siempre inicia con precio VACÍO.
+    const nr: RangoTarifario = { id: seedUtil.generateUUID(), fechaInicio: siguienteInicio, fechaFin: siguienteFin, precioPorNoche: 0 };
     setRangosTarifarios([...rangosTarifarios, nr]);
   };
 
@@ -1149,12 +1161,14 @@ const NuevaReserva: React.FC = () => {
                                   (n) => (validacionRangosCompleta.coberturaMap[n] || 0) >= 2,
                                 );
                                 const nochesFaltantes = validacionRangosCompleta.faltantesNochesStr.slice(0, 10);
+                                // ==== FIX VISUAL AMARILLO ====
+                                // Solo pintar AMARILLO si hay errores de ESTRUCTURA (fuera de rango, inversion fechas, solapamiento, 0 noches).
+                                // PRECIO VACÍO (precioPorNoche<=0) NO se marca AMARILLO mientras user edita. Solo se valida en el submit final.
                                 const bloqueConError =
                                   fueraDeRango ||
                                   inversionFechas ||
                                   nochesSolapadas.length > 0 ||
-                                  nochesRg <= 0 ||
-                                  Number(rg.precioPorNoche) <= 0;
+                                  nochesRg <= 0;
                                 return (
                                   <IonItem
                                     key={rg.id}
