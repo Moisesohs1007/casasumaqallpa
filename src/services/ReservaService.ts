@@ -186,7 +186,10 @@ export const ReservaService = {
   }): Reserva[] {
     const { habitacionId, checkinISO, checkoutISO, excluirReservaId } = params;
     return this.listarTodas().filter((r) => {
-      if (r.estado === 'CANCELADA') return false;
+      // ESTADOS TERMINADOS / HISTÓRICO = NUNCA BLOQUEAN NUEVA RESERVA.
+      // CHECKED_OUT = ya terminó y se liberó la habitación; CANCELADA = nunca ocupó; NO_SHOW = no se presentó.
+      const est: string = String(r.estado || 'PENDIENTE').toUpperCase();
+      if (['CHECKED_OUT','CANCELADA','NO_SHOW'].includes(est)) return false;
       if (excluirReservaId && r.id === excluirReservaId) return false;
       if (!(r.habitaciones || []).some((rh) => rh.habitacionId === habitacionId)) return false;
       return checkinISO < r.fechaCheckout && checkoutISO > r.fechaCheckin;
