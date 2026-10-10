@@ -386,6 +386,85 @@ const HabitacionesPage: React.FC = () => {
     return null;
   };
 
+  // RC10: Validación BLOQUEANTE previa check-in desde vista Habitaciones
+  const validarYAbrirCheckinDesdeHab = (reservaId: string, habCodigo: string): boolean => {
+    const hoy = new Date().toISOString().slice(0, 10);
+    const r = ReservaService.buscarPorId(reservaId);
+    if (!r) { mostrarAlerta('Error', 'No se encontró la reserva.'); return false; }
+
+    const ci = String(r.fechaCheckin || (r as any).fechaCheckIn || '').slice(0, 10);
+    const co = String(r.fechaCheckout || (r as any).fechaCheckOut || '').slice(0, 10);
+    const codR = r.codigoReserva || r.codigo || String(r.id || '').slice(0, 9);
+
+    if (!ci || !co) {
+      mostrarAlerta('Reserva incompleta', `La reserva ${codR} no tiene fechas de check-in/check-out definidas.`);
+      return false;
+    }
+
+    // RC10 V1: Fecha ANTES del inicio → Check-in ANTICIPADO NO permitido
+    if (hoy < ci) {
+      const ms = Math.max(0, new Date(ci).getTime() - new Date(hoy).getTime());
+      const dias = Math.max(1, Math.round(ms / 86400000));
+      mostrarAlerta(
+        '⛔ Check-in ANTICIPADO NO permitido',
+        `Habitación: ${habCodigo}\nReserva: ${codR}  (empieza ${ci})\nHoy es ${hoy}. Faltan ${dias} día(s).\n\nNo se puede hacer check-in de una reserva futura. Sólo se permite DENTRO del rango [checkin, checkout).\n\nNO reemplace a un huésped que todavía está ocupando la habitación.`,
+      );
+      return false;
+    }
+
+    // RC10 V2: Fecha DESPUÉS/IGUAL que checkout → reserva ya terminó
+    if (hoy >= co) {
+      mostrarAlerta(
+        '⛔ Reserva ya FINALIZÓ',
+        `Habitación: ${habCodigo}\nReserva: ${codR}\nCheckout programado: ${co}\nHoy es ${hoy}. Esta reserva ya terminó.`,
+      );
+      return false;
+    }
+
+    // RC10 V3: Habitación OCUPADA HOY por otra reserva ACTIVA
+    const habsIds = (r.habitaciones || []).map((rh: any) => String(rh.habitacionId || ''));
+    for (const habId of habsIds) {
+      if (!habId) continue;
+      const hab = HabitacionService.buscarPorId(habId);
+      const conflictos = (ReservaService.listarPorHabitacionYFechas as any)?.({
+        habitacionId: habId,
+        checkinISO: hoy,
+        checkoutISO: seedUtil?.addDaysISO ? seedUtil.addDaysISO(hoy, 1) : hoy,
+        excluirReservaId: r.id,
+      }) || [];
+
+      if (conflictos.length > 0) {
+        const cods = conflictos
+          .map((cf: any) => {
+            const cod = cf.codigoReserva || cf.codigo || String(cf.id || '').slice(0, 9);
+            const est = String(cf.estado || 'PENDIENTE').toUpperCase();
+            const cfCi = String(cf.fechaCheckin || '').slice(0, 10);
+            const cfCo = String(cf.fechaCheckout || '').slice(0, 10);
+            return `· #${cod}  [${est}]  ${cfCi} → ${cfCo}`;
+          })
+          .join('\n');
+        mostrarAlerta(
+          '⛔ HABITACIÓN OCUPADA HOY',
+          `Habitación: ${hab?.codigo || hab?.nombre || habCodigo}  (estado: ${hab?.estado || '?'})\n\nEstá ocupada HOY (${hoy}) por reserva(s) activa(s) sin check-out:\n${cods}\n\nSOLUCIÓN:\n1) Haga primero el CHECK-OUT de la reserva actual.\n2) La habitación pasará a LIMPIEZA → LIBRE.\n3) RECIÉN podrá hacer check-in de ESTA reserva (${codR}).\n\n⚠️ NUNCA se permite reemplazar una reserva VIGENTE por otra.`,
+        );
+        return false;
+      }
+
+      if (hab && hab.estado === 'OCUPADA') {
+        mostrarAlerta(
+          '⛔ Habitación MARCADA COMO OCUPADA',
+          `${hab.codigo || hab.nombre || habCodigo} está OCUPADA pero no se encontró una reserva activa para hoy. Puede deberse a un check-out no registrado.\n\nAntes de hacer check-in la habitación debe estar LIBRE o LIMPIEZA.`,
+        );
+        return false;
+      }
+    }
+
+    // ✅ Todas las validaciones RC10 OK
+    setCheckinReservaId(reservaId);
+    setCheckinOpen(true);
+    return true;
+  };
+
   const marcarEstado = async (h: Habitacion, nuevo: EstadoHabitacion) => {
     try {
       if (typeof (HabitacionService as any).actualizar === 'function') await (HabitacionService as any).actualizar(h.id, { estado: nuevo });
@@ -411,8 +490,7 @@ const HabitacionesPage: React.FC = () => {
           try { await refrescarFuerza(true); } catch(_){}
           const reservaId = await buscarReservaActivaHab(h.id);
           if (!reservaId) { mostrarAlerta('Sin reserva activa', `No se encontró una reserva para ${h.codigo}. Ve a Reservas y confirma una primero.`); return; }
-          setCheckinReservaId(reservaId);
-          setCheckinOpen(true);
+          validarYAbrirCheckinDesdeHab(reservaId, h.codigo);
         },
       });
       opciones.push({ text: '🚧 Marcar en MANTENIMIENTO', handler: () => marcarEstado(h, 'MANTENIMIENTO') });
@@ -491,10 +569,10 @@ const HabitacionesPage: React.FC = () => {
       opciones.push({
         text: '🔑 Hacer Check-in ahora',
         handler: async () => {
+          try { await refrescarFuerza(); } catch(_){}
           const reservaId = await buscarReservaActivaHab(h.id);
           if (!reservaId) { mostrarAlerta('Sin reserva', `No hay reserva asociada a ${h.codigo}.`); return; }
-          setCheckinReservaId(reservaId);
-          setCheckinOpen(true);
+          validarYAbrirCheckinDesdeHab(reservaId, h.codigo);
         },
       });
     }

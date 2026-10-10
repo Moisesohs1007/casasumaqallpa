@@ -388,15 +388,88 @@ export const FolioService = {
     reservaActualizada?: Reserva;
     folio?: Folio;
     error?: string;
+    errorCodigo?: 'RESERVA_NO_EXISTE' | 'ESTADO_INVALIDO' | 'FUERA_RANGO_FECHA' | 'HABITACION_OCUPADA_HOY_OTRA_RESERVA' | 'FECHA_CHECKIN_FUTURO' | 'HAB_ESTADO_YA_OCUPADA';
   } {
     const reserva = ReservaService.buscarPorId(params.reservaId);
-    if (!reserva) return { error: 'Reserva no encontrada' };
+    if (!reserva) return { error: 'Reserva no encontrada', errorCodigo: 'RESERVA_NO_EXISTE' };
 
-    if (!['CONFIRMADA', 'PENDIENTE', 'MODIFICADA'].includes(reserva.estado)) {
-      return { error: `Estado de reserva inválido para check-in: ${reserva.estado}` };
+    if (!['CONFIRMADA', 'PENDIENTE', 'MODIFICADA', 'CHECKIN', 'EN_ESPERA'].includes(reserva.estado)) {
+      return { error: `Estado de reserva inválido para check-in: ${reserva.estado}`, errorCodigo: 'ESTADO_INVALIDO' };
     }
 
     const now = seedUtil.nowISO();
+    const hoy = now.slice(0,10);
+    // ===================================
+    // ✅ VALIDACION 1: HOY debe estar DENTRO del rango FechaCheckin <= HOY <= FechaCheckout
+    // ✅ NO PERMITIR check-in ANTES de la fecha de entrada (10 días antes = ERROR BLOQUEANTE! como lo reportó usuario)
+    // ✅ NO PERMITIR check-in DESPUÉS de fechaCheckout (ya terminó).
+    // ===================================
+    if (hoy < String(reserva.fechaCheckin || '').slice(0,10)) {
+      const diasAntes = Math.max(1, Math.round((new Date(reserva.fechaCheckin).getTime() - new Date(hoy).getTime()) / (1000*60*60*24)));
+      return {
+        error: `⛔ Check-in ANTICIPADO NO permitido.\nLa reserva empieza ${String(reserva.fechaCheckin||'').slice(0,10)}. Hoy es ${hoy}. Faltan ${diasAntes} día(s).\nNo se puede hacer check-in de una reserva futura.`,
+        errorCodigo: 'FECHA_CHECKIN_FUTURO',
+      };
+    }
+    if (hoy >= String(reserva.fechaCheckout || '').slice(0,10)) {
+      return {
+        error: `⛔ No se puede hacer check-in: hoy ${hoy} es DESPUÉS o IGUAL a fecha checkout ${String(reserva.fechaCheckout||'').slice(0,10)}.\nEsta reserva ya terminó. Use Check-out.`,
+        errorCodigo: 'FUERA_RANGO_FECHA',
+      };
+    }
+
+    // ===================================
+    // ✅ VALIDACION 2: NINGUNA otra reserva ACTIVA (CHECKED_IN/CHECKIN/PENDIENTE/CONFIRMADA) con habitaciones SOLAPADAS que cubran HOY
+    // Si la habitación ya está OCUPADA hoy por otra reserva VIGENTE -> ERROR BLOQUEANTE.
+    // ===================================
+    const habIdsDeReserva = (reserva.habitaciones || []).map(rh => String(rh.habitacionId));
+    for (const habId of habIdsDeReserva) {
+      const habitacion = HabitacionService.buscarPorId(habId);
+      // Caso extremo: Habitacion.estado YA ES "OCUPADA" y la reserva ACTUAL no es la que la ocupó (es otra reserva activa)
+      if (habitacion && habitacion.estado === 'OCUPADA') {
+        // Buscar: qué reserva VIGENTE está ocupando esta habitación HOY
+        const ocupantesActivos = (ReservaService.listarTodas() || []).filter((otra: Reserva) => {
+          if (String(otra.id) === String(reserva.id)) return false; // ignorar actual
+          // estado activo?
+          const est = String(otra.estado || '').toUpperCase().replace(/[\s_-]+/g, '');
+          if (!['CHECKIN','CHECKEDIN','CHECKOUT','PENDIENTE','CONFIRMADA','ENESPERA','MODIFICADA'].includes(est)) return false;
+          // la otra reserva cubre HOY en su rango y está asignada a esta misma habId
+          const r1 = String(otra.fechaCheckin || '').slice(0,10);
+          const r2 = String(otra.fechaCheckout || '').slice(0,10);
+          if (!(r1 && r2)) return false;
+          if (!(hoy >= r1 && hoy < r2)) return false;
+          return (otra.habitaciones || []).some(rh => String(rh.habitacionId) === habId);
+        });
+        if (ocupantesActivos.length > 0) {
+          const cods = ocupantesActivos.map(r => `#${r.codigoReserva || r.id?.slice(0,8)} [${String(r.estado||'').toUpperCase()}] ${String(r.fechaCheckin||'').slice(0,10)} → ${String(r.fechaCheckout||'').slice(0,10)}`).join('\n· ');
+          return {
+            error: `⛔ HABITACIÓN OCUPADA HOY por otra reserva activa.\nHabitación ${habitacion.codigo || habId} estado = OCUPADA.\n\nReservas activas que ocupan HOY la habitación (no han terminado):\n· ${cods}\n\nSOLUCIÓN: Primero haga el CHECK-OUT de la reserva ${ocupantesActivos[0].codigoReserva || ocupantesActivos[0].id?.slice(0,8)}. La habitación se marcará LIMPIEZA → LIBRE y RECIÉN podrá hacer check-in de ESTA reserva. NO se permite reemplazar una reserva VIGENTE por otra.`,
+            errorCodigo: 'HABITACION_OCUPADA_HOY_OTRA_RESERVA',
+          };
+        }
+        // Si no encontramos reserva activa ocupante, pero la habitación está marcada OCUPADA → error.
+        return {
+          error: `⛔ La habitación ${habitacion.codigo || habId} está marcada como OCUPADA.\nAntes de hacer check-in debe estar LIBRE o LIMPIEZA.\nPuede deberse a check-out no marcado de reserva anterior.`,
+          errorCodigo: 'HAB_ESTADO_YA_OCUPADA',
+        };
+      }
+
+      // 2da validación independiente: InMemoryDB overlap por cada habId para HOY
+      const reservasMismoHab = ReservaService.listarPorHabitacionYFechas({
+        habitacionId: habId,
+        checkinISO: hoy,
+        checkoutISO: seedUtil.addDaysISO ? seedUtil.addDaysISO(hoy, 1) : hoy,
+        excluirReservaId: reserva.id,
+      });
+      if (Array.isArray(reservasMismoHab) && reservasMismoHab.length > 0) {
+        const cods = reservasMismoHab.map(r => `#${r.codigoReserva || r.id?.slice(0,8)} [${String(r.estado||'').toUpperCase()}] ${String(r.fechaCheckin||'').slice(0,10)} → ${String(r.fechaCheckout||'').slice(0,10)}`).join('\n· ');
+        return {
+          error: `⛔ Conflicto HOY (${hoy}) en habitación ${habitacion?.codigo || habId}:\nOtras reservas activas ocupan la misma habitación HOY.\n· ${cods}\n\nDebe hacer Check-out primero para liberar la habitación. NO está permitido reemplazar reserva vigente.`,
+          errorCodigo: 'HABITACION_OCUPADA_HOY_OTRA_RESERVA',
+        };
+      }
+    }
+
     const userId = params.usuarioIdRecepcionista;
     const checkInInfo: NonNullable<Reserva['checkInInfo']> = {
       fechaHoraCheckin: now,

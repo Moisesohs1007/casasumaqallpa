@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { IonContent, IonHeader, IonPage, IonTitle, IonToolbar, IonList, IonItem, IonLabel, IonBadge, IonFab, IonFabButton, IonIcon, useIonRouter, useIonViewWillEnter, IonButton, IonButtons, IonRefresher, IonRefresherContent, IonSegment, IonSegmentButton } from '@ionic/react';
+import { IonContent, IonHeader, IonPage, IonTitle, IonToolbar, IonList, IonItem, IonLabel, IonBadge, IonFab, IonFabButton, IonIcon, useIonRouter, useIonViewWillEnter, IonButton, IonButtons, IonRefresher, IonRefresherContent, IonSegment, IonSegmentButton, IonAlert } from '@ionic/react';
 import { addCircle, logIn, create, refresh } from 'ionicons/icons';
 import type { Color } from '@ionic/core';
 import {
@@ -7,7 +7,7 @@ import {
   EstadoReserva,
   OrigenReserva,
 } from '../../types';
-import { ReservaService, FolioService, HabitacionService, pendingSync } from '../../services';
+import { ReservaService, FolioService, HabitacionService, pendingSync, seedUtil } from '../../services';
 import { supabase } from '../../services/__supabase_db__';
 import CheckinModal from '../../components/modals/CheckinModal';
 import './Reservas.css';
@@ -66,6 +66,8 @@ const ReservasPage: React.FC = () => {
   const [modalCheckinOpen, setModalCheckinOpen] = useState(false);
   const [reservaIdParaCheckin, setReservaIdParaCheckin] = useState<string | null>(null);
   const [vistaReservas, setVistaReservas] = useState<'ACTIVAS' | 'HISTORICO'>('ACTIVAS');
+  const [alertCheckinOpen, setAlertCheckinOpen] = useState(false);
+  const [alertCheckinMsg, setAlertCheckinMsg] = useState<{ header: string; subHeader?: string; message?: string }>({ header: '' });
   const refreshingRef = useRef(false);
   const snapshotReservas = useRef<string>('');
   // Refs estables: setState vía refs para NO recrear refrescarFuerza
@@ -224,14 +226,88 @@ const ReservasPage: React.FC = () => {
     }
   };
 
-  // Pre-refresh ANTES de abrir Checkin modal (hidrata esa reserva + hab específica)
+  // Pre-refresh ANTES de abrir Checkin modal + BLOQUEO PREVIO RC10 (fecha/ocupación HOY)
   const abrirCheckin = async (e: React.MouseEvent, id: string) => {
     e.stopPropagation();
     e.preventDefault();
+
+    const hoy = new Date().toISOString().slice(0, 10);
+    const r = ReservaService.buscarPorId(id);
+    if (!r) return;
+
+    const ci = String(r.fechaCheckin || r.fechaCheckIn || '').slice(0, 10);
+    const co = String(r.fechaCheckout || r.fechaCheckOut || '').slice(0, 10);
+    const codR = r.codigoReserva || r.codigo || String(r.id || '').slice(0, 9);
+
+    // RC10 VALIDACIÓN 1: HOY debe estar DENTRO del rango [checkin, checkout)
+    if (hoy < ci) {
+      const msAntes = Math.max(0, new Date(ci).getTime() - new Date(hoy).getTime());
+      const diasAntes = Math.max(1, Math.round(msAntes / 86400000));
+      setAlertCheckinMsg({
+        header: '⛔ Check-in ANTICIPADO NO permitido',
+        subHeader: `Reserva ${codR} empieza el ${ci}`,
+        message: `Hoy es ${hoy}. Faltan ${diasAntes} día(s) para el inicio de la reserva.\n\nEl check-in SÓLO se permite el mismo día de ingreso o posterior (dentro del rango de la reserva).\nNO se puede reemplazar a un huésped que todavía está ocupando la habitación.`,
+      });
+      setAlertCheckinOpen(true);
+      return;
+    }
+    if (hoy >= co) {
+      setAlertCheckinMsg({
+        header: '⛔ Reserva ya FINALIZÓ',
+        subHeader: `Checkout de ${codR} fue el ${co}`,
+        message: `Hoy es ${hoy}. Esta reserva ya terminó.\nNo se puede hacer check-in de una reserva cerrada.`,
+      });
+      setAlertCheckinOpen(true);
+      return;
+    }
+
+    // RC10 VALIDACIÓN 2: Habitación NO OCUPADA HOY por otra reserva ACTIVA
+    const habsIds = (r.habitaciones || []).map((rh: any) => String(rh.habitacionId || ''));
+    for (const habId of habsIds) {
+      if (!habId) continue;
+      const hab = HabitacionService.buscarPorId(habId);
+
+      const conflictos = ReservaService.listarPorHabitacionYFechas?.({
+        habitacionId: habId,
+        checkinISO: hoy,
+        checkoutISO: seedUtil?.addDaysISO ? seedUtil.addDaysISO(hoy, 1) : hoy,
+        excluirReservaId: r.id,
+      }) || [];
+
+      if (conflictos.length > 0) {
+        const cods = conflictos
+          .map((cf: any) => {
+            const cod = cf.codigoReserva || cf.codigo || String(cf.id || '').slice(0, 9);
+            const est = String(cf.estado || 'PENDIENTE').toUpperCase();
+            const cfCi = String(cf.fechaCheckin || '').slice(0, 10);
+            const cfCo = String(cf.fechaCheckout || '').slice(0, 10);
+            return `· #${cod}  [${est}]  ${cfCi} → ${cfCo}`;
+          })
+          .join('\n');
+        setAlertCheckinMsg({
+          header: '⛔ HABITACIÓN OCUPADA HOY',
+          subHeader: `${hab?.codigo || hab?.nombre || habId} — estado = ${hab?.estado || '?'}`,
+          message: `La habitación está ocupada HOY (${hoy}) por otra(s) reserva(s) activa(s) que todavía NO han hecho check-out:\n\n${cods}\n\nSOLUCIÓN:\n1) Primero haga el CHECK-OUT de la reserva actual que ocupa la habitación.\n2) La habitación se marcará como LIMPIEZA → luego LIBRE.\n3) RECIÉN podrá hacer el check-in de ESTA reserva (${codR}).\n\n⚠️ NUNCA se permite reemplazar una reserva VIGENTE por otra.`,
+        });
+        setAlertCheckinOpen(true);
+        return;
+      }
+
+      // 2b) Si la habitación está marcada OCUPADA pero no encontramos reserva → alerta
+      if (hab && hab.estado === 'OCUPADA') {
+        setAlertCheckinMsg({
+          header: '⛔ Habitación MARCADA COMO OCUPADA',
+          subHeader: `${hab.codigo || hab.nombre || habId} — OCUPADA`,
+          message: `La habitación está marcada como OCUPADA pero no se encontró una reserva activa para hoy. Puede deberse a un check-out no registrado.\n\nAntes de hacer check-in la habitación debe estar LIBRE o LIMPIEZA.`,
+        });
+        setAlertCheckinOpen(true);
+        return;
+      }
+    }
+
+    // ✅ TODAS LAS VALIDACIONES PASARON — abrir modal
     try {
-      // 1) Refresco general
       await refrescarFuerza();
-      // 2) Re-hidrato específico ReservaService por id (force=true) - mejor 2 capas
       try {
         await Promise.all([
           (ReservaService as any).hidratarDesdeSupabase?.(true),
@@ -363,12 +439,20 @@ const ReservasPage: React.FC = () => {
           </IonFabButton>
         </IonFab>
 
+        <IonAlert
+          isOpen={alertCheckinOpen}
+          header={alertCheckinMsg.header}
+          subHeader={alertCheckinMsg.subHeader}
+          message={alertCheckinMsg.message}
+          buttons={['Entendido']}
+          onDidDismiss={() => setAlertCheckinOpen(false)}
+        />
+
         <CheckinModal
           isOpen={modalCheckinOpen}
           onDidDismiss={() => {
             setModalCheckinOpen(false);
             setReservaIdParaCheckin(null);
-            // Refrescar listado después de check-in
             try {
               const todas = ReservaService.listarTodas ? ReservaService.listarTodas() : [];
               const ordenadas = [...todas].sort((a: any, b: any) => {
