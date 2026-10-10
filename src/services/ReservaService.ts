@@ -13,6 +13,48 @@ let _hidratandoPromise: Promise<boolean> | null = null;
 
 const log = (m: string, ...rest: any[]) => { try { console.debug(`[ReservaService] ${m}`, ...rest); } catch (_) {} };
 
+/**
+ * ✅ Helper GLOBAL anti-falso-positivo overlapping históricas.
+ * USADO POR 2 MÓDULOS:
+ *   1) ReservaService.listarPorHabitacionYFechas (RC3 2 niveles overlap validación)
+ *   2) HabitacionService.listarTodas disponiblesParaFechas (valida al elegir habitación Paso 2)
+ *
+ * REGLAS DURAS: Si devuelve TRUE → esta reserva SÍ BLOQUEA nueva reserva en las fechas.
+ *   - ESTADOS NUNCA BLOQUEAN (histórico): CANCELADA · CHECKED_OUT · NO_SHOW
+ *   - NORMALIZACIÓN estado: uppercase + quitar espacios/guionesBajos/guiones → atrapa variantes "Check-out" / "checked_out" / "Checked Out" / etc
+ *   - REGLA HISTÓRICA INQUEBRANTABLE: Si fechaCheckout (t11:00 AM) de esta reserva < HOY (inicio día 00:00) → YA PASÓ → NUNCA BLOQUEA aunque el estado esté roto/corrupto por pruebas antiguas.
+ */
+export const reservaBloqueaHabitacionEnFechas = (
+  r: Pick<Reserva, 'estado'|'fechaCheckin'|'fechaCheckout'|'id'> & any,
+  checkinISO: string,
+  checkoutISO: string,
+  habitacionId?: string,
+  excluirReservaId?: string,
+): boolean => {
+  if (!r) return false;
+  if (excluirReservaId && String(r.id) === String(excluirReservaId)) return false;
+  if (habitacionId && !(r.habitaciones || []).some((rh: any) => String(rh.habitacionId) === String(habitacionId))) return false;
+  // Normaliza estado (tolerante a variantes / typo / mayus-minus)
+  const est = String(r.estado || 'PENDIENTE')
+    .toUpperCase()
+    .replace(/[\s_-]+/g, '');
+  const bloqueados = new Set(['CHECKEDOUT','CANCELADA','CANCELADO','NOSHOW']);
+  if (bloqueados.has(est)) return false;
+  // REGLA DURA: checkout < hoy = histórica = nunca bloquea
+  const fec = seedUtil.nowISO ? seedUtil.nowISO() : new Date().toISOString();
+  const arrHoy = fec.slice(0,10).split('-').map(Number);
+  const hoy00 = new Date(arrHoy[0], (arrHoy[1]||1)-1, arrHoy[2]||1).toISOString();
+  if (String(r.fechaCheckout || '').slice(0,10) < hoy00.slice(0,10)) return false;
+  // Overlap clásico estricto: checkinNuevo < checkoutViejo AND checkoutNuevo > checkinViejo
+  const ciR = seedUtil.addDaysISO ? seedUtil.addDaysISO(String(r.fechaCheckin || ''), 0) : String(r.fechaCheckin || '');
+  const coR = String(r.fechaCheckout || '');
+  const ciN = seedUtil.addDaysISO ? seedUtil.addDaysISO(String(checkinISO || ''), 0) : String(checkinISO || '');
+  const coN = String(checkoutISO || '');
+  if (!ciR || !coR || !ciN || !coN) return false;
+  return (ciN < coR) && (coN > ciR);
+};
+
+
 const siguienteCodigoLocal = (): string => {
   const sufijo = Date.now().toString().slice(-7);
   return `R-${sufijo}`;
@@ -185,15 +227,9 @@ export const ReservaService = {
     excluirReservaId?: string;
   }): Reserva[] {
     const { habitacionId, checkinISO, checkoutISO, excluirReservaId } = params;
-    return this.listarTodas().filter((r) => {
-      // ESTADOS TERMINADOS / HISTÓRICO = NUNCA BLOQUEAN NUEVA RESERVA.
-      // CHECKED_OUT = ya terminó y se liberó la habitación; CANCELADA = nunca ocupó; NO_SHOW = no se presentó.
-      const est: string = String(r.estado || 'PENDIENTE').toUpperCase();
-      if (['CHECKED_OUT','CANCELADA','NO_SHOW'].includes(est)) return false;
-      if (excluirReservaId && r.id === excluirReservaId) return false;
-      if (!(r.habitaciones || []).some((rh) => rh.habitacionId === habitacionId)) return false;
-      return checkinISO < r.fechaCheckout && checkoutISO > r.fechaCheckin;
-    });
+    return this.listarTodas().filter((r) =>
+      reservaBloqueaHabitacionEnFechas(r, checkinISO, checkoutISO, habitacionId, excluirReservaId)
+    );
   },
 
   /** Paso 1 del flujo: validar disponibilidad de habitaciones y tarifa. */

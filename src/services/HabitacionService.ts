@@ -1,6 +1,7 @@
 // @ts-nocheck
 import { db, seedUtil, type Create, type Update, type Habitacion, type TipoHabitacion, type EstadoHabitacion } from './__db__';
-import SupabaseDB, { db as dbRemota } from './__supabase_db__';
+import { reservaBloqueaHabitacionEnFechas } from './ReservaService';
+import { db as dbRemota } from './__supabase_db__';
 import * as pendingSync from './__pending_sync__';
 
 const KEY_HAB = 'habitaciones' as const;
@@ -141,13 +142,11 @@ export const HabitacionService = {
       const reservas = db.all<import('./__db__').Reserva>('reservas');
       const idsOcupadas = new Set<string>();
       for (const r of reservas) {
-        if (r.estado === 'CANCELADA') continue;
-        if (r.estado === 'CHECKED_OUT') continue;
         if (!Array.isArray(r.habitaciones)) continue;
-        const superposicion =
-          seedUtil.addDaysISO(checkinISO, 0) < r.fechaCheckout &&
-          checkoutISO > seedUtil.addDaysISO(r.fechaCheckin, 0);
-        if (!superposicion) continue;
+        // Helper único = misma validación que RC3 doble-reserva.
+        // Solo devuelve TRUE si la reserva SÍ bloquea (activa, overlap fecha, no histórica, estado no cancelada/checkout/noshow, checkout >= hoy)
+        const bloquea = reservaBloqueaHabitacionEnFechas(r, checkinISO, checkoutISO);
+        if (!bloquea) continue;
         for (const rh of r.habitaciones) idsOcupadas.add(rh.habitacionId);
       }
       lista = lista.filter((h) => !idsOcupadas.has(h.id) && h.estado !== 'BLOQUEADA' && h.estado !== 'MANTENIMIENTO');
