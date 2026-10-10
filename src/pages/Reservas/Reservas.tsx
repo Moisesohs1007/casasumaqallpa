@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { IonContent, IonHeader, IonPage, IonTitle, IonToolbar, IonList, IonItem, IonLabel, IonBadge, IonFab, IonFabButton, IonIcon, useIonRouter, useIonViewWillEnter, IonButton, IonButtons, IonRefresher, IonRefresherContent } from '@ionic/react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { IonContent, IonHeader, IonPage, IonTitle, IonToolbar, IonList, IonItem, IonLabel, IonBadge, IonFab, IonFabButton, IonIcon, useIonRouter, useIonViewWillEnter, IonButton, IonButtons, IonRefresher, IonRefresherContent, IonSegment, IonSegmentButton } from '@ionic/react';
 import { addCircle, logIn, create, refresh } from 'ionicons/icons';
 import type { Color } from '@ionic/core';
 import {
@@ -65,11 +65,35 @@ const ReservasPage: React.FC = () => {
   const [reservas, setReservas] = useState<Reserva[]>([]);
   const [modalCheckinOpen, setModalCheckinOpen] = useState(false);
   const [reservaIdParaCheckin, setReservaIdParaCheckin] = useState<string | null>(null);
+  const [vistaReservas, setVistaReservas] = useState<'ACTIVAS' | 'HISTORICO'>('ACTIVAS');
   const refreshingRef = useRef(false);
   const snapshotReservas = useRef<string>('');
   // Refs estables: setState vía refs para NO recrear refrescarFuerza
   const setReservasRef = useRef<typeof setReservas>(() => {});
   setReservasRef.current = setReservas;
+
+  // ESTADOS = RESERVA "ACTIVA" (no debe desaparecer del tab principal)
+  //   PENDIENTE / CONFIRMADA / EN_ESPERA / MODIFICADA / CHECKIN / CHECKED_IN / CHECKOUT
+  // HISTÓRICO (solo en tab Histórico):
+  //   CHECKED_OUT / CANCELADA / NO_SHOW
+  const ESTADOS_ACTIVOS = new Set<EstadoReserva>([
+    'PENDIENTE','CONFIRMADA','EN_ESPERA','MODIFICADA',
+    'CHECKIN','CHECKED_IN','CHECKOUT',
+  ]);
+
+  const reservasVisibles = useMemo(() => {
+    try {
+      const todos = Array.isArray(reservas) ? reservas : [];
+      const filtrados = vistaReservas === 'ACTIVAS'
+        ? todos.filter((r: any) => ESTADOS_ACTIVOS.has((r?.estado || 'PENDIENTE') as EstadoReserva))
+        : todos.filter((r: any) => !ESTADOS_ACTIVOS.has((r?.estado || 'PENDIENTE') as EstadoReserva));
+      return filtrados.sort((a: any, b: any) => {
+        const fa = new Date(a.fechaCreacion || a.createdAt || 0).getTime();
+        const fb = new Date(b.fechaCreacion || b.createdAt || 0).getTime();
+        return fb - fa;
+      });
+    } catch { return [] as Reserva[]; }
+  }, [reservas, vistaReservas]);
 
   const cargarReservas = () => {
     try {
@@ -229,8 +253,19 @@ const ReservasPage: React.FC = () => {
           </IonToolbar>
         </IonHeader>
 
+        <div style={{ padding: '10px 14px 0 14px' }}>
+          <IonSegment value={vistaReservas} onIonChange={(e) => { const v = (e.detail.value as any) || 'ACTIVAS'; setVistaReservas(v); }}>
+            <IonSegmentButton value="ACTIVAS">
+              <IonLabel>🟢 Activas del día</IonLabel>
+            </IonSegmentButton>
+            <IonSegmentButton value="HISTORICO">
+              <IonLabel>📚 Histórico (Check-out / Canceladas)</IonLabel>
+            </IonSegmentButton>
+          </IonSegment>
+        </div>
+
         <IonList inset>
-          {reservas.map((r: any) => {
+          {reservasVisibles.map((r: any) => {
             const hab0 = (r.habitaciones || [])[0];
             const codHab = hab0?.habitacion?.codigo ?? hab0?.tipoHabitacionNombre ?? hab0?.habitacionId ?? '—';
             const titular = r.huesped
@@ -285,10 +320,12 @@ const ReservasPage: React.FC = () => {
               </IonItem>
             );
           })}
-          {reservas.length === 0 && (
+          {reservasVisibles.length === 0 && (
             <IonItem lines="none">
               <IonLabel style={{ textAlign: 'center', padding: '24px 0' }}>
-                No hay reservas todavía. Toca el botón [+] para crear la primera.
+                {vistaReservas === 'ACTIVAS'
+                  ? 'No hay reservas activas hoy. Toca el botón [+] para crear una, o revisa "Histórico" para ver Check-out y canceladas.'
+                  : 'Todavía no hay reservas cerradas en Histórico.'}
               </IonLabel>
             </IonItem>
           )}
