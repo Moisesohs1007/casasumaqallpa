@@ -9,7 +9,7 @@ import {
 import type { Color } from '@ionic/core';
 import { add, remove, trash, close, save, receiptOutline, wallet, cart, person, restaurant, bed, cash, pricetag, refresh } from 'ionicons/icons';
 import { Habitacion, EstadoHabitacion, ProductoFB, Reserva } from '../../types';
-import { HabitacionService, ReservaService, CatalogoFBService, InventarioService, seedProductos, FolioService, pendingSync } from '../../services';
+import { HabitacionService, ReservaService, CatalogoFBService, InventarioService, seedProductos, FolioService, CargoFolioService, PagoFolioService, ImpuestoService, pendingSync, seedUtil } from '../../services';
 import { supabase } from '../../services/__supabase_db__';
 import CheckinModal from '../../components/modals/CheckinModal';
 import CheckoutModal from '../../components/modals/CheckoutModal';
@@ -656,6 +656,189 @@ const HabitacionesPage: React.FC = () => {
   }
   const calcularTotalPagos = (pagos: RegistroPago[]) => pagos.reduce((s, p) => s + Number(p.monto || 0), 0);
 
+  // ✅ Helper PERSISTENTE: Usa FolioService + CargoFolioService + PagoFolioService para guardar EN DB.
+  // El antiguo código solo guardaba en useState setFoliosLocal; los cargos/pagos no aparecían en el modal Folio
+  // que se renderiza desde FolioService.buscarPorId(folioId).cargos (datos REALES).
+  const obtenerOCrearFolioAbierto = (habId: string): any | null => {
+    try {
+      const existente = FolioService.buscarPorHabitacionAbierta(habId);
+      if (existente) return existente;
+      const hab = HabitacionService.buscarPorId(habId);
+      if (!hab) return null;
+      // Buscar reserva CHECKED_IN o CHECKIN asociada a esta habitación para asociarla.
+      const reservaAbierta = (ReservaService.listarTodas() || []).find((r: Reserva) => {
+        const est = String(r.estado || '').toUpperCase().replace(/[\s_-]+/g, '');
+        if (!['CHECKIN','CHECKEDIN','CHECKOUT'].includes(est)) return false;
+        return (r.habitaciones || []).some((h: any) => h.habitacionId === habId);
+      });
+      const fsLocal = foliosLocal[habId] as any;
+      const huespedNombre = String(fsLocal?.huesped?.nombres || fsLocal?.huesped?.apellidos || '').trim() ||
+                           (reservaAbierta ? `${(reservaAbierta as any).nombres || ''} ${(reservaAbierta as any).apellidos || ''}`.trim() : '') ||
+                           `Huesped Hab ${hab.codigo}`;
+      const payloadFolio: any = {
+        id: seedUtil.generateUUID?.() ?? `F-${habId}-${Date.now()}`,
+        numeroFolio: `F-${new Date().getFullYear()}${String(new Date().getMonth()+1).padStart(2,'0')}${String(new Date().getDate()).padStart(2,'0')}-001`,
+        reservaId: reservaAbierta?.id || undefined,
+        habitacionId: habId,
+        huespedId: (reservaAbierta as any)?.huespedId || undefined,
+        titular: huespedNombre,
+        estado: 'ABIERTO',
+        fechaApertura: seedUtil.nowISO ? seedUtil.nowISO() : new Date().toISOString(),
+        tipo: 'ALOJAMIENTO',
+        moneda: 'PEN',
+        totalAlojamiento: 0,
+        totalConsumos: 0,
+        totalImpuestos: 0,
+        totalDescuentos: 0,
+        totalPagos: 0,
+        saldoPendiente: 0,
+        totalFinal: 0,
+        observaciones: `Apertura automática Hab ${hab.codigo}`,
+        createdBy: USUARIO_ACTUAL.id,
+        updatedBy: USUARIO_ACTUAL.id,
+        createdByUsuarioNombre: `${USUARIO_ACTUAL.nombres} ${USUARIO_ACTUAL.apellidos}`,
+      };
+      return (FolioService as any).crear(payloadFolio);
+    } catch (e) { console.warn('[obtenerOCrearFolioAbierto] error:', e); return null; }
+  };
+
+  /** Crea un CARGO persistente. Retorna el CargoFolio creado o null. */
+  const crearCargoPersistenteEnFolio = (params: {
+    habId: string;
+    concepto: string;
+    tipoConcepto: any;
+    categoria?: string;
+    cantidad: number;
+    precioUnitario: number;
+    origenCargo: any;
+    comandaId?: string;
+    productoInventarioId?: string;
+    descripcion?: string;
+    observaciones?: string;
+    comentarios?: string;
+    referenciaId?: string;
+  }): any | null => {
+    try {
+      const folio = obtenerOCrearFolioAbierto(params.habId);
+      if (!folio) return null;
+      const now = seedUtil.nowISO ? seedUtil.nowISO() : new Date().toISOString();
+      const imp1 = (ImpuestoService as any).listarTodos?.() || [];
+      const impIGV = (imp1 as any[]).find((x: any) =>
+        /IGV|18/.test(String(x?.nombre || x?.codigo || x?.id || '').toUpperCase())
+      ) || null;
+      const cantidad = Math.max(0, Number(params.cantidad || 0));
+      const precioUnit = Math.max(0, Number(params.precioUnitario || 0));
+      // Sunat: precioUnitario CON IGV incluido (total nominal carta).
+      // totalNominal = cantidad * precioUnit (con IGV) = subtotal + igv.
+      const totalNominal = Number((cantidad * precioUnit).toFixed(2));
+      // Fórmula SUNAT IGV 18%: igv = totalNominal * 18 / 118; subtotal = totalNominal - igv (redondeo absorbido por subtotal).
+      const igv = Number((totalNominal * 18 / 118).toFixed(2));
+      const subtotal = Number((totalNominal - igv).toFixed(2));
+      // Recalcular subtotal para que sume EXACTO: subtotal + igv = totalNominal (absorber redondeo)
+      const diff = totalNominal - Number((subtotal + igv).toFixed(2));
+      const subtotalFinal = Number((subtotal + diff).toFixed(2));
+      const impDesglosado = impIGV ? [{
+        impuestoId: impIGV.id,
+        impuestoNombre: impIGV.nombre || 'IGV',
+        montoImpuesto: igv,
+      }] : [{
+        impuestoId: 'IMP-IGV-DEFAULT',
+        impuestoNombre: 'IGV 18%',
+        montoImpuesto: igv,
+      }];
+      const cargoParams: any = {
+        folioId: folio.id,
+        numeroLinea: ((folio.cargos || []).length) + 1,
+        fechaCargo: now,
+        concepto: params.concepto,
+        tipoConcepto: params.tipoConcepto,
+        categoria: params.categoria || params.tipoConcepto || 'Varios',
+        habitacionId: params.habId,
+        comandaId: params.comandaId,
+        comandaDetalleId: params.referenciaId,
+        descripcion: params.descripcion || params.observaciones || params.comentarios || params.concepto,
+        conceptoDetalle: params.comentarios ? [params.comentarios] : undefined,
+        comentarios: params.comentarios,
+        cantidad,
+        unidadMedida: 'UND',
+        precioUnitario: precioUnit,
+        descuentoMonto: 0,
+        descuentoPorcentaje: 0,
+        montoImpuesto: igv,
+        impuestoPorcentaje: impIGV ? Number(impIGV.porcentaje || 18) : 18,
+        subtotal: subtotalFinal,
+        total: totalNominal,
+        monto: totalNominal,
+        moneda: 'PEN',
+        cargoAuto: false,
+        origenCargo: params.origenCargo,
+        nombreUsuarioAplicaCargo: `${USUARIO_ACTUAL.nombres} ${USUARIO_ACTUAL.apellidos}`,
+        usuarioRegistroId: USUARIO_ACTUAL.id,
+        autorizadoPor: `${USUARIO_ACTUAL.nombres} ${USUARIO_ACTUAL.apellidos}`,
+        anulado: false,
+        esAnulado: false,
+        motivoAnulacion: '',
+        fechaAplicacion: now,
+        productoInventarioId: params.productoInventarioId || null,
+        reservaId: folio.reservaId || undefined,
+        huespedId: folio.huespedId || undefined,
+        usuarioId: USUARIO_ACTUAL.id,
+        estado: 'PENDIENTE_COBRO',
+        impuestosIds: impIGV ? [impIGV.id] : ['IMP-IGV-DEFAULT'],
+        impuestosMontoDesglosado: impDesglosado,
+        descuentosIds: [],
+        descuentosMontoDesglosado: [],
+        propinaMonto: 0,
+        aplicaIgv: true,
+        createdAt: now,
+        updatedAt: now,
+        createdBy: USUARIO_ACTUAL.id,
+        updatedBy: USUARIO_ACTUAL.id,
+      };
+      return CargoFolioService.crear(cargoParams);
+    } catch (e) { console.warn('[crearCargoPersistenteEnFolio] error:', e); return null; }
+  };
+
+  /** Crea un PAGO persistente. Retorna el PagoFolio creado o null. */
+  const crearPagoPersistenteEnFolio = (params: {
+    habId: string;
+    monto: number;
+    metodoPago: string;
+    moneda?: string;
+    referencia?: string;
+    observaciones?: string;
+  }): any | null => {
+    try {
+      const folio = obtenerOCrearFolioAbierto(params.habId);
+      if (!folio) return null;
+      const now = seedUtil.nowISO ? seedUtil.nowISO() : new Date().toISOString();
+      const pagoParams: any = {
+        folioId: folio.id,
+        fechaPago: now,
+        monto: Number(params.monto || 0),
+        moneda: params.moneda || 'PEN',
+        metodoPago: params.metodoPago || 'EFECTIVO_PEN',
+        estado: 'PAGADO',
+        referencia: params.referencia || `Pago Hab ${params.habId} ${now.slice(0,10)}`,
+        observaciones: params.observaciones || undefined,
+        motivo: 'Pago Habitación Recepción',
+        usuarioRegistroId: USUARIO_ACTUAL.id,
+        autorizadoPor: `${USUARIO_ACTUAL.nombres} ${USUARIO_ACTUAL.apellidos}`,
+        anulado: false,
+        esAnulado: false,
+        motivoAnulacion: '',
+        reservaId: folio.reservaId || undefined,
+        huespedId: folio.huespedId || undefined,
+        usuarioId: USUARIO_ACTUAL.id,
+        createdAt: now,
+        updatedAt: now,
+        createdBy: USUARIO_ACTUAL.id,
+        updatedBy: USUARIO_ACTUAL.id,
+      };
+      return PagoFolioService.crear(pagoParams);
+    } catch (e) { console.warn('[crearPagoPersistenteEnFolio] error:', e); return null; }
+  };
+
   // ---- Acciones ----
   const guardarDatosHuesped = () => {
     if (!habSeleccionada) return;
@@ -697,12 +880,30 @@ const HabitacionesPage: React.FC = () => {
     } catch (e) {
       console.warn('[Habitaciones.confirmarVentaStock] moverStock warn (no bloquea venta):', (e as Error).message || e);
     }
-    // Agregar líneas al folio
+    // ✅ PERSISTIR EN FOLIO REAL (FolioService + CargoFolioService)
+    // Este era el bug: antes solo guardaba en setFoliosLocal (no se veía en el modal Folio)
+    const habId = habSeleccionada.id;
+    for (const it of items) {
+      crearCargoPersistenteEnFolio({
+        habId,
+        concepto: `${it.cantidad}× ${it.prod.nombre} · ${habSeleccionada.codigo}`,
+        tipoConcepto: 'VENTA_PRODUCTO' as any,
+        categoria: (it.prod as any).categoriaId || (it.prod as any).categoria || 'Productos',
+        cantidad: it.cantidad,
+        precioUnitario: Number(it.prod.precioVentaBase || 0),
+        origenCargo: 'RECEPCION_VENTA_STOCK',
+        productoInventarioId: it.prod.id,
+        descripcion: `Venta manual desde Habitaciones · ${habSeleccionada.codigo} · SKU: ${it.prod.sku || 'N/A'}. Usuario: ${USUARIO_ACTUAL.nombres} ${USUARIO_ACTUAL.apellidos}`,
+        comentarios: `Venta manual desde Recepción. Hab: ${habSeleccionada.codigo}. SKU: ${it.prod.sku || ''}`,
+        referenciaId: it.prod.id,
+      });
+    }
+    // También actualizamos state local para que los componentes que lo lean lo vean (aunque el modal use FolioService real)
     setFoliosLocal(fs => {
-      const folio = fs[habSeleccionada!.id] as any;
+      const folio = fs[habId] as any;
       return {
         ...fs,
-        [habSeleccionada!.id]: {
+        [habId]: {
           ...folio,
           lineas: [
             ...(folio?.lineas || []),
@@ -730,11 +931,31 @@ const HabitacionesPage: React.FC = () => {
     if (!habSeleccionada) return;
     const { nombre, precio, cantidad, observaciones } = servExtraForm;
     if (!nombre.trim() || Number(precio) <= 0 || Number(cantidad) <= 0) { mostrarAlerta('Datos incompletos', 'Nombre, precio y cantidad son obligatorios.'); return; }
+    const habId = habSeleccionada.id;
+    // ✅ BUG FIX PRINCIPAL: Persistir el cargo en FOLIO REAL (CargoFolioService)
+    // Antes solo guardaba en setFoliosLocal => modal Folio abierto no mostraba nada!
+    const cargoCreado = crearCargoPersistenteEnFolio({
+      habId,
+      concepto: `${cantidad}× ${nombre.trim()} · ${habSeleccionada.codigo}`,
+      tipoConcepto: 'SERVICIO_EXTRA' as any,
+      categoria: 'Servicios Extras',
+      cantidad: Number(cantidad),
+      precioUnitario: Number(precio),
+      origenCargo: 'RECEPCION_SERVICIO_EXTRA',
+      descripcion: observaciones?.trim() || `Servicio extra agregado manualmente desde Recepción. Hab: ${habSeleccionada.codigo}.`,
+      comentarios: `Agregado desde modal Folio botón AÑADIR SERVICIO. Hab: ${habSeleccionada.codigo}. Observaciones: ${observaciones?.trim() || ''}`,
+      observaciones: observaciones?.trim() || undefined,
+    });
+    if (!cargoCreado) {
+      mostrarAlerta('No se pudo guardar', 'No se encontró folio abierto para esta habitación. Intenta marcar Check-in primero.');
+      return;
+    }
+    // Mantener compatibilidad state local
     setFoliosLocal(fs => {
-      const folio = fs[habSeleccionada!.id] as any;
+      const folio = fs[habId] as any;
       return {
         ...fs,
-        [habSeleccionada!.id]: {
+        [habId]: {
           ...folio,
           lineas: [
             ...(folio?.lineas || []),
@@ -752,6 +973,7 @@ const HabitacionesPage: React.FC = () => {
       };
     });
     setModalServicioExtra(false);
+    setRefreshTick(t => t + 1); // ← REFRESCA el modal FOLIO abierto para que el NUEVO CARGO aparezca INMEDIATAMENTE
     const total = Number(precio) * Number(cantidad);
     mostrarToast(`✅ Servicio "${nombre}" añadido · ${fmtSoles(total)}`);
   };
@@ -759,11 +981,25 @@ const HabitacionesPage: React.FC = () => {
   const confirmarRegistroPago = () => {
     if (!habSeleccionada || !pagoForm) return;
     if (Number(pagoForm.monto) <= 0) { mostrarAlerta('Monto inválido', 'Ingresa un monto mayor a 0.'); return; }
+    const habId = habSeleccionada.id;
+    // ✅ Persistir pago en PagoFolioService (antes solo setFoliosLocal)
+    const pag = crearPagoPersistenteEnFolio({
+      habId,
+      monto: Number(pagoForm.monto),
+      metodoPago: pagoForm.metodoPago,
+      moneda: pagoForm.moneda,
+      referencia: pagoForm.referencia || pagoForm.codigoAutorizacion || pagoForm.observaciones || `Venta manual Recepción Hab ${habSeleccionada.codigo}`,
+      observaciones: pagoForm.observaciones || undefined,
+    });
+    if (!pag) {
+      mostrarAlerta('No se pudo registrar', 'No se encontró folio abierto para esta habitación. Intenta marcar Check-in primero.');
+      return;
+    }
     setFoliosLocal(fs => {
-      const folio = fs[habSeleccionada!.id] as any;
+      const folio = fs[habId] as any;
       return {
         ...fs,
-        [habSeleccionada!.id]: {
+        [habId]: {
           ...folio,
           pagos: [
             ...(folio?.pagos || []),
@@ -780,6 +1016,7 @@ const HabitacionesPage: React.FC = () => {
       };
     });
     setModalRegistrarPago(false);
+    setRefreshTick(t => t + 1);
     const metodo = METODOS_PAGO_LISTA.find(m => m.value === pagoForm.metodoPago)?.label || pagoForm.metodoPago;
     mostrarToast(`✅ Pago registrado · ${metodo} · ${fmtSoles(Number(pagoForm.monto))}`);
   };
