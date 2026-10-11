@@ -125,7 +125,8 @@ export const AuthService = {
     };
 
     try {
-      localStorage.setItem(STORAGE_SESION, JSON.stringify(sesion));
+      sessionStorage.setItem(STORAGE_SESION, JSON.stringify(sesion));
+      localStorage.removeItem(STORAGE_SESION);
     } catch {}
 
     if (desdeOnline) {
@@ -142,13 +143,14 @@ export const AuthService = {
 
   logout(): void {
     try {
+      sessionStorage.removeItem(STORAGE_SESION);
       localStorage.removeItem(STORAGE_SESION);
     } catch {}
   },
 
   sesionActual(): SesionUsuario | null {
     try {
-      const raw = localStorage.getItem(STORAGE_SESION);
+      const raw = sessionStorage.getItem(STORAGE_SESION);
       return raw ? (JSON.parse(raw) as SesionUsuario) : null;
     } catch {
       return null;
