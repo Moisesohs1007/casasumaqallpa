@@ -24,7 +24,8 @@ import HabitacionesPage from './pages/Habitaciones/Habitaciones';
 import PosPage from './pages/Pos/Pos';
 import PerfilPage from './pages/Perfil/Perfil';
 import FolioPage from './pages/Folio/Folio';
-import { HabitacionService, ReservaService, TarifaService, PosService, HuespedService, FolioService, pendingSync, seedProductos } from './services';
+import LoginPage from './pages/Login/Login';
+import { HabitacionService, ReservaService, TarifaService, PosService, HuespedService, FolioService, pendingSync, seedProductos, AuthService, type SesionUsuario } from './services';
 import { dbRemota } from './services/__supabase_db__';
 
 setupIonicReact({
@@ -212,6 +213,7 @@ const App: React.FC = () => {
   const procesandoRef = React.useRef(false);
   const [toastOfflineGuardado, setToastOfflineGuardado] = useState<{ show: boolean; msg: string }>({ show: false, msg: '' });
   const [toastSyncOk, setToastSyncOk] = useState<{ show: boolean; msg: string }>({ show: false, msg: '' });
+  const [sesion, setSesion] = useState<SesionUsuario | null>(() => AuthService.sesionActual());
 
   // ===== PATRÓN REFs ESTABLES GLOBAL INQUEBRANTABLE =====
   // Cualquier state/setter/function que usemos dentro de useEffect global
@@ -446,6 +448,25 @@ const App: React.FC = () => {
     })();
     return () => { cancelled = true; };
   }, []);
+
+  const handleLogout = () => {
+    AuthService.logout();
+    setSesion(null);
+  };
+
+  React.useEffect(() => {
+    const onLogout = () => handleLogout();
+    window.addEventListener('lodge:logout', onLogout);
+    return () => window.removeEventListener('lodge:logout', onLogout);
+  }, []);
+
+  if (!sesion) {
+    return (
+      <IonApp>
+        <LoginPage onLoginOk={(u) => setSesion(u)} />
+      </IonApp>
+    );
+  }
 
   return (
     <IonApp>

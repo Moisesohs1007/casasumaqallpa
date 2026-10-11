@@ -38,7 +38,7 @@ import {
   add, create, trash, save, close, bedOutline, buildOutline, pricetag,
   cube, addCircle, removeCircle, archive, restaurant,
   search, layers, fileTray, warning, checkmarkCircle,
-  informationCircle, documentText, barcode, cash, people, refresh,
+  informationCircle, documentText, barcode, cash, people, refresh, logOutOutline,
 } from 'ionicons/icons';
 import { Usuario, Rol, RolUsuario, ModuloPermiso, Moneda, AuditFields, Habitacion, TipoHabitacion, EstadoHabitacion } from '../../types';
 import { HabitacionService, CatalogoFBService, InventarioService, seedProductos, type MoverStockResult, TarifaService, PosService, pendingSync } from '../../services';
@@ -633,6 +633,13 @@ const PerfilPage: React.FC = () => {
               try { window.dispatchEvent(new CustomEvent(EVENTO_REFRESCAR, { detail: { page: 'PERFIL' } })); } catch(_){}
             }}>
               <IonIcon icon={refresh} />
+            </IonButton>
+            <IonButton size="small" color="danger" onClick={() => {
+              if (window.confirm('¿Cerrar sesión?')) {
+                window.dispatchEvent(new CustomEvent('lodge:logout'));
+              }
+            }}>
+              <IonIcon icon={logOutOutline} />
             </IonButton>
           </IonButtons>
         </IonToolbar>
