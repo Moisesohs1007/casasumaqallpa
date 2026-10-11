@@ -33,15 +33,16 @@ import {
   IonSearchbar,
   IonChip,
   useIonAlert,
+  IonSpinner,
 } from '@ionic/react';
 import {
   add, create, trash, save, close, bedOutline, buildOutline, pricetag,
   cube, addCircle, removeCircle, archive, restaurant,
   search, layers, fileTray, warning, checkmarkCircle,
-  informationCircle, documentText, barcode, cash, people, refresh, logOutOutline,
+  informationCircle, documentText, barcode, cash, people, refresh, logOutOutline, lockClosed,
 } from 'ionicons/icons';
 import { Usuario, Rol, RolUsuario, ModuloPermiso, Moneda, AuditFields, Habitacion, TipoHabitacion, EstadoHabitacion } from '../../types';
-import { HabitacionService, CatalogoFBService, InventarioService, seedProductos, type MoverStockResult, TarifaService, PosService, pendingSync } from '../../services';
+import { HabitacionService, CatalogoFBService, InventarioService, seedProductos, type MoverStockResult, TarifaService, PosService, pendingSync, AuthService } from '../../services';
 import { supabase } from '../../services/__supabase_db__';
 import './Perfil.css';
 
@@ -167,6 +168,68 @@ const PerfilPage: React.FC = () => {
   const [modalProdAbierto, setModalProdAbierto] = useState(false);
   const [editandoProdId, setEditandoProdId] = useState<string | null>(null);
   const [formProd, setFormProd] = useState<ProdForm>({ ...FORM_VACIO_PROD });
+
+  const [pwdActual, setPwdActual] = useState('');
+  const [pwdNueva, setPwdNueva] = useState('');
+  const [pwdConfirmar, setPwdConfirmar] = useState('');
+  const [pwdProcesando, setPwdProcesando] = useState(false);
+  const [pwdMensaje, setPwdMensaje] = useState<{ tipo: 'ok' | 'error'; texto: string } | null>(null);
+
+  const manejarCambioContrasena = async () => {
+    setPwdMensaje(null);
+    if (!pwdActual || !pwdNueva || !pwdConfirmar) {
+      setPwdMensaje({ tipo: 'error', texto: 'Completa todos los campos.' });
+      return;
+    }
+    if (pwdNueva.length < 4) {
+      setPwdMensaje({ tipo: 'error', texto: 'La nueva contraseña debe tener al menos 4 caracteres.' });
+      return;
+    }
+    if (pwdNueva !== pwdConfirmar) {
+      setPwdMensaje({ tipo: 'error', texto: 'Las contraseñas nuevas no coinciden.' });
+      return;
+    }
+    const sesion = AuthService.sesionActual();
+    if (!sesion) {
+      setPwdMensaje({ tipo: 'error', texto: 'No hay sesión activa.' });
+      return;
+    }
+    setPwdProcesando(true);
+    try {
+      if (!supabase) {
+        setPwdMensaje({ tipo: 'error', texto: 'Conexión no disponible.' });
+        return;
+      }
+      const hashActual = await AuthService.hashPassword(pwdActual);
+      const { data, error } = await supabase
+        .from('usuarios')
+        .select('password_hash')
+        .eq('id', sesion.id)
+        .limit(1)
+        .maybeSingle();
+      if (error) {
+        setPwdMensaje({ tipo: 'error', texto: 'No se pudo verificar la contraseña actual.' });
+        return;
+      }
+      if (!data || String((data as any).password_hash || '') !== hashActual) {
+        setPwdMensaje({ tipo: 'error', texto: 'La contraseña actual es incorrecta.' });
+        return;
+      }
+      const res = await AuthService.cambiarContrasena(sesion.id, pwdNueva);
+      if (!res.ok) {
+        setPwdMensaje({ tipo: 'error', texto: res.error || 'No se pudo cambiar la contraseña.' });
+        return;
+      }
+      setPwdMensaje({ tipo: 'ok', texto: 'Contraseña cambiada correctamente.' });
+      setPwdActual('');
+      setPwdNueva('');
+      setPwdConfirmar('');
+    } catch (e: any) {
+      setPwdMensaje({ tipo: 'error', texto: e?.message || 'Error de conexión.' });
+    } finally {
+      setPwdProcesando(false);
+    }
+  };
   const [confirmBorrarProd, setConfirmBorrarProd] = useState<{ id: string; nombre: string } | null>(null);
 
   const [modalStockAbierto, setModalStockAbierto] = useState(false);
@@ -677,6 +740,68 @@ const PerfilPage: React.FC = () => {
                 </IonCol>
               </IonRow>
             </IonGrid>
+          </IonCardContent>
+        </IonCard>
+
+        {/* =============== CAMBIAR CONTRASEÑA =============== */}
+        <IonCard className="section-card">
+          <IonCardHeader className="section-header">
+            <div className="section-header-title">
+              <div className="section-icon" style={{ background: 'linear-gradient(135deg, #6366f1, #4f46e5)' }}>
+                <IonIcon icon={lockClosed} />
+              </div>
+              <div>
+                <div className="section-title">Seguridad de la cuenta</div>
+                <div className="section-subtitle">Cambia tu contraseña de acceso</div>
+              </div>
+            </div>
+          </IonCardHeader>
+          <IonCardContent>
+            <IonItem className="login-item">
+              <IonInput
+                type="password"
+                placeholder="Contraseña actual"
+                value={pwdActual}
+                onIonInput={(e) => setPwdActual((e.target as HTMLIonInputElement).value as string)}
+              />
+            </IonItem>
+            <IonItem className="login-item">
+              <IonInput
+                type="password"
+                placeholder="Nueva contraseña"
+                value={pwdNueva}
+                onIonInput={(e) => setPwdNueva((e.target as HTMLIonInputElement).value as string)}
+              />
+            </IonItem>
+            <IonItem className="login-item">
+              <IonInput
+                type="password"
+                placeholder="Confirmar nueva contraseña"
+                value={pwdConfirmar}
+                onIonInput={(e) => setPwdConfirmar((e.target as HTMLIonInputElement).value as string)}
+              />
+            </IonItem>
+            {pwdMensaje && (
+              <div style={{
+                background: pwdMensaje.tipo === 'ok' ? '#ecfdf5' : '#fef2f2',
+                color: pwdMensaje.tipo === 'ok' ? '#047857' : '#b91c1c',
+                padding: '10px 12px',
+                borderRadius: 8,
+                fontSize: 13,
+                margin: '12px 0',
+                border: `1px solid ${pwdMensaje.tipo === 'ok' ? '#a7f3d0' : '#fecaca'}`,
+              }}>
+                {pwdMensaje.texto}
+              </div>
+            )}
+            <IonButton
+              expand="block"
+              color="primary"
+              onClick={manejarCambioContrasena}
+              disabled={pwdProcesando}
+            >
+              {pwdProcesando ? <IonSpinner name="crescent" /> : 'Cambiar contraseña'}
+            </IonButton>
           </IonCardContent>
         </IonCard>
 
