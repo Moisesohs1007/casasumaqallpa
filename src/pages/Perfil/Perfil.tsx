@@ -2169,7 +2169,8 @@ const PerfilPage: React.FC = () => {
         />
 
         {/* ============ MODAL: Detalle Habitación ============ */}
-        <IonModal isOpen={!!habDetalle} onDidDismiss={() => setHabDetalle(null)} className="modal-fit">
+        {/* @ts-expect-error cssClass works at runtime for Ionic modals */}
+        <IonModal isOpen={!!habDetalle} onDidDismiss={() => setHabDetalle(null)} cssClass="modal-fit">
           <IonHeader className="ion-no-border">
             <IonToolbar color="primary">
               <IonButtons slot="start">
@@ -2244,7 +2245,8 @@ const PerfilPage: React.FC = () => {
         </IonModal>
 
         {/* ============ MODAL: Detalle Producto ============ */}
-        <IonModal isOpen={!!prodDetalle} onDidDismiss={() => setProdDetalle(null)} className="modal-fit">
+        {/* @ts-expect-error cssClass works at runtime for Ionic modals */}
+        <IonModal isOpen={!!prodDetalle} onDidDismiss={() => setProdDetalle(null)} cssClass="modal-fit">
           <IonHeader className="ion-no-border">
             <IonToolbar color="primary">
               <IonButtons slot="start">
