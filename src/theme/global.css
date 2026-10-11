@@ -43,12 +43,12 @@ ion-router-outlet {
   height: 100%;
 }
 
-/* ===== MODAL FIT-CONTENT (global, Ionic modales se renderizan en root) ===== */
+/* ===== MODAL COMPACTO (global, Ionic modales se renderizan en root) ===== */
 .modal-fit {
-  --width: min(460px, 94vw);
+  --width: min(400px, 92vw);
   --height: auto;
-  --max-height: 88vh;
-  --border-radius: 16px;
+  --max-height: 80vh;
+  --border-radius: 14px;
   --box-shadow: 0 20px 60px rgba(0,0,0,0.3);
 }
 .modal-fit .ion-page {
@@ -56,11 +56,14 @@ ion-router-outlet {
   top: auto;
   bottom: auto;
   height: auto;
+  display: flex;
+  flex-direction: column;
 }
 .modal-fit ion-content {
   --overflow: auto;
   position: relative;
+  flex: 1;
 }
 .modal-fit .inner-scroll {
-  padding: 12px 16px 20px;
+  padding: 8px 16px 16px;
 }

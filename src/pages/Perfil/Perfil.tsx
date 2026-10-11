@@ -166,6 +166,9 @@ const PerfilPage: React.FC = () => {
   const [productosFB, setProductosFB] = useState<any[]>([]);
   const [busqProd, setBusqProd] = useState('');
   const [filtroCatId, setFiltroCatId] = useState<string>('');
+  const [catSeleccionadaId, setCatSeleccionadaId] = useState<string>('');
+  const [prodSeleccionadoId, setProdSeleccionadoId] = useState<string>('');
+  const [habSeleccionadaId, setHabSeleccionadaId] = useState<string>('');
   const [tabStock, setTabStock] = useState<'CATEGORIAS' | 'PRODUCTOS'>('PRODUCTOS');
   const [presentarCatAlert, _d1] = useIonAlert();
   const [presentarCrudCatAlert, _d2] = useIonAlert();
@@ -481,6 +484,20 @@ const PerfilPage: React.FC = () => {
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Cuando se selecciona un producto del selector → abrir modal
+  useEffect(() => {
+    if (!prodSeleccionadoId) return;
+    const p = productosFB.find((x) => x.id === prodSeleccionadoId);
+    if (p) setProdDetalle(p);
+  }, [prodSeleccionadoId, productosFB]);
+
+  // Cuando se selecciona una habitación del selector → abrir modal
+  useEffect(() => {
+    if (!habSeleccionadaId) return;
+    const h = habsAdmin.find((x) => x.id === habSeleccionadaId);
+    if (h) setHabDetalle(h);
+  }, [habSeleccionadaId, habsAdmin]);
 
   const generarCodigoProdAuto = (categoriaIdSel: string): string => {
     const cat = categoriasFB.find(c => c.id === categoriaIdSel);
@@ -870,7 +887,7 @@ const PerfilPage: React.FC = () => {
             )}
           </IonCardHeader>
 
-          <IonCardContent className="section-content ion-no-padding">
+          <IonCardContent className="section-content">
             {habsAdmin.length === 0 ? (
               <div className="empty-state">
                 <IonIcon icon={bedOutline} className="empty-state-icon" />
@@ -878,42 +895,30 @@ const PerfilPage: React.FC = () => {
                 <div className="empty-state-text">Crea la primera habitación usando el botón superior.</div>
               </div>
             ) : (
-              <IonList lines="inset" className="compact-list">
-                {habsAdmin.map((h) => {
-                  const precio = precioTipo(h.tipoHabitacionId);
-                  const tipo = tiposHab.find((t) => t.id === h.tipoHabitacionId);
-                  const hAny = h as any;
-                  const capHab = Number(hAny.capacidadMaximaPax ?? hAny.capacidadPersonas ?? 2);
-                  const colorEstado: Record<EstadoHabitacion, string> = {
-                    LIBRE: 'success', DISPONIBLE: 'success', OCUPADA: 'danger',
-                    RESERVADA: 'primary', BLOQUEADA: 'medium', LIMPIEZA: 'warning',
-                    INSPECCIONADA: 'tertiary', MANTENIMIENTO: 'medium',
-                  };
-                  const estadoLbl: Record<EstadoHabitacion, string> = {
-                    LIBRE: 'Libre', DISPONIBLE: 'Disponible', OCUPADA: 'Ocupada',
-                    RESERVADA: 'Reservada', BLOQUEADA: 'Bloqueada', LIMPIEZA: 'Limpieza',
-                    INSPECCIONADA: 'Inspeccionada', MANTENIMIENTO: 'Mantenimiento',
-                  };
-                  return (
-                    <IonItem key={h.id} button detail onClick={() => setHabDetalle(h)} className={`hab-list-item hab-item-${colorEstado[h.estado]}`}>
-                      <div slot="start" className={`hab-dot hab-dot-${colorEstado[h.estado]}`}></div>
-                      <div className="hab-list-col-left">
-                        <div className="hab-list-nombre">
-                          <span className="hab-list-cod">{h.codigo}</span>
-                          {h.nombre || tipo?.nombre || 'Habitación'}
-                        </div>
-                        <div className="hab-list-meta">
-                          <IonBadge color={colorEstado[h.estado]} className="hab-list-estado">{estadoLbl[h.estado]}</IonBadge>
-                          <span className="hab-list-cap">{capHab} pax</span>
-                        </div>
-                      </div>
-                      <div slot="end" className="hab-list-col-right">
-                        <div className="hab-list-precio">{fmtSoles(precio)}</div>
-                      </div>
-                    </IonItem>
-                  );
-                })}
-              </IonList>
+              <div className="selector-field" style={{ margin: '8px 0' }}>
+                <label className="selector-label">Seleccionar habitación</label>
+                <IonSelect
+                  interface="action-sheet"
+                  placeholder="Seleccionar habitación"
+                  value={habSeleccionadaId}
+                  onIonChange={(e: any) => setHabSeleccionadaId(e.detail.value || '')}
+                  className="prod-select"
+                >
+                  {habsAdmin.map((h) => {
+                    const tipo = tiposHab.find((t) => t.id === h.tipoHabitacionId);
+                    const estadoLbl: Record<string, string> = {
+                      LIBRE: 'Libre', DISPONIBLE: 'Disponible', OCUPADA: 'Ocupada',
+                      RESERVADA: 'Reservada', BLOQUEADA: 'Bloqueada', LIMPIEZA: 'Limpieza',
+                      INSPECCIONADA: 'Inspeccionada', MANTENIMIENTO: 'Mantenimiento',
+                    };
+                    return (
+                      <IonSelectOption key={h.id} value={h.id}>
+                        {h.codigo} - {h.nombre || tipo?.nombre || 'Habitación'} [{estadoLbl[h.estado] || h.estado}]
+                      </IonSelectOption>
+                    );
+                  })}
+                </IonSelect>
+              </div>
             )}
           </IonCardContent>
         </IonCard>
@@ -1036,11 +1041,10 @@ const PerfilPage: React.FC = () => {
             {/* ============== TAB: PRODUCTOS ============== */}
             {tabStock === 'PRODUCTOS' && (
               <>
-                {/* FILTROS PROFESIONALES */}
-                <div className="prod-filters-wrap">
+                <div className="prod-selectors-wrap">
                   <IonSearchbar
                     className="prod-searchbar"
-                    placeholder="Buscar por nombre, código o descripción..."
+                    placeholder="Buscar por nombre o código..."
                     value={busqProd}
                     onIonInput={(e: any) => setBusqProd(String(e.target.value || ''))}
                     showCancelButton="never"
@@ -1049,99 +1053,60 @@ const PerfilPage: React.FC = () => {
                     searchIcon={search}
                   />
 
-                  {categoriasFB.length > 0 && (
-                    <div className="prod-chips-cat-scroll">
-                      <div className="prod-chips-cat-inner">
-                        <IonChip
-                          className={`prod-chip-cat ${filtroCatId === '' ? 'prod-chip-cat-active' : ''}`}
-                          onClick={() => setFiltroCatId('')}
-                        >
-                          <IonIcon icon={layers} />
-                          &nbsp;Todas ({productosFB.length})
-                        </IonChip>
-                        {[...categoriasFB].sort((a, b) => Number(a.orden || 0) - Number(b.orden || 0)).map((c) => {
-                          const cnt = productosFB.filter((p) => p.categoriaId === c.id).length;
-                          return (
-                            <IonChip
-                              key={c.id}
-                              className={`prod-chip-cat ${filtroCatId === c.id ? 'prod-chip-cat-active' : ''}`}
-                              color={c.estado === 'INACTIVO' ? 'medium' : 'tertiary'}
-                              onClick={() => setFiltroCatId(filtroCatId === c.id ? '' : c.id)}
-                            >
-                              {c.nombre} ({cnt})
-                            </IonChip>
-                          );
-                        })}
-                      </div>
+                  <div className="selector-row">
+                    <div className="selector-field">
+                      <label className="selector-label">Categoría</label>
+                      <IonSelect
+                        interface="action-sheet"
+                        placeholder="Seleccionar categoría"
+                        value={catSeleccionadaId}
+                        onIonChange={(e: any) => {
+                          setCatSeleccionadaId(e.detail.value || '');
+                          setProdSeleccionadoId('');
+                        }}
+                        className="prod-select"
+                      >
+                        {[...categoriasFB].sort((a, b) => Number(a.orden || 0) - Number(b.orden || 0)).map((c) => (
+                          <IonSelectOption key={c.id} value={c.id}>
+                            {c.nombre} ({productosFB.filter((p) => p.categoriaId === c.id).length})
+                          </IonSelectOption>
+                        ))}
+                      </IonSelect>
+                    </div>
+
+                    <div className="selector-field">
+                      <label className="selector-label">Producto</label>
+                      <IonSelect
+                        interface="action-sheet"
+                        placeholder={catSeleccionadaId ? 'Seleccionar producto' : 'Primero elige categoría'}
+                        value={prodSeleccionadoId}
+                        disabled={!catSeleccionadaId}
+                        onIonChange={(e: any) => setProdSeleccionadoId(e.detail.value || '')}
+                        className="prod-select"
+                      >
+                        {productosFB
+                          .filter((p) => p.categoriaId === catSeleccionadaId)
+                          .filter((p) => {
+                            if (!busqProd || !busqProd.trim()) return true;
+                            const q = busqProd.trim().toLowerCase();
+                            return (p.nombre || '').toLowerCase().includes(q) || (p.codigo || '').toLowerCase().includes(q);
+                          })
+                          .sort((a, b) => String(a.codigo || '').localeCompare(String(b.codigo || '')))
+                          .map((p) => (
+                            <IonSelectOption key={p.id} value={p.id}>
+                              {p.codigo} - {p.nombre}
+                            </IonSelectOption>
+                          ))}
+                      </IonSelect>
+                    </div>
+                  </div>
+
+                  {!catSeleccionadaId && (
+                    <div className="selector-hint">
+                      <IonIcon icon={cube} /> Selecciona una categoría para ver sus productos
                     </div>
                   )}
                 </div>
-
-                {productosFiltrados.length === 0 ? (
-                  <div className="empty-state">
-                    <IonIcon icon={fileTray} className="empty-state-icon" />
-                    <div className="empty-state-title">
-                      {busqProd || filtroCatId ? 'Sin resultados' : 'No hay productos'}
-                    </div>
-                    <div className="empty-state-text">
-                      {categoriasFB.length === 0 && !busqProd && !filtroCatId
-                        ? 'El catálogo se encuentra vacío. Puedes cargar el menú oficial de Casa Sumaq Allpa (120 productos, 12 categorías) o crear productos manualmente.'
-                        : categoriasFB.length === 0
-                          ? 'Crea primero una categoría y luego productos.'
-                          : busqProd || filtroCatId
-                            ? 'Cambia los filtros o limpia la búsqueda.'
-                            : 'Usa el botón "+ Producto" para agregar el primero.'}
-                    </div>
-                    {!busqProd && !filtroCatId && (
-                      categoriasFB.length === 0 && productosFB.length === 0 ? (
-                        <div style={{display:'flex', gap:8, flexWrap:'wrap', justifyContent:'center', marginTop:8}}>
-                          <IonButton color="tertiary" className="mt-xl" onClick={() => cargarSeedInicial(false)}>
-                            <IonIcon slot="start" icon={restaurant} />
-                            🤖 Cargar menú oficial · 120 productos
-                          </IonButton>
-                          <IonButton color="medium" fill="outline" className="mt-xl" onClick={abrirNuevoProd}>
-                            <IonIcon slot="start" icon={add} />
-                            Crear manualmente
-                          </IonButton>
-                        </div>
-                      ) : categoriasFB.length > 0 ? (
-                        <IonButton color="success" className="mt-xl" onClick={abrirNuevoProd}>
-                          <IonIcon slot="start" icon={add} />
-                          Crear primer producto
-                        </IonButton>
-                      ) : null
-                    )}
-                  </div>
-                ) : (
-                  <IonList lines="inset" className="compact-list prod-compact-list">
-                    {productosFiltrados.map((p) => {
-                      const plano = stockPlanoProd(p);
-                      let stockColor = 'success';
-                      if (!plano.stockControl) { stockColor = 'medium'; }
-                      else if (plano.stockActual < 0) { stockColor = 'danger'; }
-                      else if (plano.stockActual === 0) { stockColor = 'warning'; }
-                      else if (plano.stockMinimo > 0 && plano.stockActual < plano.stockMinimo) { stockColor = 'warning'; }
-                      return (
-                        <IonItem key={p.id} button detail onClick={() => setProdDetalle(p)} className={`prod-list-item ${p.estado === 'INACTIVO' ? 'prod-inactivo' : ''}`}>
-                          <div slot="start" className="prod-list-col-left">
-                            <div className="prod-list-cod">{p.codigo || '—'}</div>
-                            <div className="prod-list-nombre">{p.nombre}</div>
-                          </div>
-                          <div slot="end" className="prod-list-col-right">
-                            <div className="prod-list-precio">{fmtSoles(p.precioVentaBase)}</div>
-                            {plano.stockControl ? (
-                              <div className={`prod-list-stock prod-stock-${stockColor}`}>
-                                📦 {fmtNum(plano.stockActual)}
-                              </div>
-                            ) : (
-                              <div className="prod-list-stock prod-stock-medium">—</div>
-                            )}
-                          </div>
-                        </IonItem>
-                      );
-                    })}
-                  </IonList>
-                )}
               </>
             )}
           </IonCardContent>

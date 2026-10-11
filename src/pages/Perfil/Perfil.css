@@ -1179,39 +1179,80 @@
 .prod-stock-medium { color: #cbd5e1; }
 .prod-inactivo { opacity: 0.55; }
 
-/* ===== CHIPS CATEGORIAS: scroll horizontal 1 fila ===== */
-.prod-chips-cat-scroll {
-  width: 100%;
-  overflow-x: auto;
-  overflow-y: hidden;
-  -webkit-overflow-scrolling: touch;
-  margin-bottom: 4px;
-  padding-bottom: 4px;
-}
-.prod-chips-cat-scroll::-webkit-scrollbar { height: 4px; }
-.prod-chips-cat-scroll::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
-.prod-chips-cat-inner {
+/* ===== SELECTORES (categoría + producto) ===== */
+.prod-selectors-wrap {
+  padding: 12px;
   display: flex;
-  gap: 6px;
-  white-space: nowrap;
-  padding-right: 8px;
+  flex-direction: column;
+  gap: 12px;
+}
+.selector-row {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+@media (min-width: 768px) {
+  .selector-row {
+    flex-direction: row;
+    gap: 16px;
+  }
+  .selector-field { flex: 1; }
+}
+.selector-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.selector-label {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #475569;
+  padding-left: 4px;
+}
+.prod-select {
+  --padding-start: 12px;
+  --padding-end: 12px;
+  --placeholder-opacity: 0.5;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  font-size: 0.9rem;
+  min-height: 44px;
+}
+.selector-hint {
+  text-align: center;
+  color: #94a3b8;
+  font-size: 0.85rem;
+  padding: 20px 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
 }
 
-/* ===== MODAL FIT-CONTENT ===== */
+/* ===== MODAL COMPACTO ===== */
 .modal-fit {
-  --width: min(460px, 94vw);
+  --width: min(400px, 92vw);
   --height: auto;
-  --max-height: 88vh;
-  --border-radius: 16px;
+  --max-height: 80vh;
+  --border-radius: 14px;
   --box-shadow: 0 20px 60px rgba(0,0,0,0.3);
 }
 .modal-fit .ion-page {
+  position: relative;
   top: auto;
-  bottom: 0;
+  bottom: auto;
   height: auto;
+  display: flex;
+  flex-direction: column;
 }
 .modal-fit ion-content {
   --overflow: auto;
+  position: relative;
+  flex: 1;
+}
+.modal-fit .inner-scroll {
+  padding: 8px 16px 16px;
 }
 
 /* Pestañas principales scrollable */
