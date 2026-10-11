@@ -42,3 +42,25 @@ ion-router-outlet {
   width: 100%;
   height: 100%;
 }
+
+/* ===== MODAL FIT-CONTENT (global, Ionic modales se renderizan en root) ===== */
+.modal-fit {
+  --width: min(460px, 94vw);
+  --height: auto;
+  --max-height: 88vh;
+  --border-radius: 16px;
+  --box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+}
+.modal-fit .ion-page {
+  position: relative;
+  top: auto;
+  bottom: auto;
+  height: auto;
+}
+.modal-fit ion-content {
+  --overflow: auto;
+  position: relative;
+}
+.modal-fit .inner-scroll {
+  padding: 12px 16px 20px;
+}

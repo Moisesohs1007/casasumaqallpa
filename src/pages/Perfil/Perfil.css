@@ -1050,23 +1050,31 @@
   border-radius: 9px;
 }
 
-/* ===== LISTAS COMPACTAS ===== */
+/* ===== LISTAS COMPACTAS (patrón unificado 2 columnas) ===== */
 .compact-list {
   margin: 0;
   background: transparent;
 }
 .compact-list ion-item {
   --padding-start: 14px;
-  --inner-padding-end: 12px;
-  --min-height: 58px;
+  --inner-padding-end: 14px;
+  --min-height: 62px;
   --border-color: #eef2f7;
+  --background: transparent;
 }
+.compact-list ion-item::part(native) {
+  padding-left: 14px;
+  padding-right: 14px;
+}
+
+/* ===== HABITACIONES ===== */
 .hab-list-item { --border-width: 0 0 1px 0; }
 .hab-dot {
   width: 10px;
   height: 10px;
   border-radius: 50%;
-  margin-right: 10px;
+  margin-right: 12px;
+  flex-shrink: 0;
 }
 .hab-dot-success { background: #2dd36f; }
 .hab-dot-danger { background: #eb445a; }
@@ -1074,54 +1082,153 @@
 .hab-dot-medium { background: #92949c; }
 .hab-dot-warning { background: #ffc409; }
 .hab-dot-tertiary { background: #7044ff; }
-.hab-list-row1 {
+.hab-list-col-left {
   display: flex;
-  align-items: baseline;
+  flex-direction: column;
+  gap: 3px;
+  flex: 1;
+  min-width: 0;
+}
+.hab-list-nombre {
+  font-weight: 600;
+  color: #1e293b;
+  font-size: 0.92rem;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.hab-list-cod {
+  font-weight: 800;
+  color: #065f46;
+  font-size: 0.85rem;
+  background: #ecfdf5;
+  padding: 1px 7px;
+  border-radius: 5px;
+  flex-shrink: 0;
+}
+.hab-list-meta {
+  display: flex;
+  align-items: center;
   gap: 8px;
   flex-wrap: wrap;
 }
-.hab-list-cod { font-weight: 800; color: #065f46; font-size: 0.9rem; }
-.hab-list-nombre { font-weight: 600; color: #1e293b; font-size: 0.92rem; flex: 1; }
-.hab-list-precio { font-weight: 700; color: #065f46; font-size: 0.9rem; }
-.hab-list-row2 {
+.hab-list-estado { font-size: 0.68rem; }
+.hab-list-cap { font-size: 0.76rem; color: #64748b; }
+.hab-list-col-right {
   display: flex;
-  align-items: center;
-  gap: 6px;
-  margin-top: 4px;
-  flex-wrap: wrap;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 3px;
+  margin-left: 10px;
+  flex-shrink: 0;
 }
-.hab-chip-mini {
-  --padding-top: 0;
-  --padding-bottom: 0;
-  height: 20px;
-  font-size: 0.7rem;
+.hab-list-precio {
+  font-weight: 700;
+  color: #065f46;
+  font-size: 0.92rem;
 }
-.hab-list-estado { font-size: 0.68rem; margin-left: auto; }
 
+/* ===== PRODUCTOS ===== */
 .prod-list-item { --border-width: 0 0 1px 0; }
-.prod-list-row1 {
+.prod-list-col-left {
   display: flex;
-  align-items: baseline;
-  gap: 8px;
-  flex-wrap: wrap;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
 }
-.prod-list-cod { font-weight: 800; color: #065f46; font-size: 0.78rem; font-family: monospace; }
-.prod-list-nombre { font-weight: 600; color: #1e293b; font-size: 0.9rem; flex: 1; }
-.prod-list-precio { font-weight: 700; color: #065f46; font-size: 0.88rem; }
-.prod-list-row2 {
+.prod-list-cod {
+  font-weight: 800;
+  color: #065f46;
+  font-size: 0.74rem;
+  font-family: 'Courier New', monospace;
+  background: #f0fdf4;
+  display: inline-block;
+  padding: 1px 6px;
+  border-radius: 4px;
+  align-self: flex-start;
+}
+.prod-list-nombre {
+  font-weight: 600;
+  color: #1e293b;
+  font-size: 0.9rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.prod-list-col-right {
   display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-top: 3px;
-  flex-wrap: wrap;
-  font-size: 0.76rem;
-  color: #64748b;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  margin-left: 12px;
+  flex-shrink: 0;
 }
-.prod-list-cat { color: #64748b; }
-.prod-list-margen { font-weight: 600; }
-.prod-list-stock { font-weight: 600; margin-left: auto; }
+.prod-list-precio {
+  font-weight: 700;
+  color: #065f46;
+  font-size: 0.88rem;
+}
+.prod-list-stock {
+  font-size: 0.72rem;
+  font-weight: 600;
+}
 .prod-stock-success { color: #2dd36f; }
 .prod-stock-warning { color: #ffc409; }
 .prod-stock-danger { color: #eb445a; }
-.prod-stock-medium { color: #94a3b8; }
+.prod-stock-medium { color: #cbd5e1; }
 .prod-inactivo { opacity: 0.55; }
+
+/* ===== CHIPS CATEGORIAS: scroll horizontal 1 fila ===== */
+.prod-chips-cat-scroll {
+  width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+  margin-bottom: 4px;
+  padding-bottom: 4px;
+}
+.prod-chips-cat-scroll::-webkit-scrollbar { height: 4px; }
+.prod-chips-cat-scroll::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+.prod-chips-cat-inner {
+  display: flex;
+  gap: 6px;
+  white-space: nowrap;
+  padding-right: 8px;
+}
+
+/* ===== MODAL FIT-CONTENT ===== */
+.modal-fit {
+  --width: min(460px, 94vw);
+  --height: auto;
+  --max-height: 88vh;
+  --border-radius: 16px;
+  --box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+}
+.modal-fit .ion-page {
+  top: auto;
+  bottom: 0;
+  height: auto;
+}
+.modal-fit ion-content {
+  --overflow: auto;
+}
+
+/* Pestañas principales scrollable */
+.main-tabs-segment {
+  margin: 0 0 12px 0;
+  --background: #f1f5f9;
+  border-radius: 12px;
+  padding: 4px;
+}
+.main-tabs-segment ion-segment-button {
+  --color: #64748b;
+  --color-checked: #065f46;
+  --background-checked: #ffffff;
+  font-weight: 600;
+  font-size: 0.82rem;
+  border-radius: 9px;
+  min-height: 40px;
+  --padding-top: 8px;
+  --padding-bottom: 8px;
+}

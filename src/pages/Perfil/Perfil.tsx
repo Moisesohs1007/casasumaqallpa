@@ -897,24 +897,19 @@ const PerfilPage: React.FC = () => {
                   return (
                     <IonItem key={h.id} button detail onClick={() => setHabDetalle(h)} className={`hab-list-item hab-item-${colorEstado[h.estado]}`}>
                       <div slot="start" className={`hab-dot hab-dot-${colorEstado[h.estado]}`}></div>
-                      <IonLabel>
-                        <div className="hab-list-row1">
+                      <div className="hab-list-col-left">
+                        <div className="hab-list-nombre">
                           <span className="hab-list-cod">{h.codigo}</span>
-                          <span className="hab-list-nombre">{h.nombre || tipo?.nombre || 'Habitación'}</span>
-                          <span className="hab-list-precio">{fmtSoles(precio)}</span>
+                          {h.nombre || tipo?.nombre || 'Habitación'}
                         </div>
-                        <div className="hab-list-row2">
-                          <IonChip className="hab-chip-mini" color="light" outline>
-                            {tipo?.nombre || 'Sin tipo'}
-                          </IonChip>
-                          <IonChip className="hab-chip-mini" color="primary" outline>
-                            {capHab} pax
-                          </IonChip>
-                          <IonBadge color={colorEstado[h.estado]} className="hab-list-estado">
-                            {estadoLbl[h.estado]}
-                          </IonBadge>
+                        <div className="hab-list-meta">
+                          <IonBadge color={colorEstado[h.estado]} className="hab-list-estado">{estadoLbl[h.estado]}</IonBadge>
+                          <span className="hab-list-cap">{capHab} pax</span>
                         </div>
-                      </IonLabel>
+                      </div>
+                      <div slot="end" className="hab-list-col-right">
+                        <div className="hab-list-precio">{fmtSoles(precio)}</div>
+                      </div>
                     </IonItem>
                   );
                 })}
@@ -1055,27 +1050,29 @@ const PerfilPage: React.FC = () => {
                   />
 
                   {categoriasFB.length > 0 && (
-                    <div className="prod-chips-cat">
-                      <IonChip
-                        className={`prod-chip-cat ${filtroCatId === '' ? 'prod-chip-cat-active' : ''}`}
-                        onClick={() => setFiltroCatId('')}
-                      >
-                        <IonIcon icon={layers} />
-                        &nbsp;Todas ({productosFB.length})
-                      </IonChip>
-                      {[...categoriasFB].sort((a, b) => Number(a.orden || 0) - Number(b.orden || 0)).map((c) => {
-                        const cnt = productosFB.filter((p) => p.categoriaId === c.id).length;
-                        return (
-                          <IonChip
-                            key={c.id}
-                            className={`prod-chip-cat ${filtroCatId === c.id ? 'prod-chip-cat-active' : ''}`}
-                            color={c.estado === 'INACTIVO' ? 'medium' : 'tertiary'}
-                            onClick={() => setFiltroCatId(filtroCatId === c.id ? '' : c.id)}
-                          >
-                            {c.nombre} ({cnt})
-                          </IonChip>
-                        );
-                      })}
+                    <div className="prod-chips-cat-scroll">
+                      <div className="prod-chips-cat-inner">
+                        <IonChip
+                          className={`prod-chip-cat ${filtroCatId === '' ? 'prod-chip-cat-active' : ''}`}
+                          onClick={() => setFiltroCatId('')}
+                        >
+                          <IonIcon icon={layers} />
+                          &nbsp;Todas ({productosFB.length})
+                        </IonChip>
+                        {[...categoriasFB].sort((a, b) => Number(a.orden || 0) - Number(b.orden || 0)).map((c) => {
+                          const cnt = productosFB.filter((p) => p.categoriaId === c.id).length;
+                          return (
+                            <IonChip
+                              key={c.id}
+                              className={`prod-chip-cat ${filtroCatId === c.id ? 'prod-chip-cat-active' : ''}`}
+                              color={c.estado === 'INACTIVO' ? 'medium' : 'tertiary'}
+                              onClick={() => setFiltroCatId(filtroCatId === c.id ? '' : c.id)}
+                            >
+                              {c.nombre} ({cnt})
+                            </IonChip>
+                          );
+                        })}
+                      </div>
                     </div>
                   )}
                 </div>
@@ -1119,39 +1116,27 @@ const PerfilPage: React.FC = () => {
                   <IonList lines="inset" className="compact-list prod-compact-list">
                     {productosFiltrados.map((p) => {
                       const plano = stockPlanoProd(p);
-                      const cat = categoriasFB.find((c) => c.id === p.categoriaId);
-                      const precioGanancia = Number(p.precioVentaBase || 0) - Number(p.costoAproximado || 0);
-                      const pctGan = Number(p.precioVentaBase || 0) > 0
-                        ? Math.round((precioGanancia / Number(p.precioVentaBase || 1)) * 100)
-                        : 0;
                       let stockColor = 'success';
-                      let stockLabel = 'OK';
-                      if (!plano.stockControl) { stockColor = 'medium'; stockLabel = 'N/A'; }
-                      else if (plano.stockActual < 0) { stockColor = 'danger'; stockLabel = 'Negativo'; }
-                      else if (plano.stockActual === 0) { stockColor = 'warning'; stockLabel = 'Cero'; }
-                      else if (plano.stockMinimo > 0 && plano.stockActual < plano.stockMinimo) { stockColor = 'warning'; stockLabel = 'Bajo'; }
+                      if (!plano.stockControl) { stockColor = 'medium'; }
+                      else if (plano.stockActual < 0) { stockColor = 'danger'; }
+                      else if (plano.stockActual === 0) { stockColor = 'warning'; }
+                      else if (plano.stockMinimo > 0 && plano.stockActual < plano.stockMinimo) { stockColor = 'warning'; }
                       return (
                         <IonItem key={p.id} button detail onClick={() => setProdDetalle(p)} className={`prod-list-item ${p.estado === 'INACTIVO' ? 'prod-inactivo' : ''}`}>
-                          <IonLabel>
-                            <div className="prod-list-row1">
-                              <span className="prod-list-cod">{p.codigo || '—'}</span>
-                              <span className="prod-list-nombre">{p.nombre}</span>
-                              <span className="prod-list-precio">{fmtSoles(p.precioVentaBase)}</span>
-                            </div>
-                            <div className="prod-list-row2">
-                              <span className="prod-list-cat">{cat?.nombre || 'Sin cat.'}</span>
-                              <span className="prod-list-margen" style={{ color: pctGan >= 40 ? '#2dd36f' : pctGan >= 20 ? '#ffc409' : '#eb445a' }}>
-                                {pctGan}% margen
-                              </span>
-                              {plano.stockControl ? (
-                                <span className={`prod-list-stock prod-stock-${stockColor}`}>
-                                  📦 {fmtNum(plano.stockActual)} {stockLabel}
-                                </span>
-                              ) : (
-                                <span className="prod-list-stock prod-stock-medium">Sin control</span>
-                              )}
-                            </div>
-                          </IonLabel>
+                          <div slot="start" className="prod-list-col-left">
+                            <div className="prod-list-cod">{p.codigo || '—'}</div>
+                            <div className="prod-list-nombre">{p.nombre}</div>
+                          </div>
+                          <div slot="end" className="prod-list-col-right">
+                            <div className="prod-list-precio">{fmtSoles(p.precioVentaBase)}</div>
+                            {plano.stockControl ? (
+                              <div className={`prod-list-stock prod-stock-${stockColor}`}>
+                                📦 {fmtNum(plano.stockActual)}
+                              </div>
+                            ) : (
+                              <div className="prod-list-stock prod-stock-medium">—</div>
+                            )}
+                          </div>
                         </IonItem>
                       );
                     })}
@@ -2219,7 +2204,7 @@ const PerfilPage: React.FC = () => {
         />
 
         {/* ============ MODAL: Detalle Habitación ============ */}
-        <IonModal isOpen={!!habDetalle} onDidDismiss={() => setHabDetalle(null)} initialBreakpoint={0.85} breakpoints={[0, 0.5, 0.85, 1]}>
+        <IonModal isOpen={!!habDetalle} onDidDismiss={() => setHabDetalle(null)} className="modal-fit">
           <IonHeader className="ion-no-border">
             <IonToolbar color="primary">
               <IonButtons slot="start">
@@ -2294,7 +2279,7 @@ const PerfilPage: React.FC = () => {
         </IonModal>
 
         {/* ============ MODAL: Detalle Producto ============ */}
-        <IonModal isOpen={!!prodDetalle} onDidDismiss={() => setProdDetalle(null)} initialBreakpoint={0.85} breakpoints={[0, 0.5, 0.85, 1]}>
+        <IonModal isOpen={!!prodDetalle} onDidDismiss={() => setProdDetalle(null)} className="modal-fit">
           <IonHeader className="ion-no-border">
             <IonToolbar color="primary">
               <IonButtons slot="start">
