@@ -3,6 +3,7 @@ import { ImpresoraConfigService, TamanoPapel } from '../services/ImpresoraConfig
 const STYLE_ID = 'lodge-print-dynamic-style';
 const TICKET_PRINT_ID = 'lodge-ticket-print';
 const PRINTING_CLASS = 'lodge-printing';
+const PRINTING_MOBILE_CLASS = 'lodge-printing-mobile';
 
 /**
  * Aplica las variables CSS del ticket según la configuración guardada.
@@ -23,6 +24,12 @@ export function aplicarEstilosTicket(): void {
 
 export function getTamanoPapel(): TamanoPapel {
   return ImpresoraConfigService.obtener().tamanoPapel;
+}
+
+function esDispositivoMovilParaImpresion(): boolean {
+  if (typeof navigator === 'undefined' || typeof window === 'undefined') return false;
+  const plataforma = ImpresoraConfigService.plataforma();
+  return plataforma === 'android' || plataforma === 'ios' || window.innerWidth <= 768;
 }
 
 /**
@@ -118,6 +125,7 @@ function tablaATextoPlano(tabla: HTMLTableElement): string {
 export function imprimirTicket(callbackAfterPrint?: () => void, delayMs: number = 200): void {
   const config = ImpresoraConfigService.obtener();
   const tamanoMm = config.tamanoPapel;
+  const esMovil = esDispositivoMovilParaImpresion();
 
   // Buscar el ticket actual
   const ticket = document.querySelector('.nota-venta') as HTMLElement | null;
@@ -135,6 +143,7 @@ export function imprimirTicket(callbackAfterPrint?: () => void, delayMs: number 
   const previo = document.getElementById(STYLE_ID);
   if (previo) previo.remove();
   document.body.classList.remove(PRINTING_CLASS);
+  document.body.classList.remove(PRINTING_MOBILE_CLASS);
 
   // CSS de impresión: usa body.lodge-printing + @media print para anular cualquier
   // @page o regla global de otros módulos (ej: Perfil.css fuerza A4 landscape).
@@ -205,6 +214,12 @@ export function imprimirTicket(callbackAfterPrint?: () => void, delayMs: number 
       box-sizing: border-box !important;
     }
 
+    body.${PRINTING_MOBILE_CLASS} #${TICKET_PRINT_ID} .nota-venta {
+      padding: 0.5mm 1mm !important;
+      font-size: 14px !important;
+      line-height: 1.2 !important;
+    }
+
     /* Tablas dentro del ticket: mantener display de tabla */
     body.lodge-printing #${TICKET_PRINT_ID} table { display: table !important; width: 100% !important; border-collapse: collapse !important; font-size: 8px !important; table-layout: fixed !important; }
     body.lodge-printing #${TICKET_PRINT_ID} thead { display: table-header-group !important; }
@@ -235,6 +250,11 @@ export function imprimirTicket(callbackAfterPrint?: () => void, delayMs: number 
       letter-spacing: 0 !important;
       word-spacing: 0 !important;
       break-inside: avoid !important;
+    }
+
+    body.${PRINTING_MOBILE_CLASS} #${TICKET_PRINT_ID} pre {
+      font-size: 12px !important;
+      line-height: 1.15 !important;
     }
 
     /* Texto dentro del ticket — forzar monospace y tamaños explícitos para
@@ -273,6 +293,13 @@ export function imprimirTicket(callbackAfterPrint?: () => void, delayMs: number 
       letter-spacing: 0 !important;
       word-spacing: 0 !important;
     }
+    body.${PRINTING_MOBILE_CLASS} #${TICKET_PRINT_ID} .nv-logo { font-size: 20px !important; }
+    body.${PRINTING_MOBILE_CLASS} #${TICKET_PRINT_ID} .nv-nombre-empresa { font-size: 14px !important; }
+    body.${PRINTING_MOBILE_CLASS} #${TICKET_PRINT_ID} .nv-linea-uno { font-size: 13px !important; }
+    body.${PRINTING_MOBILE_CLASS} #${TICKET_PRINT_ID} .nv-linea { font-size: 12px !important; }
+    body.${PRINTING_MOBILE_CLASS} #${TICKET_PRINT_ID} .nv-cliente { font-size: 12px !important; line-height: 1.25 !important; }
+    body.${PRINTING_MOBILE_CLASS} #${TICKET_PRINT_ID} .nv-footer { font-size: 11px !important; }
+    body.${PRINTING_MOBILE_CLASS} #${TICKET_PRINT_ID} .nv-corte { font-size: 10px !important; }
     body.lodge-printing #${TICKET_PRINT_ID} .nv-header { text-align: center !important; }
 
     /* Evitar saltos de página */
@@ -324,6 +351,7 @@ export function imprimirTicket(callbackAfterPrint?: () => void, delayMs: number 
 
   // Activar modo impresión
   document.body.classList.add(PRINTING_CLASS);
+  if (esMovil) document.body.classList.add(PRINTING_MOBILE_CLASS);
 
   // CONVERTIR TABLA A TEXTO PLANO
   // El driver Generic / Text Only no renderiza tablas HTML correctamente
@@ -379,6 +407,7 @@ export function imprimirTicket(callbackAfterPrint?: () => void, delayMs: number 
     if (limpiado) return;
     limpiado = true;
     document.body.classList.remove(PRINTING_CLASS);
+    document.body.classList.remove(PRINTING_MOBILE_CLASS);
     // Restaurar #root (removeProperty elimina el !important)
     if (rootEl) {
       rootEl.style.removeProperty('display');

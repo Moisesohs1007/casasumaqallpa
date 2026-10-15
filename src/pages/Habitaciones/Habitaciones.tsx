@@ -12,6 +12,7 @@ import { Habitacion, EstadoHabitacion, ProductoFB, Reserva } from '../../types';
 import { HabitacionService, ReservaService, CatalogoFBService, InventarioService, seedProductos, FolioService, CargoFolioService, PagoFolioService, ImpuestoService, pendingSync, seedUtil, ImpresoraConfigService } from '../../services';
 import { supabase } from '../../services/__supabase_db__';
 import { imprimirTicket } from '../../utils/ticketStyles';
+import { lineaDoble, separador, lineaProducto, humanizarMetodoPago, getAnchoLinea } from '../../utils/ticketFormat';
 import CheckinModal from '../../components/modals/CheckinModal';
 import CheckoutModal from '../../components/modals/CheckoutModal';
 import TomarComanda from '../../components/modals/TomarComanda';
@@ -1504,7 +1505,6 @@ const HabitacionesPage: React.FC = () => {
           const totalPagado = calcularTotalPagos(folio?.pagos || []);
           const saldo = total - totalPagado;
           const metodoPago = pagos[0]?.metodoPago || 'EFECTIVO_PEN';
-          const metodoLabel = METODOS_PAGO_LISTA.find(m => m.value === metodoPago)?.label || metodoPago;
           const nombreHuesped = `${folio?.huesped?.nombres || 'Huesped'} ${folio?.huesped?.apellidos || ''}`.trim() || 'Cliente Eventual';
           const checkinNV = (folio?.reserva?.checkin || '').slice(0, 10);
           const checkoutNV = (folio?.reserva?.checkout || '').slice(0, 10);
@@ -1523,54 +1523,56 @@ const HabitacionesPage: React.FC = () => {
                     <div className="nv-linea-uno">Nota de Venta · {folio?.reserva?.id || checkoutReservaId || 'SIN-CORRELATIVO'}</div>
                     <div className="nv-linea">{fechaHoy()}</div>
                   </div>
+                  <div className="nv-separador">{separador(getAnchoLinea())}</div>
                   <div className="nv-cliente">
-                    <div><b>Cliente:</b> {nombreHuesped}</div>
-                    {folio?.huesped?.dni && <div><b>DNI / Doc:</b> {folio.huesped.dni}</div>}
-                    {folio?.reserva && <div><b>Periodo:</b> {checkinNV || folio.reserva.checkin} → {checkoutNV || folio.reserva.checkout} · {nochesNV || folio.reserva.noches || 1} noche(s)</div>}
-                    <div><b>Habitación:</b> {notaVentaCheckout.habId}</div>
-                    <div><b>Cajero/a:</b> {USUARIO_ACTUAL.nombres}</div>
-                    {hasRangoAloj && <div style={{ marginTop: 4, fontSize: 11, color: '#374151' }}><b>💡 Tarifa por rangos:</b> {lineasCargo.find((l: any) => l?.tipo === 'ALOJAMIENTO')?.nombre || ''}</div>}
+                    <div className="nv-linea">Cliente: {nombreHuesped}</div>
+                    {folio?.huesped?.dni && <div className="nv-linea">DNI / Doc: {folio.huesped.dni}</div>}
+                    {folio?.reserva && <div className="nv-linea">Periodo: {checkinNV || folio.reserva.checkin}{' -> '}{checkoutNV || folio.reserva.checkout}</div>}
+                    {folio?.reserva && <div className="nv-linea">{nochesNV || folio.reserva.noches || 1} noche(s)</div>}
+                    <div className="nv-linea">Habitacion: {notaVentaCheckout.habId}</div>
+                    <div className="nv-linea">Cajero/a: {USUARIO_ACTUAL.nombres}</div>
+                    {totalPagado > 0 && <div className="nv-linea">Pago: {humanizarMetodoPago(metodoPago)}</div>}
+                    {hasRangoAloj && <div className="nv-linea">Tarifa por rangos aplicada</div>}
                   </div>
-                  <table className="nv-tabla">
-                    <thead>
-                      <tr>
-                        <th style={{ textAlign: 'left' }}>DESCRIPCIÓN</th>
-                        <th style={{ textAlign: 'center' }}>CANT</th>
-                        <th style={{ textAlign: 'right' }}>P.U.</th>
-                        <th style={{ textAlign: 'right' }}>SUBTOT</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {lineasCargo.length === 0 && (
-                        <tr><td colSpan={4} style={{ textAlign: 'center', color: '#6b7280', padding: '12px 4px' }}>No hay cargos registrados en esta habitación.</td></tr>
-                      )}
-                      {lineasCargo.map((l: any) => (
-                        <tr key={l.id}>
-                          <td style={{ textAlign: 'left' }}>{l.nombre}</td>
-                          <td style={{ textAlign: 'center' }}>{l.cantidad}</td>
-                          <td style={{ textAlign: 'right' }}>{fmtSoles(l.precioUnit)}</td>
-                          <td style={{ textAlign: 'right' }}>{fmtSoles(l.cantidad * l.precioUnit)}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                  <div className="nv-totales">
-                    <div className="nv-total-row"><span>SUBTOTAL:</span><span>{fmtSoles(subtotal)}</span></div>
-                    <div className="nv-total-row"><span>IGV (incluido 18%):</span><span>{fmtSoles(igv)}</span></div>
-                    <div className="nv-total-row nv-total-final"><span>TOTAL:</span><span>{fmtSoles(total)}</span></div>
-                    {totalPagado > 0 && <div className="nv-total-row nv-pagado"><span>MONTO PAGADO ({metodoLabel}):</span><span>{fmtSoles(totalPagado)}</span></div>}
-                    {pagos.length > 1 && pagos.slice(1).map((p: any, i: number) => (
-                      <div key={p.id || i} className="nv-total-row" style={{ fontSize: 11 }}>
-                        <span>Otro pago ({METODOS_PAGO_LISTA.find(m => m.value === p.metodoPago)?.label || p.metodoPago}):</span>
-                        <span>{fmtSoles(p.monto)}</span>
-                      </div>
-                    ))}
-                    {Math.abs(saldo) > 0.01 && <div className="nv-total-row" style={{ color: saldo > 0 ? '#dc2626' : '#16a34a', fontWeight: 700 }}>
-                      <span>SALDO:</span><span>{fmtSoles(Math.max(0, saldo))}</span>
-                    </div>}
+                  <div className="nv-separador">{separador(getAnchoLinea())}</div>
+                  <pre className="nv-productos">{
+                    [
+                      lineaDoble('PRODUCTO', 'CANT SUBT', getAnchoLinea()),
+                      ...(lineasCargo.length === 0
+                        ? [lineaDoble('SIN CARGOS', '', getAnchoLinea())]
+                        : lineasCargo.map((l: any) =>
+                            lineaProducto(
+                              l.nombre,
+                              l.cantidad,
+                              l.cantidad * l.precioUnit,
+                              getAnchoLinea()
+                            )
+                          )),
+                    ].join('\n')
+                  }</pre>
+                  <div className="nv-separador">{separador(getAnchoLinea())}</div>
+                  <pre className="nv-totales-pre">{
+                    (() => {
+                      const ancho = getAnchoLinea();
+                      const fmt = (n: number) => 'S/' + Number(n || 0).toFixed(2);
+                      return [
+                        lineaDoble('SUBTOTAL:', fmt(subtotal), ancho),
+                        lineaDoble('IGV (incluido 18%):', fmt(igv), ancho),
+                        lineaDoble('TOTAL:', fmt(total), ancho),
+                        ...(totalPagado > 0 ? [lineaDoble('MONTO PAGADO:', fmt(totalPagado), ancho)] : []),
+                        ...pagos.slice(1).map((p: any, i: number) =>
+                          lineaDoble(`PAGO ${i + 2}:`, fmt(p.monto), ancho)
+                        ),
+                        ...(Math.abs(saldo) > 0.01 ? [lineaDoble('SALDO:', fmt(Math.max(0, saldo)), ancho)] : []),
+                      ].join('\n');
+                    })()
+                  }</pre>
+                  <div className="nv-separador">{separador(getAnchoLinea())}</div>
+                  <div className="nv-footer">
+                    <div className="nv-linea">Gracias por su visita.</div>
+                    <div className="nv-linea">Esperamos volver a verle pronto.</div>
                   </div>
-                  <div className="nv-footer">Gracias por su visita. Esperamos volver a verle pronto.</div>
-                  <div className="nv-corte">-- corte ticket --</div>
+                  <div className="nv-corte">--- corte ticket ---</div>
                 </div>
                 <div className="modal-foot no-print">
                   <IonButton color="primary" onClick={imprimirNotaCheckout}><IonIcon slot="start" icon={receiptOutline} />Imprimir (Ticket {ImpresoraConfigService.obtener().tamanoPapel}mm)</IonButton>
