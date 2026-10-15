@@ -88,7 +88,7 @@ export function imprimirTicket(callbackAfterPrint?: () => void, delayMs: number 
       margin: 0 !important; padding: 0 !important; background: #fff !important;
       -webkit-print-color-adjust: exact; print-color-adjust: exact;
       box-sizing: border-box !important;
-      width: 100% !important;
+      width: ${tamanoMm}mm !important;
     }
 
     /* ANULAR @media print globales que ocultan todo (Perfil.css: body * { visibility:hidden }) */
@@ -96,15 +96,16 @@ export function imprimirTicket(callbackAfterPrint?: () => void, delayMs: number 
       body * { visibility: visible !important; }
     }
 
-    /* Mostrar SOLO el wrapper del ticket — ancho completo del @page */
+    /* Mostrar SOLO el wrapper del ticket — ancho EXPLÍCITO en mm para que
+       no dependa de width:100% que puede resolverse mal contra el viewport. */
     body.lodge-printing #${TICKET_PRINT_ID} {
       display: block !important;
       visibility: visible !important;
       position: static !important;
       margin: 0 !important;
       padding: 0 !important;
-      width: 100% !important;
-      max-width: 100% !important;
+      width: ${tamanoMm}mm !important;
+      max-width: ${tamanoMm}mm !important;
       background: #fff !important;
       box-sizing: border-box !important;
       float: none !important;
@@ -127,13 +128,13 @@ export function imprimirTicket(callbackAfterPrint?: () => void, delayMs: number 
 
     body.lodge-printing #${TICKET_PRINT_ID} .nota-venta {
       border: none !important; border-radius: 0 !important;
-      width: 100% !important; max-width: 100% !important;
-      margin: 0 !important; padding: 1mm 0 !important;
+      width: ${tamanoMm}mm !important; max-width: ${tamanoMm}mm !important;
+      margin: 0 !important; padding: 1mm 2mm !important;
       box-shadow: none !important; background: #fff !important; color: #000 !important;
       display: block !important;
       font-family: 'Courier New', Courier, monospace !important;
-      font-size: 11px !important;
-      line-height: 1.25 !important;
+      font-size: 12px !important;
+      line-height: 1.3 !important;
       text-align: left !important;
       box-sizing: border-box !important;
     }
@@ -205,6 +206,25 @@ export function imprimirTicket(callbackAfterPrint?: () => void, delayMs: number 
   wrapper.id = TICKET_PRINT_ID;
   document.body.appendChild(wrapper);
   wrapper.appendChild(ticket); // Mueve el ticket (no clona)
+
+  // Aplicar estilos INLINE al ticket para garantizar que el ancho y fuente
+  // se apliquen sin importar la especificidad de otros CSS.
+  // El ancho se calcula en px para evitar problemas de resolución de mm.
+  // 58mm @ 96 DPI = 219px, 80mm @ 96 DPI = 302px
+  const ticketWidthPx = Math.round(tamanoMm * 96 / 25.4);
+  ticket.style.setProperty('width', `${ticketWidthPx}px`, 'important');
+  ticket.style.setProperty('max-width', `${ticketWidthPx}px`, 'important');
+  ticket.style.setProperty('font-family', "'Courier New', Courier, monospace", 'important');
+  ticket.style.setProperty('font-size', '12px', 'important');
+  ticket.style.setProperty('color', '#000', 'important');
+  ticket.style.setProperty('background', '#fff', 'important');
+  ticket.style.setProperty('padding', '1mm 2mm', 'important');
+  ticket.style.setProperty('margin', '0', 'important');
+  ticket.style.setProperty('box-sizing', 'border-box', 'important');
+
+  // Aplicar ancho inline tambien al wrapper
+  wrapper.style.setProperty('width', `${ticketWidthPx}px`, 'important');
+  wrapper.style.setProperty('max-width', `${ticketWidthPx}px`, 'important');
 
   // Ocultar #root (donde está ion-app) con estilo en línea !important
   const rootEl = document.getElementById('root') || document.querySelector('#root');
