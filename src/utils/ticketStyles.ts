@@ -64,14 +64,14 @@ export function imprimirTicket(callbackAfterPrint?: () => void, delayMs: number 
   // @page o regla global de otros módulos (ej: Perfil.css fuerza A4 landscape).
   // Todas las reglas llevan !important para ganar la especificidad sobre @media print globales.
   //
-  // ESTRATEGIA: @page { size: 58mm auto } para ancho fijo y altura automatica.
-  // El ticket usa width:100% para llenar el ancho del área imprimible.
+  // ESTRATEGIA: @page { size: auto } respeta el tamaño de papel del driver
+  // y evita múltiples páginas. El ticket usa width:100% para llenar el ancho.
   const css = `
-    /* @page: ancho fijo 58mm, altura automatica para cortar justo despues del contenido */
+    /* @page: auto para respetar el tamaño de papel del driver y evitar multiples paginas */
     @media print {
-      @page { size: ${tamanoMm}mm auto; margin: 0; }
+      @page { size: auto; margin: 0; }
     }
-    @page { size: ${tamanoMm}mm auto; margin: 0; }
+    @page { size: auto; margin: 0; }
 
     /* OCULTAR TODO lo que no sea el ticket durante la impresión. */
     @media print {
