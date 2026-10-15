@@ -75,6 +75,15 @@ export function imprimirTicket(callbackAfterPrint?: () => void, delayMs: number 
     }
     @page { size: ${tamanoMm}mm auto; margin: 0; }
 
+    /* OCULTAR TODO lo que no sea el ticket durante la impresión.
+       Esto es CRÍTICO: Ionic mantiene #root montado y aunque le pongamos
+       display:none inline, algun @media print de otros modulos puede anularlo.
+       Esta regla garantiza que SOLO #lodge-ticket-print sea visible. */
+    @media print {
+      body > *:not(#${TICKET_PRINT_ID}) { display: none !important; }
+      #${TICKET_PRINT_ID} { display: block !important; }
+    }
+
     html, body {
       margin: 0 !important; padding: 0 !important; background: #fff !important;
       -webkit-print-color-adjust: exact; print-color-adjust: exact;
