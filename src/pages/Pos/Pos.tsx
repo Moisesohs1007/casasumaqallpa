@@ -20,6 +20,7 @@ import { lineaDoble, lineaCentrada, separador, lineaProducto, humanizarMetodoPag
 import './Pos.css';
 
 const PUNTO_VENTA_ID = 'PV-RESTAURANTE-01';
+const TICKET_LOGO_SRC = `${import.meta.env.BASE_URL}Sumaq%20Allpa.png`;
 const obtenerUsuarioActual = () => {
   const sesion = AuthService.sesionActual();
   return sesion ? { id: sesion.id, nombres: sesion.nombres, apellidos: sesion.apellidos } : { id: 'USR-SYSTEM', nombres: 'Sistema', apellidos: '' };
@@ -1148,8 +1149,9 @@ const PosPage: React.FC = () => {
               </div>
               <div className="nota-venta">
                 <div className="nv-header">
-                  <div className="nv-logo">{ImpresoraConfigService.obtener().nombreEmpresa.split(' ').slice(-1)[0] || 'Sumaq Allpa'}</div>
-                  <div className="nv-nombre-empresa">{ImpresoraConfigService.obtener().nombreEmpresa || 'Casa Sumaq Allpa'}</div>
+                  <div className="nv-logo">
+                    <img className="nv-logo-img" src={TICKET_LOGO_SRC} alt="Sumaq Allpa" />
+                  </div>
                   <div className="nv-linea-uno">Nota de Venta · {modalNotaVenta.id}</div>
                   <div className="nv-linea">{modalNotaVenta.fecha}</div>
                 </div>
@@ -1177,13 +1179,9 @@ const PosPage: React.FC = () => {
                 <pre className="nv-totales-pre">{
                   (() => {
                     const ancho = getAnchoLinea();
-                    const igv = Number((modalNotaVenta.total * 18 / 118).toFixed(2));
                     const fmt = (n: number) => 'S/' + Number(n || 0).toFixed(2);
                     return [
-                      lineaDoble('SUBTOTAL:', fmt(modalNotaVenta.total), ancho),
-                      lineaDoble('IGV (incluido 18%):', fmt(igv), ancho),
                       lineaDoble('TOTAL:', fmt(modalNotaVenta.total), ancho),
-                      lineaDoble('MONTO PAGADO:', fmt(modalNotaVenta.montoPagado), ancho),
                     ].join('\n');
                   })()
                 }</pre>

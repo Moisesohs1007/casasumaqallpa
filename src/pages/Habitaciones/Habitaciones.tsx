@@ -22,6 +22,7 @@ import './Habitaciones.css';
 
 const EVENTO_REFRESCAR = 'lodge:refrescarAhora' as const;
 const AUTO_REFRESH_MS = 8000;
+const TICKET_LOGO_SRC = `${import.meta.env.BASE_URL}Sumaq%20Allpa.png`;
 
 const estadoLabel: Record<EstadoHabitacion, string> = {
   LIBRE: 'LIBRE',
@@ -1501,7 +1502,7 @@ const HabitacionesPage: React.FC = () => {
           const hasRangoAloj = lineasCargoIn.some((l: any) => String(l?.nombre || '').includes('rango')) && lineasCargoIn.some((l: any) => l?.cantidad === 1);
           const lineasCargo = lineasCargoIn;
           const pagos = (folio?.pagos || []) as any[];
-          const { subtotal, igv, total } = calcularTotales(folio?.lineas || []);
+          const { total } = calcularTotales(folio?.lineas || []);
           const totalPagado = calcularTotalPagos(folio?.pagos || []);
           const saldo = total - totalPagado;
           const metodoPago = pagos[0]?.metodoPago || 'EFECTIVO_PEN';
@@ -1518,8 +1519,9 @@ const HabitacionesPage: React.FC = () => {
                 </div>
                 <div className="nota-venta">
                   <div className="nv-header">
-                    <div className="nv-logo">{ImpresoraConfigService.obtener().nombreEmpresa.split(' ').slice(-1)[0] || 'Sumaq Allpa'}</div>
-                    <div className="nv-nombre-empresa">{ImpresoraConfigService.obtener().nombreEmpresa || 'Casa Sumaq Allpa'}</div>
+                    <div className="nv-logo">
+                      <img className="nv-logo-img" src={TICKET_LOGO_SRC} alt="Sumaq Allpa" />
+                    </div>
                     <div className="nv-linea-uno">Nota de Venta · {folio?.reserva?.id || checkoutReservaId || 'SIN-CORRELATIVO'}</div>
                     <div className="nv-linea">{fechaHoy()}</div>
                   </div>
@@ -1556,14 +1558,7 @@ const HabitacionesPage: React.FC = () => {
                       const ancho = getAnchoLinea();
                       const fmt = (n: number) => 'S/' + Number(n || 0).toFixed(2);
                       return [
-                        lineaDoble('SUBTOTAL:', fmt(subtotal), ancho),
-                        lineaDoble('IGV (incluido 18%):', fmt(igv), ancho),
                         lineaDoble('TOTAL:', fmt(total), ancho),
-                        ...(totalPagado > 0 ? [lineaDoble('MONTO PAGADO:', fmt(totalPagado), ancho)] : []),
-                        ...pagos.slice(1).map((p: any, i: number) =>
-                          lineaDoble(`PAGO ${i + 2}:`, fmt(p.monto), ancho)
-                        ),
-                        ...(Math.abs(saldo) > 0.01 ? [lineaDoble('SALDO:', fmt(Math.max(0, saldo)), ancho)] : []),
                       ].join('\n');
                     })()
                   }</pre>

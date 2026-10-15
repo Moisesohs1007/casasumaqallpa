@@ -208,16 +208,17 @@ export function imprimirTicket(callbackAfterPrint?: () => void, delayMs: number 
       box-shadow: none !important; background: #fff !important; color: #000 !important;
       display: block !important;
       font-family: 'Courier New', Courier, monospace !important;
-      font-size: 12px !important;
-      line-height: 1.3 !important;
+      font-size: 13px !important;
+      line-height: 1.18 !important;
+      font-weight: 700 !important;
       text-align: left !important;
       box-sizing: border-box !important;
     }
 
     body.${PRINTING_MOBILE_CLASS} #${TICKET_PRINT_ID} .nota-venta {
       padding: 0.5mm 1mm !important;
-      font-size: 15px !important;
-      line-height: 1.15 !important;
+      font-size: 15.5px !important;
+      line-height: 1.08 !important;
     }
 
     /* Tablas dentro del ticket: mantener display de tabla */
@@ -243,19 +244,29 @@ export function imprimirTicket(callbackAfterPrint?: () => void, delayMs: number 
       margin: 0 !important;
       padding: 0 !important;
       font-family: 'Courier New', Courier, monospace !important;
-      font-size: 9px !important;
-      line-height: 1.2 !important;
+      font-size: 10px !important;
+      line-height: 1.12 !important;
       white-space: pre !important;
       color: #000 !important;
       letter-spacing: 0 !important;
       word-spacing: 0 !important;
+      font-weight: 700 !important;
       break-inside: avoid !important;
     }
 
     body.${PRINTING_MOBILE_CLASS} #${TICKET_PRINT_ID} pre {
-      font-size: 13px !important;
-      line-height: 1.1 !important;
-      font-weight: 700 !important;
+      font-size: 13.5px !important;
+      line-height: 1.05 !important;
+      font-weight: 800 !important;
+    }
+
+    body.lodge-printing #${TICKET_PRINT_ID} img {
+      display: block !important;
+      max-width: 100% !important;
+      height: auto !important;
+      margin: 0 auto !important;
+      filter: grayscale(1) contrast(1.8) brightness(0.78) !important;
+      image-rendering: -webkit-optimize-contrast !important;
     }
 
     /* Texto dentro del ticket — forzar monospace y tamaños explícitos para
@@ -279,13 +290,13 @@ export function imprimirTicket(callbackAfterPrint?: () => void, delayMs: number 
     }
     body.lodge-printing #${TICKET_PRINT_ID} .nv-logo { font-size: 16px !important; font-weight: 700 !important; text-align: center !important; }
     body.lodge-printing #${TICKET_PRINT_ID} .nv-nombre-empresa { font-size: 12px !important; font-weight: 700 !important; text-align: center !important; }
-    body.lodge-printing #${TICKET_PRINT_ID} .nv-linea-uno { font-size: 11px !important; font-weight: 600 !important; text-align: center !important; }
-    body.lodge-printing #${TICKET_PRINT_ID} .nv-linea { font-size: 10px !important; text-align: center !important; }
-    body.lodge-printing #${TICKET_PRINT_ID} .nv-cliente { font-size: 10.5px !important; line-height: 1.3 !important; }
+    body.lodge-printing #${TICKET_PRINT_ID} .nv-linea-uno { font-size: 12px !important; font-weight: 800 !important; text-align: center !important; }
+    body.lodge-printing #${TICKET_PRINT_ID} .nv-linea { font-size: 11px !important; text-align: center !important; font-weight: 700 !important; }
+    body.lodge-printing #${TICKET_PRINT_ID} .nv-cliente { font-size: 11.5px !important; line-height: 1.22 !important; font-weight: 700 !important; }
     body.lodge-printing #${TICKET_PRINT_ID} .nv-total-row { font-size: 11px !important; }
     body.lodge-printing #${TICKET_PRINT_ID} .nv-total-final { font-size: 13px !important; font-weight: 900 !important; }
     body.lodge-printing #${TICKET_PRINT_ID} .nv-pagado { font-size: 11px !important; font-weight: 700 !important; }
-    body.lodge-printing #${TICKET_PRINT_ID} .nv-footer { font-size: 10px !important; text-align: center !important; }
+    body.lodge-printing #${TICKET_PRINT_ID} .nv-footer { font-size: 11px !important; text-align: center !important; font-weight: 700 !important; }
     body.lodge-printing #${TICKET_PRINT_ID} .nv-corte { font-size: 9px !important; text-align: center !important; }
     body.lodge-printing #${TICKET_PRINT_ID} .nv-total-row span {
       display: inline !important;
@@ -296,12 +307,12 @@ export function imprimirTicket(callbackAfterPrint?: () => void, delayMs: number 
     }
     body.${PRINTING_MOBILE_CLASS} #${TICKET_PRINT_ID} .nv-logo { font-size: 22px !important; font-weight: 900 !important; }
     body.${PRINTING_MOBILE_CLASS} #${TICKET_PRINT_ID} .nv-nombre-empresa { font-size: 15px !important; font-weight: 900 !important; }
-    body.${PRINTING_MOBILE_CLASS} #${TICKET_PRINT_ID} .nv-linea-uno { font-size: 14px !important; font-weight: 800 !important; }
-    body.${PRINTING_MOBILE_CLASS} #${TICKET_PRINT_ID} .nv-linea { font-size: 13px !important; font-weight: 700 !important; }
-    body.${PRINTING_MOBILE_CLASS} #${TICKET_PRINT_ID} .nv-cliente { font-size: 13px !important; line-height: 1.2 !important; font-weight: 700 !important; }
-    body.${PRINTING_MOBILE_CLASS} #${TICKET_PRINT_ID} .nv-footer { font-size: 12px !important; font-weight: 700 !important; }
+    body.${PRINTING_MOBILE_CLASS} #${TICKET_PRINT_ID} .nv-linea-uno { font-size: 14.5px !important; font-weight: 900 !important; }
+    body.${PRINTING_MOBILE_CLASS} #${TICKET_PRINT_ID} .nv-linea { font-size: 13.5px !important; font-weight: 800 !important; }
+    body.${PRINTING_MOBILE_CLASS} #${TICKET_PRINT_ID} .nv-cliente { font-size: 13.5px !important; line-height: 1.12 !important; font-weight: 800 !important; }
+    body.${PRINTING_MOBILE_CLASS} #${TICKET_PRINT_ID} .nv-footer { font-size: 12.5px !important; font-weight: 800 !important; }
     body.${PRINTING_MOBILE_CLASS} #${TICKET_PRINT_ID} .nv-corte { font-size: 11px !important; font-weight: 700 !important; }
-    body.${PRINTING_MOBILE_CLASS} #${TICKET_PRINT_ID} .nv-separador { font-size: 12px !important; font-weight: 700 !important; }
+    body.${PRINTING_MOBILE_CLASS} #${TICKET_PRINT_ID} .nv-separador { font-size: 12.5px !important; font-weight: 800 !important; }
     body.lodge-printing #${TICKET_PRINT_ID} .nv-header { text-align: center !important; }
 
     /* Evitar saltos de página */
