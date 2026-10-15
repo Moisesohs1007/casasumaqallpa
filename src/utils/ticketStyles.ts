@@ -32,6 +32,35 @@ function esDispositivoMovilParaImpresion(): boolean {
   return plataforma === 'android' || plataforma === 'ios' || window.innerWidth <= 768;
 }
 
+function esperarImagenesTicket(ticket: HTMLElement, timeoutMs: number = 2500): Promise<void> {
+  const imagenes = Array.from(ticket.querySelectorAll('img')) as HTMLImageElement[];
+  if (imagenes.length === 0) return Promise.resolve();
+
+  const pendientes = imagenes.filter(img => !img.complete || img.naturalWidth === 0);
+  if (pendientes.length === 0) return Promise.resolve();
+
+  return new Promise(resolve => {
+    let restantes = pendientes.length;
+    const finalizar = () => {
+      restantes -= 1;
+      if (restantes <= 0) resolve();
+    };
+
+    const timer = window.setTimeout(() => resolve(), timeoutMs);
+
+    pendientes.forEach(img => {
+      const onDone = () => {
+        img.removeEventListener('load', onDone);
+        img.removeEventListener('error', onDone);
+        finalizar();
+        if (restantes <= 0) window.clearTimeout(timer);
+      };
+      img.addEventListener('load', onDone, { once: true });
+      img.addEventListener('error', onDone, { once: true });
+    });
+  });
+}
+
 /**
  * Normaliza texto para drivers de impresora térmica que no soportan
  * caracteres especiales (ñ, tildes).
@@ -453,14 +482,15 @@ export function imprimirTicket(callbackAfterPrint?: () => void, delayMs: number 
   };
   window.addEventListener('afterprint', limpiar);
 
-  // Esperar a que el DOM y CSS se apliquen, luego imprimir
+  // Esperar a que DOM, CSS e imágenes del ticket estén listos antes de imprimir.
   setTimeout(() => {
-    // Forzar reflow
-    void document.body.offsetHeight;
-    window.print();
-    // Fallback por si afterprint no dispara (algunos navegadores)
-    setTimeout(() => {
-      if (!limpiado) limpiar();
-    }, 20000);
+    esperarImagenesTicket(ticket).finally(() => {
+      void document.body.offsetHeight;
+      window.print();
+      // Fallback por si afterprint no dispara (algunos navegadores)
+      setTimeout(() => {
+        if (!limpiado) limpiar();
+      }, 20000);
+    });
   }, delayMs);
 }

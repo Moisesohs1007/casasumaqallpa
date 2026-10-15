@@ -35,7 +35,7 @@ setupIonicReact({
 });
 
 // VERSIÓN de la app - incrementar en cada cambio importante (v3.0, v3.1, v3.2...)
-const APP_VERSION = 'v5.3';
+const APP_VERSION = 'v5.4';
 if (typeof document !== 'undefined') {
   document.title = `Casa Sumaq Allpa · ${APP_VERSION}`;
 }
