@@ -79,6 +79,7 @@ export function imprimirTicket(callbackAfterPrint?: () => void, delayMs: number 
       margin: 0 !important; padding: 0 !important; background: #fff !important;
       -webkit-print-color-adjust: exact; print-color-adjust: exact;
       box-sizing: border-box !important;
+      width: 100% !important;
     }
 
     /* ANULAR @media print globales que ocultan todo (Perfil.css: body * { visibility:hidden }) */
@@ -97,6 +98,7 @@ export function imprimirTicket(callbackAfterPrint?: () => void, delayMs: number 
       max-width: 100% !important;
       background: #fff !important;
       box-sizing: border-box !important;
+      float: none !important;
     }
 
     /* Todos los elementos dentro del ticket: visibles, color negro y RESETS de texto
@@ -111,12 +113,13 @@ export function imprimirTicket(callbackAfterPrint?: () => void, delayMs: number 
       word-spacing: 0 !important;
       text-rendering: geometricPrecision !important;
       box-sizing: border-box !important;
+      max-width: 100% !important;
     }
 
     body.lodge-printing #${TICKET_PRINT_ID} .nota-venta {
       border: none !important; border-radius: 0 !important;
       width: 100% !important; max-width: 100% !important;
-      margin: 0 !important; padding: 1mm 2mm !important;
+      margin: 0 !important; padding: 1mm 0 !important;
       box-shadow: none !important; background: #fff !important; color: #000 !important;
       display: block !important;
       font-family: 'Courier New', Courier, monospace !important;
