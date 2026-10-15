@@ -26,6 +26,79 @@ export function getTamanoPapel(): TamanoPapel {
 }
 
 /**
+ * Normaliza texto para drivers de impresora térmica que no soportan
+ * caracteres especiales (ñ, tildes).
+ */
+function normalizarTexto(texto: string): string {
+  return texto
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '') // quitar tildes
+    .replace(/ñ/g, 'n').replace(/Ñ/g, 'N')
+    .replace(/[^\x20-\x7E]/g, ''); // solo ASCII imprimible
+}
+
+/**
+ * Convierte la tabla HTML del ticket a texto plano con columnas de ancho fijo.
+ * Esto es necesario porque el driver Generic / Text Only no renderiza tablas HTML
+ * correctamente (pega las filas).
+ */
+function tablaATextoPlano(tabla: HTMLTableElement): string {
+  const lineas: string[] = [];
+
+  // Anchos de columna (en caracteres)
+  const W_DESC = 15;
+  const W_CANT = 3;
+  const W_PU = 8;
+  const W_SUBTOT = 8;
+
+  const truncar = (s: string, w: number) => (s.length > w ? s.substring(0, w) : s);
+  const centrar = (s: string, w: number) => {
+    const t = truncar(s, w);
+    const pad = w - t.length;
+    const left = Math.floor(pad / 2);
+    return ' '.repeat(left) + t + ' '.repeat(pad - left);
+  };
+  const derecha = (s: string, w: number) => {
+    const t = truncar(s, w);
+    return ' '.repeat(w - t.length) + t;
+  };
+  const izquierda = (s: string, w: number) => {
+    const t = truncar(s, w);
+    return t + ' '.repeat(w - t.length);
+  };
+
+  // Encabezado
+  const thead = tabla.querySelector('thead');
+  if (thead) {
+    const ths = thead.querySelectorAll('th');
+    if (ths.length >= 4) {
+      lineas.push(
+        izquierda(normalizarTexto(ths[0].textContent || ''), W_DESC) + ' ' +
+        centrar(normalizarTexto(ths[1].textContent || ''), W_CANT) + ' ' +
+        derecha(normalizarTexto(ths[2].textContent || ''), W_PU) + ' ' +
+        derecha(normalizarTexto(ths[3].textContent || ''), W_SUBTOT)
+      );
+    }
+  }
+
+  // Filas de productos
+  const filas = tabla.querySelectorAll('tbody tr');
+  filas.forEach(fila => {
+    const tds = fila.querySelectorAll('td');
+    if (tds.length >= 4) {
+      lineas.push(
+        izquierda(normalizarTexto(tds[0].textContent || ''), W_DESC) + ' ' +
+        centrar(normalizarTexto(tds[1].textContent || ''), W_CANT) + ' ' +
+        derecha(normalizarTexto(tds[2].textContent || ''), W_PU) + ' ' +
+        derecha(normalizarTexto(tds[3].textContent || ''), W_SUBTOT)
+      );
+    }
+  });
+
+  return lineas.join('\n');
+}
+
+/**
  * Imprime el ticket térmico.
  *
  * Estrategia:
@@ -146,6 +219,21 @@ export function imprimirTicket(callbackAfterPrint?: () => void, delayMs: number 
     body.lodge-printing #${TICKET_PRINT_ID} th:nth-child(4),
     body.lodge-printing #${TICKET_PRINT_ID} td:nth-child(4) { width: 24% !important; text-align: right !important; }
 
+    /* Texto plano de la tabla (pre) */
+    body.lodge-printing #${TICKET_PRINT_ID} pre {
+      display: block !important;
+      margin: 0 !important;
+      padding: 0 !important;
+      font-family: 'Courier New', Courier, monospace !important;
+      font-size: 9px !important;
+      line-height: 1.2 !important;
+      white-space: pre !important;
+      color: #000 !important;
+      letter-spacing: 0 !important;
+      word-spacing: 0 !important;
+      break-inside: avoid !important;
+    }
+
     /* Texto dentro del ticket — forzar monospace y tamaños explícitos para
        evitar que el driver de la impresora sustituya fuentes con spacing raro */
     body.lodge-printing #${TICKET_PRINT_ID} .nv-logo,
@@ -234,6 +322,51 @@ export function imprimirTicket(callbackAfterPrint?: () => void, delayMs: number 
   // Activar modo impresión
   document.body.classList.add(PRINTING_CLASS);
 
+  // CONVERTIR TABLA A TEXTO PLANO
+  // El driver Generic / Text Only no renderiza tablas HTML correctamente
+  // (pega todas las filas en una sola línea). Reemplazamos la tabla por un
+  // <pre> con texto de ancho fijo para que cada producto salga en su línea.
+  const tablaOriginal = ticket.querySelector('.nv-tabla') as HTMLTableElement | null;
+  let tablaRestaurada: HTMLElement | null = null;
+  let preReemplazo: HTMLElement | null = null;
+  if (tablaOriginal && tablaOriginal.parentElement) {
+    const textoTabla = tablaATextoPlano(tablaOriginal);
+    const pre = document.createElement('pre');
+    pre.style.margin = '0';
+    pre.style.padding = '0';
+    pre.style.fontFamily = "'Courier New', Courier, monospace";
+    pre.style.fontSize = '9px';
+    pre.style.lineHeight = '1.2';
+    pre.style.whiteSpace = 'pre';
+    pre.style.fontWeight = 'normal';
+    pre.style.color = '#000';
+    pre.style.letterSpacing = '0';
+    pre.style.wordSpacing = '0';
+    pre.textContent = textoTabla;
+
+    const padreTabla = tablaOriginal.parentElement;
+    padreTabla.insertBefore(pre, tablaOriginal);
+    padreTabla.removeChild(tablaOriginal);
+    tablaRestaurada = tablaOriginal;
+    preReemplazo = pre;
+  }
+
+  // NORMALIZAR TEXTO del resto del ticket (tildes, ñ) para Generic / Text Only
+  const textosOriginales: { nodo: Text; valor: string }[] = [];
+  const normalizarNodosTexto = (el: Element) => {
+    const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT, null);
+    let nodo = walker.nextNode();
+    while (nodo) {
+      const t = nodo as Text;
+      if (t.nodeValue && /[^\x00-\x7F]/.test(t.nodeValue)) {
+        textosOriginales.push({ nodo: t, valor: t.nodeValue });
+        t.nodeValue = normalizarTexto(t.nodeValue);
+      }
+      nodo = walker.nextNode();
+    }
+  };
+  normalizarNodosTexto(ticket);
+
   // Forzar reflow para que el navegador calcule las dimensiones reales del ticket
   void document.body.offsetHeight;
 
@@ -250,6 +383,16 @@ export function imprimirTicket(callbackAfterPrint?: () => void, delayMs: number 
     }
     // Restaurar overlays
     overlays.forEach(el => { (el as HTMLElement).style.removeProperty('display'); });
+    // Restaurar la tabla HTML original
+    if (preReemplazo && tablaRestaurada && preReemplazo.parentElement) {
+      const padre = preReemplazo.parentElement;
+      padre.insertBefore(tablaRestaurada, preReemplazo);
+      padre.removeChild(preReemplazo);
+    }
+    // Restaurar texto original (tildes, ñ)
+    textosOriginales.forEach(({ nodo, valor }) => {
+      try { nodo.nodeValue = valor; } catch (e) { /* nodo pudo ser eliminado */ }
+    });
     // Devolver el ticket a su posición original
     if (parentOriginal) {
       if (nextSiblingOriginal) {
