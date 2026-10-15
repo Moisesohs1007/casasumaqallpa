@@ -63,6 +63,11 @@ export function imprimirTicket(callbackAfterPrint?: () => void, delayMs: number 
   // CSS de impresión: usa body.lodge-printing + @media print para anular cualquier
   // @page o regla global de otros módulos (ej: Perfil.css fuerza A4 landscape).
   // Todas las reglas llevan !important para ganar la especificidad sobre @media print globales.
+  //
+  // NOTA sobre ancho: el papel es 58mm pero el área imprimible real del driver
+  // POS-80 (modificado a 58mm) es ~48mm (384 master units @ 203 DPI).
+  // Por eso el ticket usa width:100% con box-sizing:border-box y padding pequeño,
+  // para que el contenido quepa dentro del área imprimible sin recortarse.
   const css = `
     /* @page dentro de @media print para que sea el último en aplicarse y gane a Perfil.css */
     @media print {
@@ -73,6 +78,7 @@ export function imprimirTicket(callbackAfterPrint?: () => void, delayMs: number 
     html, body {
       margin: 0 !important; padding: 0 !important; background: #fff !important;
       -webkit-print-color-adjust: exact; print-color-adjust: exact;
+      box-sizing: border-box !important;
     }
 
     /* ANULAR @media print globales que ocultan todo (Perfil.css: body * { visibility:hidden }) */
@@ -80,16 +86,17 @@ export function imprimirTicket(callbackAfterPrint?: () => void, delayMs: number 
       body * { visibility: visible !important; }
     }
 
-    /* Mostrar SOLO el wrapper del ticket */
+    /* Mostrar SOLO el wrapper del ticket — ancho completo del @page */
     body.lodge-printing #${TICKET_PRINT_ID} {
       display: block !important;
       visibility: visible !important;
       position: static !important;
       margin: 0 !important;
       padding: 0 !important;
-      width: ${tamanoMm}mm !important;
-      max-width: ${tamanoMm}mm !important;
+      width: 100% !important;
+      max-width: 100% !important;
       background: #fff !important;
+      box-sizing: border-box !important;
     }
 
     /* Todos los elementos dentro del ticket: visibles, color negro y RESETS de texto
@@ -103,18 +110,20 @@ export function imprimirTicket(callbackAfterPrint?: () => void, delayMs: number 
       letter-spacing: 0 !important;
       word-spacing: 0 !important;
       text-rendering: geometricPrecision !important;
+      box-sizing: border-box !important;
     }
 
     body.lodge-printing #${TICKET_PRINT_ID} .nota-venta {
       border: none !important; border-radius: 0 !important;
-      width: ${tamanoMm}mm !important; max-width: ${tamanoMm}mm !important;
-      margin: 0 !important; padding: 2mm !important;
+      width: 100% !important; max-width: 100% !important;
+      margin: 0 !important; padding: 1mm 2mm !important;
       box-shadow: none !important; background: #fff !important; color: #000 !important;
       display: block !important;
       font-family: 'Courier New', Courier, monospace !important;
       font-size: 11px !important;
       line-height: 1.25 !important;
       text-align: left !important;
+      box-sizing: border-box !important;
     }
 
     /* Tablas dentro del ticket: mantener display de tabla */
