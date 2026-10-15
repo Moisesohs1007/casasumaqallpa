@@ -117,3 +117,32 @@ const MAPA_METODO_PAGO: Record<string, string> = {
 export function humanizarMetodoPago(metodo: string): string {
   return MAPA_METODO_PAGO[metodo] || normalizarTexto(metodo);
 }
+
+/**
+ * Compacta fechas largas para que entren en una sola línea del ticket.
+ * Ejemplo: "15/10/2026, 10:25:44 a. m." -> "15/10/26 10:25 AM"
+ */
+export function compactarFechaHora(texto: string): string {
+  const t = normalizarTexto(String(texto || '')).replace(',', ' ').replace(/\s+/g, ' ').trim();
+  const m = t.match(/(\d{1,2}\/\d{1,2}\/\d{4}).*?(\d{1,2}:\d{2})(?::\d{2})?\s*([ap])?\.?\s*m?\.?/i);
+  if (!m) return t;
+
+  const fecha = m[1].replace(/(\d{1,2}\/\d{1,2}\/)\d{4}/, '$1' + m[1].slice(-2));
+  const hora = m[2];
+  const periodo = (m[3] || '').toUpperCase();
+
+  return `${fecha} ${hora}${periodo ? ` ${periodo}M` : ''}`.trim();
+}
+
+/**
+ * Encabezado de columnas del bloque de productos.
+ * Corre ligeramente "CANT" a la izquierda para alinearlo mejor con la columna.
+ */
+export function lineaEncabezadoProductos(ancho: number = getAnchoLinea()): string {
+  const wNombre = ancho <= 28 ? 16 : ancho <= 32 ? 18 : 20;
+  const shiftCant = ancho <= 28 ? 1 : 0;
+  const nombreArea = Math.max(8, wNombre - shiftCant);
+  const subtotalArea = Math.max(4, ancho - nombreArea - 4);
+
+  return padRight('PRODUCTO', nombreArea) + 'CANT' + padLeft('SUBT', subtotalArea);
+}

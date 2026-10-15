@@ -12,7 +12,7 @@ import { Habitacion, EstadoHabitacion, ProductoFB, Reserva } from '../../types';
 import { HabitacionService, ReservaService, CatalogoFBService, InventarioService, seedProductos, FolioService, CargoFolioService, PagoFolioService, ImpuestoService, pendingSync, seedUtil, ImpresoraConfigService } from '../../services';
 import { supabase } from '../../services/__supabase_db__';
 import { imprimirTicket } from '../../utils/ticketStyles';
-import { lineaDoble, separador, lineaProducto, humanizarMetodoPago, getAnchoLinea } from '../../utils/ticketFormat';
+import { lineaDoble, separador, lineaProducto, humanizarMetodoPago, getAnchoLinea, compactarFechaHora, lineaEncabezadoProductos } from '../../utils/ticketFormat';
 import CheckinModal from '../../components/modals/CheckinModal';
 import CheckoutModal from '../../components/modals/CheckoutModal';
 import TomarComanda from '../../components/modals/TomarComanda';
@@ -1523,7 +1523,7 @@ const HabitacionesPage: React.FC = () => {
                       <img className="nv-logo-img" src={TICKET_LOGO_SRC} alt="Sumaq Allpa" />
                     </div>
                     <div className="nv-linea-uno">Nota de Venta · {folio?.reserva?.id || checkoutReservaId || 'SIN-CORRELATIVO'}</div>
-                    <div className="nv-linea">{fechaHoy()}</div>
+                    <div className="nv-linea">{compactarFechaHora(fechaHoy())}</div>
                   </div>
                   <div className="nv-separador">{separador(getAnchoLinea())}</div>
                   <div className="nv-cliente">
@@ -1539,7 +1539,8 @@ const HabitacionesPage: React.FC = () => {
                   <div className="nv-separador">{separador(getAnchoLinea())}</div>
                   <pre className="nv-productos">{
                     [
-                      lineaDoble('PRODUCTO', 'CANT SUBT', getAnchoLinea()),
+                      lineaEncabezadoProductos(getAnchoLinea()),
+                      '',
                       ...(lineasCargo.length === 0
                         ? [lineaDoble('SIN CARGOS', '', getAnchoLinea())]
                         : lineasCargo.map((l: any) =>

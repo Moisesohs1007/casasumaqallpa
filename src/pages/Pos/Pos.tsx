@@ -16,7 +16,7 @@ import { MesaService, ComandaService, CatalogoFBService, InventarioService, seed
 import { AuthService } from '../../services/AuthService';
 import { supabase, dbRemota } from '../../services/__supabase_db__';
 import { imprimirTicket } from '../../utils/ticketStyles';
-import { lineaDoble, lineaCentrada, separador, lineaProducto, humanizarMetodoPago, getAnchoLinea } from '../../utils/ticketFormat';
+import { lineaDoble, lineaCentrada, separador, lineaProducto, humanizarMetodoPago, getAnchoLinea, compactarFechaHora, lineaEncabezadoProductos } from '../../utils/ticketFormat';
 import './Pos.css';
 
 const PUNTO_VENTA_ID = 'PV-RESTAURANTE-01';
@@ -1153,7 +1153,7 @@ const PosPage: React.FC = () => {
                     <img className="nv-logo-img" src={TICKET_LOGO_SRC} alt="Sumaq Allpa" />
                   </div>
                   <div className="nv-linea-uno">Nota de Venta · {modalNotaVenta.id}</div>
-                  <div className="nv-linea">{modalNotaVenta.fecha}</div>
+                  <div className="nv-linea">{compactarFechaHora(modalNotaVenta.fecha)}</div>
                 </div>
                 <div className="nv-separador">{separador(getAnchoLinea())}</div>
                 <div className="nv-cliente">
@@ -1164,7 +1164,8 @@ const PosPage: React.FC = () => {
                 <div className="nv-separador">{separador(getAnchoLinea())}</div>
                 <pre className="nv-productos">{
                   [
-                    lineaDoble('PRODUCTO', 'CANT SUBT', getAnchoLinea()),
+                    lineaEncabezadoProductos(getAnchoLinea()),
+                    '',
                     ...modalNotaVenta.lineas.map(l =>
                       lineaProducto(
                         l.nombre + (l.tipo === 'SERVICIO_EXTRA' ? ' (Srv Extra)' : ''),
