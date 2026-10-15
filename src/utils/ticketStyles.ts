@@ -216,8 +216,8 @@ export function imprimirTicket(callbackAfterPrint?: () => void, delayMs: number 
 
     body.${PRINTING_MOBILE_CLASS} #${TICKET_PRINT_ID} .nota-venta {
       padding: 0.5mm 1mm !important;
-      font-size: 14px !important;
-      line-height: 1.2 !important;
+      font-size: 15px !important;
+      line-height: 1.15 !important;
     }
 
     /* Tablas dentro del ticket: mantener display de tabla */
@@ -253,8 +253,9 @@ export function imprimirTicket(callbackAfterPrint?: () => void, delayMs: number 
     }
 
     body.${PRINTING_MOBILE_CLASS} #${TICKET_PRINT_ID} pre {
-      font-size: 12px !important;
-      line-height: 1.15 !important;
+      font-size: 13px !important;
+      line-height: 1.1 !important;
+      font-weight: 700 !important;
     }
 
     /* Texto dentro del ticket — forzar monospace y tamaños explícitos para
@@ -293,13 +294,14 @@ export function imprimirTicket(callbackAfterPrint?: () => void, delayMs: number 
       letter-spacing: 0 !important;
       word-spacing: 0 !important;
     }
-    body.${PRINTING_MOBILE_CLASS} #${TICKET_PRINT_ID} .nv-logo { font-size: 20px !important; }
-    body.${PRINTING_MOBILE_CLASS} #${TICKET_PRINT_ID} .nv-nombre-empresa { font-size: 14px !important; }
-    body.${PRINTING_MOBILE_CLASS} #${TICKET_PRINT_ID} .nv-linea-uno { font-size: 13px !important; }
-    body.${PRINTING_MOBILE_CLASS} #${TICKET_PRINT_ID} .nv-linea { font-size: 12px !important; }
-    body.${PRINTING_MOBILE_CLASS} #${TICKET_PRINT_ID} .nv-cliente { font-size: 12px !important; line-height: 1.25 !important; }
-    body.${PRINTING_MOBILE_CLASS} #${TICKET_PRINT_ID} .nv-footer { font-size: 11px !important; }
-    body.${PRINTING_MOBILE_CLASS} #${TICKET_PRINT_ID} .nv-corte { font-size: 10px !important; }
+    body.${PRINTING_MOBILE_CLASS} #${TICKET_PRINT_ID} .nv-logo { font-size: 22px !important; font-weight: 900 !important; }
+    body.${PRINTING_MOBILE_CLASS} #${TICKET_PRINT_ID} .nv-nombre-empresa { font-size: 15px !important; font-weight: 900 !important; }
+    body.${PRINTING_MOBILE_CLASS} #${TICKET_PRINT_ID} .nv-linea-uno { font-size: 14px !important; font-weight: 800 !important; }
+    body.${PRINTING_MOBILE_CLASS} #${TICKET_PRINT_ID} .nv-linea { font-size: 13px !important; font-weight: 700 !important; }
+    body.${PRINTING_MOBILE_CLASS} #${TICKET_PRINT_ID} .nv-cliente { font-size: 13px !important; line-height: 1.2 !important; font-weight: 700 !important; }
+    body.${PRINTING_MOBILE_CLASS} #${TICKET_PRINT_ID} .nv-footer { font-size: 12px !important; font-weight: 700 !important; }
+    body.${PRINTING_MOBILE_CLASS} #${TICKET_PRINT_ID} .nv-corte { font-size: 11px !important; font-weight: 700 !important; }
+    body.${PRINTING_MOBILE_CLASS} #${TICKET_PRINT_ID} .nv-separador { font-size: 12px !important; font-weight: 700 !important; }
     body.lodge-printing #${TICKET_PRINT_ID} .nv-header { text-align: center !important; }
 
     /* Evitar saltos de página */
