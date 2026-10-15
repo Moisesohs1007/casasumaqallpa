@@ -13,7 +13,7 @@ import { ImpresoraConfigService, TamanoPapel } from '../services/ImpresoraConfig
 /** Ancho de línea en caracteres según el tamaño de papel */
 export function getAnchoLinea(tamano?: TamanoPapel): number {
   const t = tamano || ImpresoraConfigService.obtener().tamanoPapel;
-  return t === 58 ? 32 : 48;
+  return t === 58 ? 30 : 48;
 }
 
 /**
@@ -80,7 +80,7 @@ export function lineaProducto(
   subtotal: number,
   ancho: number = getAnchoLinea()
 ): string {
-  const W_NOMBRE = 20;
+  const W_NOMBRE = ancho <= 32 ? 18 : 20;
   const W_CANT = 4;
 
   let n = normalizarTexto(nombre);
