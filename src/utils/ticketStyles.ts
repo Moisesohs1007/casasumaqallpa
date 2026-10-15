@@ -1,0 +1,239 @@
+import { ImpresoraConfigService, TamanoPapel } from '../services/ImpresoraConfigService';
+
+const STYLE_ID = 'lodge-print-dynamic-style';
+const TICKET_PRINT_ID = 'lodge-ticket-print';
+const PRINTING_CLASS = 'lodge-printing';
+
+/**
+ * Aplica las variables CSS del ticket según la configuración guardada.
+ */
+export function aplicarEstilosTicket(): void {
+  const config = ImpresoraConfigService.obtener();
+  const root = document.documentElement;
+
+  const anchoPx = config.tamanoPapel === 58 ? 204 : 300;
+  const anchoMm = `${config.tamanoPapel}mm`;
+  const fuente = config.tamanoPapel === 58 ? 12 : 13;
+
+  root.style.setProperty('--ticket-ancho', `${anchoPx}px`);
+  root.style.setProperty('--ticket-ancho-mm', anchoMm);
+  root.style.setProperty('--ticket-fuente', `${fuente}px`);
+  root.style.setProperty('--ticket-padding', config.tamanoPapel === 58 ? '6px 8px' : '10px 12px');
+}
+
+export function getTamanoPapel(): TamanoPapel {
+  return ImpresoraConfigService.obtener().tamanoPapel;
+}
+
+/**
+ * Imprime el ticket térmico.
+ *
+ * Estrategia:
+ * 1. Agrega la clase 'lodge-printing' al body
+ * 2. Inyecta CSS que oculta TODO excepto el ticket (usando body.lodge-printing, NO @media print)
+ * 3. Mueve el ticket a un wrapper en el body
+ * 4. Inyecta @page con el tamaño correcto
+ * 5. window.print()
+ * 6. Limpia todo
+ *
+ * Usar clase en body en lugar de @media print evita conflictos con otros
+ * @media print globales (ej: Perfil.css).
+ */
+export function imprimirTicket(callbackAfterPrint?: () => void, delayMs: number = 200): void {
+  const config = ImpresoraConfigService.obtener();
+  const tamanoMm = config.tamanoPapel;
+
+  // Buscar el ticket actual
+  const ticket = document.querySelector('.nota-venta') as HTMLElement | null;
+  if (!ticket) {
+    console.warn('[imprimirTicket] No se encontró .nota-venta en el DOM');
+    if (callbackAfterPrint) callbackAfterPrint();
+    return;
+  }
+
+  // Guardar posición original
+  const parentOriginal = ticket.parentElement;
+  const nextSiblingOriginal = ticket.nextSibling;
+
+  // Limpiar estilos previos
+  const previo = document.getElementById(STYLE_ID);
+  if (previo) previo.remove();
+  document.body.classList.remove(PRINTING_CLASS);
+
+  // CSS de impresión: usa body.lodge-printing + @media print para anular cualquier
+  // @page o regla global de otros módulos (ej: Perfil.css fuerza A4 landscape).
+  // Todas las reglas llevan !important para ganar la especificidad sobre @media print globales.
+  const css = `
+    /* @page dentro de @media print para que sea el último en aplicarse y gane a Perfil.css */
+    @media print {
+      @page { size: ${tamanoMm}mm auto; margin: 0; }
+    }
+    @page { size: ${tamanoMm}mm auto; margin: 0; }
+
+    html, body {
+      margin: 0 !important; padding: 0 !important; background: #fff !important;
+      -webkit-print-color-adjust: exact; print-color-adjust: exact;
+    }
+
+    /* ANULAR @media print globales que ocultan todo (Perfil.css: body * { visibility:hidden }) */
+    @media print {
+      body * { visibility: visible !important; }
+    }
+
+    /* Mostrar SOLO el wrapper del ticket */
+    body.lodge-printing #${TICKET_PRINT_ID} {
+      display: block !important;
+      visibility: visible !important;
+      position: static !important;
+      margin: 0 !important;
+      padding: 0 !important;
+      width: ${tamanoMm}mm !important;
+      max-width: ${tamanoMm}mm !important;
+      background: #fff !important;
+    }
+
+    /* Todos los elementos dentro del ticket: visibles, color negro y RESETS de texto
+       para evitar que estilos heredados (letter-spacing, word-spacing, justify) rompan
+       la alineación en impresoras térmicas. */
+    body.lodge-printing #${TICKET_PRINT_ID} * {
+      visibility: visible !important;
+      color: #000 !important;
+      background: transparent !important;
+      opacity: 1 !important;
+      letter-spacing: 0 !important;
+      word-spacing: 0 !important;
+      text-rendering: geometricPrecision !important;
+    }
+
+    body.lodge-printing #${TICKET_PRINT_ID} .nota-venta {
+      border: none !important; border-radius: 0 !important;
+      width: ${tamanoMm}mm !important; max-width: ${tamanoMm}mm !important;
+      margin: 0 !important; padding: 2mm !important;
+      box-shadow: none !important; background: #fff !important; color: #000 !important;
+      display: block !important;
+      font-family: 'Courier New', Courier, monospace !important;
+      font-size: 11px !important;
+      line-height: 1.25 !important;
+      text-align: left !important;
+    }
+
+    /* Tablas dentro del ticket: mantener display de tabla */
+    body.lodge-printing #${TICKET_PRINT_ID} table { display: table !important; width: 100% !important; border-collapse: collapse !important; font-size: 10px !important; }
+    body.lodge-printing #${TICKET_PRINT_ID} thead { display: table-header-group !important; }
+    body.lodge-printing #${TICKET_PRINT_ID} tbody { display: table-row-group !important; }
+    body.lodge-printing #${TICKET_PRINT_ID} tr { display: table-row !important; }
+    body.lodge-printing #${TICKET_PRINT_ID} th,
+    body.lodge-printing #${TICKET_PRINT_ID} td { display: table-cell !important; padding: 1px 2px !important; font-size: 10px !important; }
+
+    /* Texto dentro del ticket — forzar monospace y tamaños explícitos para
+       evitar que el driver de la impresora sustituya fuentes con spacing raro */
+    body.lodge-printing #${TICKET_PRINT_ID} .nv-logo,
+    body.lodge-printing #${TICKET_PRINT_ID} .nv-nombre-empresa,
+    body.lodge-printing #${TICKET_PRINT_ID} .nv-linea,
+    body.lodge-printing #${TICKET_PRINT_ID} .nv-linea-uno,
+    body.lodge-printing #${TICKET_PRINT_ID} .nv-cliente,
+    body.lodge-printing #${TICKET_PRINT_ID} .nv-totales,
+    body.lodge-printing #${TICKET_PRINT_ID} .nv-total-row,
+    body.lodge-printing #${TICKET_PRINT_ID} .nv-footer,
+    body.lodge-printing #${TICKET_PRINT_ID} .nv-corte,
+    body.lodge-printing #${TICKET_PRINT_ID} .nv-total-final,
+    body.lodge-printing #${TICKET_PRINT_ID} .nv-pagado {
+      display: block !important;
+      color: #000 !important;
+      font-family: 'Courier New', Courier, monospace !important;
+      letter-spacing: 0 !important;
+      word-spacing: 0 !important;
+    }
+    body.lodge-printing #${TICKET_PRINT_ID} .nv-logo { font-size: 16px !important; font-weight: 700 !important; text-align: center !important; }
+    body.lodge-printing #${TICKET_PRINT_ID} .nv-nombre-empresa { font-size: 12px !important; font-weight: 700 !important; text-align: center !important; }
+    body.lodge-printing #${TICKET_PRINT_ID} .nv-linea-uno { font-size: 11px !important; font-weight: 600 !important; text-align: center !important; }
+    body.lodge-printing #${TICKET_PRINT_ID} .nv-linea { font-size: 10px !important; text-align: center !important; }
+    body.lodge-printing #${TICKET_PRINT_ID} .nv-cliente { font-size: 10.5px !important; line-height: 1.3 !important; }
+    body.lodge-printing #${TICKET_PRINT_ID} .nv-total-row { font-size: 11px !important; }
+    body.lodge-printing #${TICKET_PRINT_ID} .nv-total-final { font-size: 13px !important; font-weight: 900 !important; }
+    body.lodge-printing #${TICKET_PRINT_ID} .nv-pagado { font-size: 11px !important; font-weight: 700 !important; }
+    body.lodge-printing #${TICKET_PRINT_ID} .nv-footer { font-size: 10px !important; text-align: center !important; }
+    body.lodge-printing #${TICKET_PRINT_ID} .nv-corte { font-size: 9px !important; text-align: center !important; }
+    body.lodge-printing #${TICKET_PRINT_ID} .nv-total-row span {
+      display: inline !important;
+      color: #000 !important;
+      font-family: 'Courier New', Courier, monospace !important;
+      letter-spacing: 0 !important;
+      word-spacing: 0 !important;
+    }
+    body.lodge-printing #${TICKET_PRINT_ID} .nv-header { text-align: center !important; }
+
+    /* Evitar saltos de página */
+    body.lodge-printing #${TICKET_PRINT_ID} .nota-venta,
+    body.lodge-printing #${TICKET_PRINT_ID} table,
+    body.lodge-printing #${TICKET_PRINT_ID} tr,
+    body.lodge-printing #${TICKET_PRINT_ID} td,
+    body.lodge-printing #${TICKET_PRINT_ID} th,
+    body.lodge-printing #${TICKET_PRINT_ID} div {
+      break-inside: avoid !important;
+      page-break-inside: avoid !important;
+    }
+  `;
+  const style = document.createElement('style');
+  style.id = STYLE_ID;
+  style.textContent = css;
+  document.head.appendChild(style);
+
+  // Crear wrapper y mover el ticket al body
+  const wrapper = document.createElement('div');
+  wrapper.id = TICKET_PRINT_ID;
+  document.body.appendChild(wrapper);
+  wrapper.appendChild(ticket); // Mueve el ticket (no clona)
+
+  // Ocultar #root (donde está ion-app) con estilo en línea !important
+  const rootEl = document.getElementById('root') || document.querySelector('#root');
+  const rootOriginalDisplay = rootEl ? rootEl.style.display : '';
+  if (rootEl) {
+    rootEl.style.setProperty('display', 'none', 'important');
+  }
+  // También ocultar ion-toast y otros overlays de Ionic
+  const overlays = document.querySelectorAll('ion-toast, ion-modal, ion-popover, ion-alert, ion-action-sheet');
+  overlays.forEach(el => { (el as HTMLElement).style.setProperty('display', 'none', 'important'); });
+
+  // Activar modo impresión
+  document.body.classList.add(PRINTING_CLASS);
+
+  // Listener para limpiar y devolver el ticket
+  let limpiado = false;
+  const limpiar = () => {
+    if (limpiado) return;
+    limpiado = true;
+    document.body.classList.remove(PRINTING_CLASS);
+    // Restaurar #root (removeProperty elimina el !important)
+    if (rootEl) {
+      rootEl.style.removeProperty('display');
+      if (rootOriginalDisplay) rootEl.style.display = rootOriginalDisplay;
+    }
+    // Restaurar overlays
+    overlays.forEach(el => { (el as HTMLElement).style.removeProperty('display'); });
+    // Devolver el ticket a su posición original
+    if (parentOriginal) {
+      if (nextSiblingOriginal) {
+        parentOriginal.insertBefore(ticket, nextSiblingOriginal);
+      } else {
+        parentOriginal.appendChild(ticket);
+      }
+    }
+    wrapper.remove();
+    style.remove();
+    window.removeEventListener('afterprint', limpiar);
+    if (callbackAfterPrint) callbackAfterPrint();
+  };
+  window.addEventListener('afterprint', limpiar);
+
+  // Esperar a que el DOM y CSS se apliquen, luego imprimir
+  setTimeout(() => {
+    // Forzar reflow
+    void document.body.offsetHeight;
+    window.print();
+    // Fallback por si afterprint no dispara (algunos navegadores)
+    setTimeout(() => {
+      if (!limpiado) limpiar();
+    }, 20000);
+  }, delayMs);
+}

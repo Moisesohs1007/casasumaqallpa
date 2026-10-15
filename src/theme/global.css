@@ -45,9 +45,9 @@ ion-router-outlet {
 
 /* ===== MODAL COMPACTO (global, Ionic modales se renderizan en root) ===== */
 .modal-fit {
-  --width: min(400px, 92vw);
+  --width: min(420px, 94vw);
   --height: auto;
-  --max-height: 80vh;
+  --max-height: 88vh;
   --border-radius: 14px;
   --box-shadow: 0 20px 60px rgba(0,0,0,0.3);
 }
@@ -55,15 +55,141 @@ ion-router-outlet {
   position: relative;
   top: auto;
   bottom: auto;
-  height: auto;
+  height: auto !important;
+  min-height: 0;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
 }
 .modal-fit ion-content {
   --overflow: auto;
+  position: relative !important;
+  flex: 1 1 auto;
+}
+
+/* ===== MODAL FORMULARIO COMPACTO ===== */
+.modal-form {
+  --width: min(640px, 96vw);
+  --height: auto;
+  --max-height: 96vh;
+  --border-radius: 10px;
+}
+.modal-form .ion-page {
   position: relative;
-  flex: 1;
+  top: auto;
+  bottom: auto;
+  height: auto !important;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
-.modal-fit .inner-scroll {
-  padding: 8px 16px 16px;
+.modal-form ion-item {
+  --padding-start: 8px;
+  --padding-end: 8px;
+  --min-height: 34px;
+  --inner-padding-end: 6px;
+  margin-bottom: 1px;
 }
+.modal-form ion-item ion-label h2 {
+  font-size: 11px;
+  margin: 0 0 1px 0;
+  color: #5a6472;
+  font-weight: 600;
+}
+.modal-form ion-item ion-label p {
+  font-size: 13px;
+  margin: 0;
+}
+.modal-form ion-input,
+.modal-form ion-textarea,
+.modal-form ion-select {
+  --padding-top: 3px;
+  --padding-bottom: 3px;
+  font-size: 13px;
+}
+.modal-form ion-item-divider {
+  --padding-top: 6px;
+  --padding-bottom: 4px;
+  --min-height: auto;
+  font-size: 10px;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  font-weight: 700;
+  color: #2dd36f;
+  margin-top: 4px;
+}
+.modal-form ion-card {
+  margin: 3px 0;
+  padding: 5px 7px;
+}
+.modal-form ion-card-content {
+  padding: 3px 1px;
+}
+.modal-form .ion-padding {
+  --padding-top: 5px;
+  --padding-bottom: 5px;
+  --padding-start: 6px;
+  --padding-end: 6px;
+}
+.modal-form ion-row {
+  margin-bottom: 1px;
+}
+.modal-form ion-button {
+  --min-height: 30px;
+  font-size: 12px;
+}
+.modal-form .modal-section {
+  margin-bottom: 4px !important;
+  padding: 6px 8px !important;
+}
+.modal-form .modal-section-title {
+  font-size: 10px !important;
+  margin-bottom: 4px !important;
+}
+
+/* ============================================================
+   TICKET TÉRMICO (58mm / 80mm configurable)
+   Variables compartidas para POS y Habitaciones
+   ============================================================ */
+:root {
+  --ticket-ancho: 204px;      /* 58mm ≈ 204px, 80mm ≈ 300px */
+  --ticket-ancho-mm: 58mm;
+  --ticket-fuente: 12px;
+  --ticket-padding: 8px 10px;
+}
+.nota-venta {
+  width: var(--ticket-ancho);
+  margin: 10px auto;
+  padding: var(--ticket-padding);
+  border: 1px dashed #d1d5db;
+  border-radius: 6px;
+  font-family: 'Courier New', Courier, monospace;
+  font-size: var(--ticket-fuente);
+  color: #111;
+  background: #fff;
+}
+.nv-header { text-align: center; padding-bottom: 6px; border-bottom: 1px dashed #111; }
+.nv-logo {
+  font-family: 'Brush Script MT', 'Segoe Script', cursive;
+  font-size: 24px; font-weight: 700; letter-spacing: 0.5px;
+  color: #0f172a; line-height: 1.1;
+}
+.nv-nombre-empresa { font-weight: 700; font-size: 13px; margin-top: 2px; }
+.nv-linea-uno { font-weight: 600; margin-top: 4px; }
+.nv-linea { font-size: 11px; opacity: 0.95; }
+.nv-cliente { padding: 6px 0; border-bottom: 1px dashed #111; line-height: 1.4; font-size: 11.5px; }
+.nv-tabla { width: 100%; border-collapse: collapse; margin: 6px 0; font-size: 11px; }
+.nv-tabla th, .nv-tabla td { padding: 2px 2px; vertical-align: top; }
+.nv-tabla thead th { border-bottom: 1px dashed #111; padding-bottom: 3px; font-weight: 700; font-size: 10px; }
+.nv-totales { padding-top: 4px; border-top: 1px dashed #111; margin-top: 2px; }
+.nv-total-row { display: flex; justify-content: space-between; padding: 2px 0; font-size: 11.5px; }
+.nv-total-final { font-weight: 900; font-size: 14px; border-top: 1px solid #111; border-bottom: 1px solid #111; margin: 3px 0; padding: 4px 0; }
+.nv-pagado { color: #16a34a; font-weight: 700; }
+.nv-footer { text-align: center; padding: 8px 0 2px; font-size: 10.5px; }
+.nv-corte { text-align: center; font-size: 10px; opacity: .6; margin-top: 6px; }
+
+/* NOTA: El CSS de impresión (@media print) se inyecta dinámicamente
+   desde src/utils/ticketStyles.ts para soportar tamaños de papel variables.
+   No agregar @media print aquí. */
+

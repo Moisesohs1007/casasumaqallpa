@@ -23,19 +23,17 @@ const IMP_IGV = 'IMP-IGV-18';
 const USR = 'seed-inicial';
 
 export const SEED_CATEGORIAS = [
-  { id: 'CAT-DESAYUNOS', nombre: 'Desayunos', descripcion: 'Carta desayunos oficial: Lomo al Jugo, Continental, Americano, Regional-Yungaíno', tipo: 'ALIMENTO', usaStock: false, orden: 10, color: '#FFE4B5' },
-  { id: 'CAT-JUGOS', nombre: 'Jugos', descripcion: 'Jugos naturales oficiales 500ml: Papaya, Piña, Naranja, Fresa', tipo: 'BEBIDA', usaStock: false, orden: 20, color: '#D4EFDF' },
-  { id: 'CAT-SANDWICHES', nombre: 'Sándwiches', descripcion: 'Sándwiches de carta: Queso, Huevo, Aceituna y Pollo a la Plancha', tipo: 'ALIMENTO', usaStock: false, orden: 30, color: '#FADBD8' },
-  { id: 'CAT-BEBIDAS-CALIENTES', nombre: 'Bebidas Calientes', descripcion: 'Infusiones, Café, Cappuccino, Chocolate con Leche, Leche (sin stock físico)', tipo: 'BEBIDA', usaStock: false, orden: 40, color: '#F6DDCC' },
-  { id: 'CAT-ENTRADAS', nombre: 'Entradas', descripcion: 'Entradas carta: Ensaladas, Papa a la Huancaína, Tequeños', tipo: 'ALIMENTO', usaStock: false, orden: 50, color: '#D5F5E3' },
-  { id: 'CAT-SOPAS', nombre: 'Sopas', descripcion: 'Carta de sopas: Caldo de Gallina, Sopa a la Minuta, Sopa de Quinua, Crema de Zapallo', tipo: 'ALIMENTO', usaStock: false, orden: 60, color: '#FCF3CF' },
-  { id: 'CAT-PLATOS-PRINCIPALES', nombre: 'Platos Principales', descripcion: 'Carta principal: Lomo Saltado, Tallarín Saltado, Picante de Cuy, Trucha a la Plancha', tipo: 'ALIMENTO', usaStock: false, orden: 70, color: '#EBDEF0' },
-  { id: 'CAT-PIZZAS', nombre: 'Pizzas', descripcion: 'Pizzas Americana / Hawaiana / Pepperoni en tamaños Personal y Mediana', tipo: 'ALIMENTO', usaStock: false, orden: 80, color: '#FDEDEC' },
-  { id: 'CAT-POSTRES', nombre: 'Postres', descripcion: 'Dulces y postres disponibles en casa', tipo: 'ALIMENTO', usaStock: false, orden: 90, color: '#FFF2CC' },
-  { id: 'CAT-BEBIDAS-FRIAS', nombre: 'Bebidas Frías', descripcion: 'Agua, gaseosas 1/2L, Gatorade, Chicha 1L, Limonada 1L, Maracuyá 1L (stock)', tipo: 'BEBIDA', usaStock: true, orden: 100, color: '#D6EAF8' },
-  { id: 'CAT-BAR-ALCOHOL', nombre: 'Bar / Alcohol', descripcion: 'Carta oficial: Cerveza Artesanal, Vino Santiago Queirolo, Cubetto 1L (stock)', tipo: 'BEBIDA', usaStock: true, orden: 110, color: '#D1F2EB' },
-  { id: 'CAT-SNACKS', nombre: 'Snacks / Amenities', descripcion: 'Snacks empaquetados, toallas extra, amenities de habitación (control de stock)', tipo: 'VENTA', usaStock: true, orden: 120, color: '#E8DAEF' },
-  { id: 'CAT-SERVICIOS-EXTRAS', nombre: 'Servicios Extras', descripcion: 'Taxi, tour, lavandería, masaje, servicio a habitación manual (intangible)', tipo: 'SERVICIO', usaStock: false, orden: 130, color: '#FEF9E7' },
+  { id: 'CAT-DESAYUNOS', codigo: 'DES', nombre: 'Desayunos', descripcion: 'Desayunos de la carta', tipo: 'ALIMENTO', usaStock: false, orden: 1, color: '#FFE4B5' },
+  { id: 'CAT-BEBIDAS-FRIAS', codigo: 'BF', nombre: 'Bebidas Frías', descripcion: 'Bebidas frías de la carta', tipo: 'BEBIDA', usaStock: true, orden: 2, color: '#D6EAF8' },
+  { id: 'CAT-BEBIDAS-CALIENTES', codigo: 'BC', nombre: 'Bebidas Calientes', descripcion: 'Bebidas calientes de la carta', tipo: 'BEBIDA', usaStock: false, orden: 3, color: '#F6DDCC' },
+  { id: 'CAT-BEBIDAS-ALCOHOL', codigo: 'BA', nombre: 'Bebidas (Alcohólicas)', descripcion: 'Cervezas, vinos y calientito', tipo: 'BEBIDA', usaStock: true, orden: 4, color: '#D1F2EB' },
+  { id: 'CAT-JUGOS', codigo: 'JUG', nombre: 'Jugos', descripcion: 'Jugos naturales', tipo: 'BEBIDA', usaStock: false, orden: 5, color: '#D4EFDF' },
+  { id: 'CAT-SANDWICH', codigo: 'SAN', nombre: 'Sándwich', descripcion: 'Sándwiches de la carta', tipo: 'ALIMENTO', usaStock: false, orden: 6, color: '#FADBD8' },
+  { id: 'CAT-ENTRADAS', codigo: 'ENT', nombre: 'Entradas', descripcion: 'Entradas de la carta', tipo: 'ALIMENTO', usaStock: false, orden: 7, color: '#D5F5E3' },
+  { id: 'CAT-SOPAS', codigo: 'SOP', nombre: 'Sopas', descripcion: 'Sopas de la carta', tipo: 'ALIMENTO', usaStock: false, orden: 8, color: '#FCF3CF' },
+  { id: 'CAT-PLATOS-PRINCIPALES', codigo: 'PP', nombre: 'Platos Principales', descripcion: 'Platos principales de la carta', tipo: 'ALIMENTO', usaStock: false, orden: 9, color: '#EBDEF0' },
+  { id: 'CAT-PIZZAS', codigo: 'PIZ', nombre: 'Pizzas', descripcion: 'Pizzas Personal y Mediana', tipo: 'ALIMENTO', usaStock: false, orden: 10, color: '#FDEDEC' },
+  { id: 'CAT-POSTRES', codigo: 'POS', nombre: 'Postres', descripcion: 'Postres de la carta', tipo: 'ALIMENTO', usaStock: false, orden: 11, color: '#FFF2CC' },
 ];
 
 export const SEED_ALERGENOS = [
@@ -52,108 +50,80 @@ function codigoCat(prefix: string, n: number): string {
 }
 
 export const SEED_PRODUCTOS_CARTA = [
-  // ========== CAT-DESAYUNOS (preparados, sin stock - OFICIALES PDF) ==========
-  { id: 'PROD-DES-001', codigo: codigoCat('DES', 1), categoriaId: 'CAT-DESAYUNOS', nombre: 'Lomo al Jugo', descripcion: '2 Panes, Jugo, Café.', precioVentaBase: 20.00, stockControl: false, orden: 1 },
-  { id: 'PROD-DES-002', codigo: codigoCat('DES', 2), categoriaId: 'CAT-DESAYUNOS', nombre: 'Continental', descripcion: '2 Panes, Huevo (revuelto, frito o sancochado), Jugo, Café', precioVentaBase: 20.00, stockControl: false, orden: 2 },
-  { id: 'PROD-DES-003', codigo: codigoCat('DES', 3), categoriaId: 'CAT-DESAYUNOS', nombre: 'Americano', descripcion: '2 Tostadas, Mantequilla, Mermelada, Jugo, Café', precioVentaBase: 15.00, stockControl: false, orden: 3 },
-  { id: 'PROD-DES-004', codigo: codigoCat('DES', 4), categoriaId: 'CAT-DESAYUNOS', nombre: 'Regional - Yungaíno', descripcion: '2 Panes, 1 tamal (relleno de chicharrón o cuy), Jugo, Café', precioVentaBase: 20.00, stockControl: false, orden: 4 },
+  // ========== DESAYUNOS ==========
+  { id: 'PROD-DES-001', codigo: 'DES-001', categoriaId: 'CAT-DESAYUNOS', nombre: 'Lomo al Jugo', descripcion: '2 Panes, Jugo, Café.', precioVentaBase: 20.00, stockControl: false, orden: 1 },
+  { id: 'PROD-DES-002', codigo: 'DES-002', categoriaId: 'CAT-DESAYUNOS', nombre: 'Continental', descripcion: '2 Panes, Huevos (revuelto, frito o sancochado), Jugo, Café.', precioVentaBase: 20.00, stockControl: false, orden: 2 },
+  { id: 'PROD-DES-003', codigo: 'DES-003', categoriaId: 'CAT-DESAYUNOS', nombre: 'Americano', descripcion: '2 Panos, Mermermelada, mantequilla, Jugo, Café.', precioVentaBase: 15.00, stockControl: false, orden: 3 },
+  { id: 'PROD-DES-004', codigo: 'DES-004', categoriaId: 'CAT-DESAYUNOS', nombre: 'Regional - Yungaíno', descripcion: '2 Panes, 1 tamal / refresco de chicha morada o coya, Jugo, Café.', precioVentaBase: 20.00, stockControl: false, orden: 4 },
 
-  // ========== CAT-JUGOS (oficiales PDF 500ml) ==========
-  { id: 'PROD-JUG-001', codigo: codigoCat('JUG', 1), categoriaId: 'CAT-JUGOS', nombre: 'Papaya', descripcion: 'Jugo natural de papaya 500ml', precioVentaBase: 6.00, stockControl: false, orden: 1 },
-  { id: 'PROD-JUG-002', codigo: codigoCat('JUG', 2), categoriaId: 'CAT-JUGOS', nombre: 'Piña', descripcion: 'Jugo natural de piña 500ml', precioVentaBase: 6.00, stockControl: false, orden: 2 },
-  { id: 'PROD-JUG-003', codigo: codigoCat('JUG', 3), categoriaId: 'CAT-JUGOS', nombre: 'Naranja', descripcion: 'Jugo exprimido fresco 500ml', precioVentaBase: 8.00, stockControl: false, orden: 3 },
-  { id: 'PROD-JUG-004', codigo: codigoCat('JUG', 4), categoriaId: 'CAT-JUGOS', nombre: 'Fresa', descripcion: 'Jugo de fresa natural 500ml', precioVentaBase: 7.00, stockControl: false, orden: 4 },
+  // ========== BEBIDAS FRIAS ==========
+  { id: 'PROD-BF-001', codigo: 'BF-001', categoriaId: 'CAT-BEBIDAS-FRIAS', nombre: 'Agua Mineral', descripcion: '', precioVentaBase: 3.00, stockControl: true, stockActual: 72, stockMinimo: 24, orden: 1 },
+  { id: 'PROD-BF-002', codigo: 'BF-002', categoriaId: 'CAT-BEBIDAS-FRIAS', nombre: 'Gaseosa (1/2 L)', descripcion: '', precioVentaBase: 5.00, stockControl: true, stockActual: 60, stockMinimo: 20, orden: 2 },
+  { id: 'PROD-BF-003', codigo: 'BF-003', categoriaId: 'CAT-BEBIDAS-FRIAS', nombre: 'Gatorade', descripcion: '', precioVentaBase: 4.00, stockControl: true, stockActual: 24, stockMinimo: 8, orden: 3 },
+  { id: 'PROD-BF-004', codigo: 'BF-004', categoriaId: 'CAT-BEBIDAS-FRIAS', nombre: 'Chicha Morada (1L)', descripcion: '', precioVentaBase: 14.00, stockControl: true, stockActual: 20, stockMinimo: 8, orden: 4 },
+  { id: 'PROD-BF-005', codigo: 'BF-005', categoriaId: 'CAT-BEBIDAS-FRIAS', nombre: 'Limonada (1L)', descripcion: '', precioVentaBase: 14.00, stockControl: true, stockActual: 20, stockMinimo: 6, orden: 5 },
+  { id: 'PROD-BF-006', codigo: 'BF-006', categoriaId: 'CAT-BEBIDAS-FRIAS', nombre: 'Maracuyá (1L)', descripcion: '', precioVentaBase: 14.00, stockControl: true, stockActual: 18, stockMinimo: 6, orden: 6 },
 
-  // ========== CAT-SANDWICHES (oficiales PDF) ==========
-  { id: 'PROD-SAN-001', codigo: codigoCat('SAN', 1), categoriaId: 'CAT-SANDWICHES', nombre: 'Sándwich de Queso', descripcion: 'Pan con queso', precioVentaBase: 5.00, stockControl: false, orden: 1 },
-  { id: 'PROD-SAN-002', codigo: codigoCat('SAN', 2), categoriaId: 'CAT-SANDWICHES', nombre: 'Sándwich de Huevo', descripcion: 'Pan con huevo', precioVentaBase: 5.00, stockControl: false, orden: 2 },
-  { id: 'PROD-SAN-003', codigo: codigoCat('SAN', 3), categoriaId: 'CAT-SANDWICHES', nombre: 'Sándwich de Aceituna', descripcion: 'Pan con aceituna', precioVentaBase: 5.00, stockControl: false, orden: 3 },
-  { id: 'PROD-SAN-004', codigo: codigoCat('SAN', 4), categoriaId: 'CAT-SANDWICHES', nombre: 'Pollo a la Plancha', descripcion: 'Sándwich de pollo a la plancha', precioVentaBase: 12.00, stockControl: false, orden: 4 },
+  // ========== BEBIDAS CALIENTES ==========
+  { id: 'PROD-BC-001', codigo: 'BC-001', categoriaId: 'CAT-BEBIDAS-CALIENTES', nombre: 'Infusiones', descripcion: 'Té, Anís, Manzanillo, Cedrón, Hierba Luisa, Muña.', precioVentaBase: 3.00, stockControl: false, orden: 1 },
+  { id: 'PROD-BC-002', codigo: 'BC-002', categoriaId: 'CAT-BEBIDAS-CALIENTES', nombre: 'Café', descripcion: '', precioVentaBase: 5.00, stockControl: false, orden: 2 },
+  { id: 'PROD-BC-003', codigo: 'BC-003', categoriaId: 'CAT-BEBIDAS-CALIENTES', nombre: 'Cappuccino', descripcion: '', precioVentaBase: 8.50, stockControl: false, orden: 3 },
+  { id: 'PROD-BC-004', codigo: 'BC-004', categoriaId: 'CAT-BEBIDAS-CALIENTES', nombre: 'Chocolate con Leche', descripcion: '', precioVentaBase: 7.00, stockControl: false, orden: 4 },
+  { id: 'PROD-BC-005', codigo: 'BC-005', categoriaId: 'CAT-BEBIDAS-CALIENTES', nombre: 'Leche', descripcion: '', precioVentaBase: 5.50, stockControl: false, orden: 5 },
 
-  // ========== CAT-BEBIDAS-CALIENTES (oficiales PDF, sin stock) ==========
-  { id: 'PROD-BC-001', codigo: codigoCat('BC', 1), categoriaId: 'CAT-BEBIDAS-CALIENTES', nombre: 'Infusiones', descripcion: 'Té, Anís, Hierbabuena, Muña, Manzanilla (a elección)', precioVentaBase: 3.00, stockControl: false, orden: 1 },
-  { id: 'PROD-BC-002', codigo: codigoCat('BC', 2), categoriaId: 'CAT-BEBIDAS-CALIENTES', nombre: 'Café', descripcion: 'Café de grano exportación', precioVentaBase: 5.00, stockControl: false, orden: 2 },
-  { id: 'PROD-BC-003', codigo: codigoCat('BC', 3), categoriaId: 'CAT-BEBIDAS-CALIENTES', nombre: 'Cappuccino', descripcion: 'Café con espuma de leche', precioVentaBase: 8.00, stockControl: false, orden: 3 },
-  { id: 'PROD-BC-004', codigo: codigoCat('BC', 4), categoriaId: 'CAT-BEBIDAS-CALIENTES', nombre: 'Chocolate con Leche', descripcion: 'Chocolate caliente con leche', precioVentaBase: 7.00, stockControl: false, orden: 4 },
-  { id: 'PROD-BC-005', codigo: codigoCat('BC', 5), categoriaId: 'CAT-BEBIDAS-CALIENTES', nombre: 'Leche', descripcion: 'Leche caliente entera', precioVentaBase: 5.00, stockControl: false, orden: 5 },
+  // ========== BEBIDAS ALCOHOLICAS ==========
+  { id: 'PROD-BA-001', codigo: 'BA-001', categoriaId: 'CAT-BEBIDAS-ALCOHOL', nombre: 'Cerveza Artesanal', descripcion: '', precioVentaBase: 15.00, stockControl: true, stockActual: 24, stockMinimo: 8, orden: 1 },
+  { id: 'PROD-BA-002', codigo: 'BA-002', categoriaId: 'CAT-BEBIDAS-ALCOHOL', nombre: 'Vino Santiago Queirolo', descripcion: '(Rosé, Magdalena y borgoña).', precioVentaBase: 25.00, stockControl: true, stockActual: 16, stockMinimo: 6, orden: 2 },
+  { id: 'PROD-BA-003', codigo: 'BA-003', categoriaId: 'CAT-BEBIDAS-ALCOHOL', nombre: 'Calientito', descripcion: '(Bebida tradicional de yerba loka, flor de jamaica, naranja, limón y piña).', precioVentaBase: 20.00, stockControl: true, stockActual: 12, stockMinimo: 4, orden: 3 },
 
-  // ========== CAT-ENTRADAS (oficiales PDF) ==========
-  { id: 'PROD-ENT-001', codigo: codigoCat('ENT', 1), categoriaId: 'CAT-ENTRADAS', nombre: 'Ensalada Fresca', descripcion: 'Mix de hojas, palta y tomate', precioVentaBase: 15.00, stockControl: false, orden: 1 },
-  { id: 'PROD-ENT-002', codigo: codigoCat('ENT', 2), categoriaId: 'CAT-ENTRADAS', nombre: 'Ensalada de Atún', descripcion: 'Ensalada fresca con filete de atún', precioVentaBase: 20.00, stockControl: false, orden: 2 },
-  { id: 'PROD-ENT-003', codigo: codigoCat('ENT', 3), categoriaId: 'CAT-ENTRADAS', nombre: 'Papa a la Huancaína', descripcion: 'Papa sancochada con salsa de ají amarillo, queso fresco y aceitunas negras', precioVentaBase: 12.00, stockControl: false, orden: 3 },
-  { id: 'PROD-ENT-004', codigo: codigoCat('ENT', 4), categoriaId: 'CAT-ENTRADAS', nombre: 'Tequeños', descripcion: 'Ración de 4 piezas de queso crema frito acompañado de salsa de ají', precioVentaBase: 11.00, stockControl: false, orden: 4 },
+  // ========== JUGOS ==========
+  { id: 'PROD-JUG-001', codigo: 'JUG-001', categoriaId: 'CAT-JUGOS', nombre: 'Papaya', descripcion: '', precioVentaBase: 6.00, stockControl: false, orden: 1 },
+  { id: 'PROD-JUG-002', codigo: 'JUG-002', categoriaId: 'CAT-JUGOS', nombre: 'Piña', descripcion: '', precioVentaBase: 6.00, stockControl: false, orden: 2 },
+  { id: 'PROD-JUG-003', codigo: 'JUG-003', categoriaId: 'CAT-JUGOS', nombre: 'Naranja', descripcion: '', precioVentaBase: 7.00, stockControl: false, orden: 3 },
+  { id: 'PROD-JUG-004', codigo: 'JUG-004', categoriaId: 'CAT-JUGOS', nombre: 'Fresa', descripcion: '', precioVentaBase: 7.00, stockControl: false, orden: 4 },
 
-  // ========== CAT-SOPAS (NUEVA CATEGORÍA oficiales PDF pág 2) ==========
-  { id: 'PROD-SOP-001', codigo: codigoCat('SOP', 1), categoriaId: 'CAT-SOPAS', nombre: 'Caldo de Gallina', descripcion: 'Acompañado de papa amarilla y fideo casero', precioVentaBase: 20.00, stockControl: false, orden: 1 },
-  { id: 'PROD-SOP-002', codigo: codigoCat('SOP', 2), categoriaId: 'CAT-SOPAS', nombre: 'Sopa a la Minuta', descripcion: 'Acompañada de papa amarilla y huevo frito', precioVentaBase: 20.00, stockControl: false, orden: 2 },
-  { id: 'PROD-SOP-003', codigo: codigoCat('SOP', 3), categoriaId: 'CAT-SOPAS', nombre: 'Sopa de Quinua', descripcion: 'Papa amarilla, quinua y hierbas aromáticas', precioVentaBase: 15.00, stockControl: false, orden: 3 },
-  { id: 'PROD-SOP-004', codigo: codigoCat('SOP', 4), categoriaId: 'CAT-SOPAS', nombre: 'Crema de Zapallo', descripcion: 'A base de zapallo y hierbas aromáticas', precioVentaBase: 15.00, stockControl: false, orden: 4 },
+  // ========== SANDWICH ==========
+  { id: 'PROD-SAN-001', codigo: 'SAN-001', categoriaId: 'CAT-SANDWICH', nombre: 'Queso', descripcion: '', precioVentaBase: 5.00, stockControl: false, orden: 1 },
+  { id: 'PROD-SAN-002', codigo: 'SAN-002', categoriaId: 'CAT-SANDWICH', nombre: 'Huevo', descripcion: '', precioVentaBase: 5.00, stockControl: false, orden: 2 },
+  { id: 'PROD-SAN-003', codigo: 'SAN-003', categoriaId: 'CAT-SANDWICH', nombre: 'Aceituna', descripcion: '', precioVentaBase: 5.00, stockControl: false, orden: 3 },
+  { id: 'PROD-SAN-004', codigo: 'SAN-004', categoriaId: 'CAT-SANDWICH', nombre: 'Pollo a la Plancha', descripcion: '', precioVentaBase: 12.00, stockControl: false, orden: 4 },
 
-  // ========== CAT-PLATOS-PRINCIPALES (oficiales PDF pág 2) ==========
-  { id: 'PROD-PLA-001', codigo: codigoCat('PLA', 1), categoriaId: 'CAT-PLATOS-PRINCIPALES', nombre: 'Lomo Saltado', descripcion: 'Lomo fino salteado con papas fritas y arroz blanco', precioVentaBase: 30.00, stockControl: false, orden: 1 },
-  { id: 'PROD-PLA-002', codigo: codigoCat('PLA', 2), categoriaId: 'CAT-PLATOS-PRINCIPALES', nombre: 'Tallarín Saltado', descripcion: 'Tallarín salteado con lomo fino', precioVentaBase: 30.00, stockControl: false, orden: 2 },
-  { id: 'PROD-PLA-003', codigo: codigoCat('PLA', 3), categoriaId: 'CAT-PLATOS-PRINCIPALES', nombre: 'Picante de Cuy', descripcion: 'Cuy trozado con maní, ají amarillo, papa amarilla y arroz', precioVentaBase: 35.00, stockControl: false, orden: 3 },
-  { id: 'PROD-PLA-004', codigo: codigoCat('PLA', 4), categoriaId: 'CAT-PLATOS-PRINCIPALES', nombre: 'Trucha a la Plancha', descripcion: 'Trucha fresca a la plancha acompañada de yuca, ensalada y arroz', precioVentaBase: 30.00, stockControl: false, orden: 4 },
+  // ========== ENTRADAS ==========
+  { id: 'PROD-ENT-001', codigo: 'ENT-001', categoriaId: 'CAT-ENTRADAS', nombre: 'Ensalada Fresca', descripcion: 'Pechuga, lechuga, pepinillo y tomate.', precioVentaBase: 15.00, stockControl: false, orden: 1 },
+  { id: 'PROD-ENT-002', codigo: 'ENT-002', categoriaId: 'CAT-ENTRADAS', nombre: 'Ensalada de Atún', descripcion: 'Filete de atún en conserva, lechuga, huevo duro, cebolla, aceitunas y vinagreta.', precioVentaBase: 20.00, stockControl: false, orden: 2 },
+  { id: 'PROD-ENT-003', codigo: 'ENT-003', categoriaId: 'CAT-ENTRADAS', nombre: 'Papa a la Huancaína', descripcion: 'Papas escalfadas, crema a la huancaína, lechuga, huevo duro y aceitunas.', precioVentaBase: 12.00, stockControl: false, orden: 3 },
+  { id: 'PROD-ENT-004', codigo: 'ENT-004', categoriaId: 'CAT-ENTRADAS', nombre: 'Tequeños', descripcion: 'Bastones con queso y jamonada acompañados de crema de pato.', precioVentaBase: 15.00, stockControl: false, orden: 4 },
 
-  // ========== CAT-PIZZAS (oficiales PDF × 2 tamaños cada sabor) ==========
-  // PERSONAL (1 persona)
-  { id: 'PROD-PIZ-001', codigo: codigoCat('PIZ', 1), categoriaId: 'CAT-PIZZAS', nombre: 'Pizza Americana (Personal)', descripcion: 'Salsa de tomate, jamón, queso mozzarella, aceitunas. 1 porción.', precioVentaBase: 20.00, stockControl: false, orden: 1 },
-  { id: 'PROD-PIZ-002', codigo: codigoCat('PIZ', 2), categoriaId: 'CAT-PIZZAS', nombre: 'Pizza Hawaiana (Personal)', descripcion: 'Jamón, piña natural, queso mozzarella. 1 porción.', precioVentaBase: 20.00, stockControl: false, orden: 2 },
-  { id: 'PROD-PIZ-003', codigo: codigoCat('PIZ', 3), categoriaId: 'CAT-PIZZAS', nombre: 'Pizza de Pepperoni (Personal)', descripcion: 'Pepperoni, queso mozzarella, orégano y aceitunas. 1 porción.', precioVentaBase: 20.00, stockControl: false, orden: 3 },
-  // MEDIANA (2 personas)
-  { id: 'PROD-PIZ-004', codigo: codigoCat('PIZ', 4), categoriaId: 'CAT-PIZZAS', nombre: 'Pizza Americana (Mediana)', descripcion: 'Salsa de tomate, jamón, queso mozzarella, aceitunas. Mediana para 2 personas.', precioVentaBase: 32.00, stockControl: false, orden: 4 },
-  { id: 'PROD-PIZ-005', codigo: codigoCat('PIZ', 5), categoriaId: 'CAT-PIZZAS', nombre: 'Pizza Hawaiana (Mediana)', descripcion: 'Jamón, piña natural, queso mozzarella. Mediana para 2 personas.', precioVentaBase: 32.00, stockControl: false, orden: 5 },
-  { id: 'PROD-PIZ-006', codigo: codigoCat('PIZ', 6), categoriaId: 'CAT-PIZZAS', nombre: 'Pizza de Pepperoni (Mediana)', descripcion: 'Pepperoni, queso mozzarella, orégano y aceitunas. Mediana para 2 personas.', precioVentaBase: 32.00, stockControl: false, orden: 6 },
+  // ========== SOPAS ==========
+  { id: 'PROD-SOP-001', codigo: 'SOP-001', categoriaId: 'CAT-SOPAS', nombre: 'Caldo de Gallina', descripcion: 'Acompañado de Papas escaldadas y Huevo.', precioVentaBase: 25.00, stockControl: false, orden: 1 },
+  { id: 'PROD-SOP-002', codigo: 'SOP-002', categoriaId: 'CAT-SOPAS', nombre: 'Sopa a la Minuta', descripcion: 'Acompañado de Pan tostado.', precioVentaBase: 20.00, stockControl: false, orden: 2 },
+  { id: 'PROD-SOP-003', codigo: 'SOP-003', categoriaId: 'CAT-SOPAS', nombre: 'Sopa de Papa Cashqui', descripcion: 'Papas en trozos, huevo, queso y hierbas aromáticas.', precioVentaBase: 15.00, stockControl: false, orden: 3 },
+  { id: 'PROD-SOP-004', codigo: 'SOP-004', categoriaId: 'CAT-SOPAS', nombre: 'Crema de Zapallo', descripcion: 'A base de zapallo y hierbas aromáticas.', precioVentaBase: 15.00, stockControl: false, orden: 4 },
 
-  // ========== CAT-POSTRES (como no aparecen en PDF, mantenemos los más vendidos + no inventamos nuevos) ==========
-  { id: 'PROD-POS-001', codigo: codigoCat('POS', 1), categoriaId: 'CAT-POSTRES', nombre: 'Flan Casero con Dulce de Leche', descripcion: 'Flan de leche + dulce de leche casero', precioVentaBase: 8.00, stockControl: false, orden: 1 },
-  { id: 'PROD-POS-002', codigo: codigoCat('POS', 2), categoriaId: 'CAT-POSTRES', nombre: 'Suspiro a la Limeña', descripcion: 'Postre clásico con manjar blanco y merengue', precioVentaBase: 9.00, stockControl: false, orden: 2 },
-  { id: 'PROD-POS-003', codigo: codigoCat('POS', 3), categoriaId: 'CAT-POSTRES', nombre: 'Frutas de Temporada', descripcion: 'Plato de frutas cortadas con yogur natural', precioVentaBase: 8.00, stockControl: false, orden: 3 },
+  // ========== PLATOS PRINCIPALES ==========
+  { id: 'PROD-PLA-001', codigo: 'PLA-001', categoriaId: 'CAT-PLATOS-PRINCIPALES', nombre: 'Lomo Saltado', descripcion: 'Lomo frito regional, papas fritas y arroz.', precioVentaBase: 30.00, stockControl: false, orden: 1 },
+  { id: 'PROD-PLA-002', codigo: 'PLA-002', categoriaId: 'CAT-PLATOS-PRINCIPALES', nombre: 'Tallarín Saltado', descripcion: 'Lomo fino, queso mozzarella, pimientos y pisco.', precioVentaBase: 30.00, stockControl: false, orden: 2 },
+  { id: 'PROD-PLA-003', codigo: 'PLA-003', categoriaId: 'CAT-PLATOS-PRINCIPALES', nombre: 'Picante de Cuy', descripcion: 'El cuy, papas escalfadas, aderezo a base de ají amarillo y nuestro verde.', precioVentaBase: 35.00, stockControl: false, orden: 3 },
+  { id: 'PROD-PLA-004', codigo: 'PLA-004', categoriaId: 'CAT-PLATOS-PRINCIPALES', nombre: 'Trucha a la Plancha', descripcion: 'Papas fritas o ensalada, ensalada fresca.', precioVentaBase: 30.00, stockControl: false, orden: 4 },
+  { id: 'PROD-PLA-005', codigo: 'PLA-005', categoriaId: 'CAT-PLATOS-PRINCIPALES', nombre: 'Trucha Frita', descripcion: 'Papas fritas o ensalada, ensalada fresca.', precioVentaBase: 32.00, stockControl: false, orden: 5 },
+  { id: 'PROD-PLA-006', codigo: 'PLA-006', categoriaId: 'CAT-PLATOS-PRINCIPALES', nombre: 'Pollo a la Plancha', descripcion: 'Papas fritas o ensalada, ensalada fresca.', precioVentaBase: 28.00, stockControl: false, orden: 6 },
+  { id: 'PROD-PLA-007', codigo: 'PLA-007', categoriaId: 'CAT-PLATOS-PRINCIPALES', nombre: 'Chuleta a la Parrilla', descripcion: '', precioVentaBase: 28.00, stockControl: false, orden: 7 },
+  { id: 'PROD-PLA-008', codigo: 'PLA-008', categoriaId: 'CAT-PLATOS-PRINCIPALES', nombre: 'Estofado de Pollo', descripcion: 'Acompañado de papas tiamanchadas y arroz.', precioVentaBase: 25.00, stockControl: false, orden: 8 },
+  { id: 'PROD-PLA-009', codigo: 'PLA-009', categoriaId: 'CAT-PLATOS-PRINCIPALES', nombre: 'Guiso de Pollo', descripcion: 'Acompañado de Arroz.', precioVentaBase: 25.00, stockControl: false, orden: 9 },
 
-  // ========== CAT-BEBIDAS-FRIAS (oficiales PDF, stock físico) ==========
-  { id: 'PROD-BF-001', codigo: 'BEB401', categoriaId: 'CAT-BEBIDAS-FRIAS', nombre: 'Agua Mineral', descripcion: 'Agua mineral natural sin gas 500ml', precioVentaBase: 3.00, stockControl: true, stockActual: 72, stockMinimo: 24, orden: 1 },
-  { id: 'PROD-BF-002', codigo: 'BEB402', categoriaId: 'CAT-BEBIDAS-FRIAS', nombre: 'Gaseosa (1/2 L)', descripcion: 'Gaseosa 500ml variedades (Coca, Inca Kola, Sprite, Fanta)', precioVentaBase: 5.00, stockControl: true, stockActual: 60, stockMinimo: 20, orden: 2 },
-  { id: 'PROD-BF-003', codigo: 'BEB403', categoriaId: 'CAT-BEBIDAS-FRIAS', nombre: 'Gatorade', descripcion: 'Hidratante isotónico Gatorade 500ml variedades', precioVentaBase: 4.00, stockControl: true, stockActual: 24, stockMinimo: 8, orden: 3 },
-  { id: 'PROD-BF-004', codigo: 'BEB404', categoriaId: 'CAT-BEBIDAS-FRIAS', nombre: 'Chicha Morada (1L)', descripcion: 'Chicha morada casera botella 1 litro', precioVentaBase: 14.00, stockControl: true, stockActual: 20, stockMinimo: 8, orden: 4 },
-  { id: 'PROD-BF-005', codigo: 'BEB405', categoriaId: 'CAT-BEBIDAS-FRIAS', nombre: 'Limonada (1L)', descripcion: 'Limonada natural botella 1 litro', precioVentaBase: 14.00, stockControl: true, stockActual: 20, stockMinimo: 6, orden: 5 },
-  { id: 'PROD-BF-006', codigo: 'BEB406', categoriaId: 'CAT-BEBIDAS-FRIAS', nombre: 'Maracuyá (1L)', descripcion: 'Jugo de maracuyá natural botella 1 litro', precioVentaBase: 14.00, stockControl: true, stockActual: 18, stockMinimo: 6, orden: 6 },
+  // ========== PIZZAS (Personal y Mediana) ==========
+  { id: 'PROD-PIZ-001', codigo: 'PIZ-001', categoriaId: 'CAT-PIZZAS', nombre: 'Pizza Americana (Personal)', descripcion: 'aceituna inglesa y queso mozzarella.', precioVentaBase: 29.00, stockControl: false, orden: 1 },
+  { id: 'PROD-PIZ-002', codigo: 'PIZ-002', categoriaId: 'CAT-PIZZAS', nombre: 'Pizza Americana (Mediana)', descripcion: 'aceituna inglesa y queso mozzarella.', precioVentaBase: 41.00, stockControl: false, orden: 2 },
+  { id: 'PROD-PIZ-003', codigo: 'PIZ-003', categoriaId: 'CAT-PIZZAS', nombre: 'Pizza Hawaiana (Personal)', descripcion: 'aceituna inglesa, queso mozzarella, piña y pavo.', precioVentaBase: 30.00, stockControl: false, orden: 3 },
+  { id: 'PROD-PIZ-004', codigo: 'PIZ-004', categoriaId: 'CAT-PIZZAS', nombre: 'Pizza Hawaiana (Mediana)', descripcion: 'aceituna inglesa, queso mozzarella, piña y pavo.', precioVentaBase: 42.00, stockControl: false, orden: 4 },
+  { id: 'PROD-PIZ-005', codigo: 'PIZ-005', categoriaId: 'CAT-PIZZAS', nombre: 'Pizza de Pepperoni (Personal)', descripcion: 'aceituna inglesa, queso mozzarella y pepperoni.', precioVentaBase: 32.00, stockControl: false, orden: 5 },
+  { id: 'PROD-PIZ-006', codigo: 'PIZ-006', categoriaId: 'CAT-PIZZAS', nombre: 'Pizza de Pepperoni (Mediana)', descripcion: 'aceituna inglesa, queso mozzarella y pepperoni.', precioVentaBase: 44.00, stockControl: false, orden: 6 },
 
-  // ========== CAT-BAR-ALCOHOL (oficiales PDF, solo 3 items carta; stock físico) ==========
-  { id: 'PROD-BAR-001', codigo: 'BAR601', categoriaId: 'CAT-BAR-ALCOHOL', nombre: 'Cerveza Artesanal', descripcion: 'Cerveza artesanal de la región', precioVentaBase: 15.00, stockControl: true, stockActual: 24, stockMinimo: 8, orden: 1 },
-  { id: 'PROD-BAR-002', codigo: 'BAR602', categoriaId: 'CAT-BAR-ALCOHOL', nombre: 'Vino Santiago Queirolo', descripcion: 'Vino Santiago Queirolo medio (tinto, blanco o rosé)', precioVentaBase: 25.00, stockControl: true, stockActual: 16, stockMinimo: 6, orden: 2 },
-  { id: 'PROD-BAR-003', codigo: 'BAR603', categoriaId: 'CAT-BAR-ALCOHOL', nombre: 'Cubetto 1L', descripcion: 'Refresco tradicional de garrafón de vino, fruta de temporada, casara, limón y piña. 1 Litro.', precioVentaBase: 20.00, stockControl: true, stockActual: 12, stockMinimo: 4, orden: 3 },
-
-  // ========== CAT-SNACKS (no aparecen en PDF, se mantiene stock físico existente) ==========
-  { id: 'PROD-SNK-001', codigo: 'SNK-001', categoriaId: 'CAT-SNACKS', nombre: 'Snack / Galleta', descripcion: 'Galleta surtida para snack bar', precioVentaBase: 3.00, stockControl: true, stockActual: 48, stockMinimo: 16, orden: 1 },
-  { id: 'PROD-SNK-002', codigo: 'SNK-002', categoriaId: 'CAT-SNACKS', nombre: 'Lays Clásicas 100g', descripcion: 'Papas fritas Lay\'s clásicas', precioVentaBase: 5.00, stockControl: true, stockActual: 30, stockMinimo: 10, orden: 2 },
-  { id: 'PROD-SNK-003', codigo: 'SNK-003', categoriaId: 'CAT-SNACKS', nombre: 'Cheetos Flamin Hot', descripcion: 'Snack de queso picante 90g', precioVentaBase: 5.00, stockControl: true, stockActual: 28, stockMinimo: 10, orden: 3 },
-  { id: 'PROD-SNK-004', codigo: 'SNK-004', categoriaId: 'CAT-SNACKS', nombre: 'Barra de Cereal Nuez', descripcion: 'Barra energética con frutos secos', precioVentaBase: 4.00, stockControl: true, stockActual: 24, stockMinimo: 8, orden: 4 },
-  { id: 'PROD-SNK-005', codigo: 'SNK-005', categoriaId: 'CAT-SNACKS', nombre: 'Chocolatina Jet', descripcion: 'Chocolatina mediana', precioVentaBase: 3.50, stockControl: true, stockActual: 30, stockMinimo: 10, orden: 5 },
-  { id: 'PROD-SNK-006', codigo: 'SNK-006', categoriaId: 'CAT-SNACKS', nombre: 'Maní Salado 100g', descripcion: 'Maní frito salado bolsa', precioVentaBase: 4.00, stockControl: true, stockActual: 28, stockMinimo: 10, orden: 6 },
-  { id: 'PROD-SNK-007', codigo: 'SNK-007', categoriaId: 'CAT-SNACKS', nombre: 'Dulces Surtidos Nacionales', descripcion: 'Mix Teja, King Kong, Alfajores', precioVentaBase: 5.00, stockControl: true, stockActual: 20, stockMinimo: 6, orden: 7 },
-  { id: 'PROD-SNK-008', codigo: 'EXT-001', categoriaId: 'CAT-SNACKS', nombre: 'Toalla Extra', descripcion: 'Toalla adicional para piscina o habitación', precioVentaBase: 15.00, stockControl: true, stockActual: 20, stockMinimo: 5, orden: 8 },
-  { id: 'PROD-SNK-009', codigo: 'EXT-002', categoriaId: 'CAT-SNACKS', nombre: 'Botella de Agua para Piscina 1L', descripcion: 'Agua piscina (paquete 2 botellas)', precioVentaBase: 8.00, stockControl: true, stockActual: 30, stockMinimo: 10, orden: 9 },
-  { id: 'PROD-SNK-010', codigo: 'EXT-005', categoriaId: 'CAT-SNACKS', nombre: 'Kit Aseo Baño Extra', descripcion: 'Shampoo + jabón + toalla pequeña', precioVentaBase: 12.00, stockControl: true, stockActual: 18, stockMinimo: 6, orden: 10 },
-
-  // ========== CAT-SERVICIOS-EXTRAS (intangible; fuera de carta PDF pero necesarios para operación) ==========
-  { id: 'PROD-EXT-001', codigo: codigoCat('EXT', 1), categoriaId: 'CAT-SERVICIOS-EXTRAS', nombre: 'Taxi Aeropuerto Tarapoto (TPP)', descripcion: 'Traslado desde/aeropuerto TPP (1-4 pax)', precioVentaBase: 45.00, stockControl: false, orden: 1 },
-  { id: 'PROD-EXT-002', codigo: codigoCat('EXT', 2), categoriaId: 'CAT-SERVICIOS-EXTRAS', nombre: 'Taxi Centro - Aeropuerto', descripcion: 'Traslado dentro de Tarapoto / centro hacia terminal', precioVentaBase: 20.00, stockControl: false, orden: 2 },
-  { id: 'PROD-EXT-003', codigo: codigoCat('EXT', 3), categoriaId: 'CAT-SERVICIOS-EXTRAS', nombre: 'Tour Catarata de Ahuashiyacu', descripcion: 'Excursión de 1/2 día. Incluye guía + transporte + entrada', precioVentaBase: 60.00, stockControl: false, orden: 3 },
-  { id: 'PROD-EXT-004', codigo: codigoCat('EXT', 4), categoriaId: 'CAT-SERVICIOS-EXTRAS', nombre: 'Tour Laguna Azul Sauce', descripcion: 'Excursión día completo con almuerzo', precioVentaBase: 75.00, stockControl: false, orden: 4 },
-  { id: 'PROD-EXT-005', codigo: codigoCat('EXT', 5), categoriaId: 'CAT-SERVICIOS-EXTRAS', nombre: 'Lavandería 5kg', descripcion: 'Lavado + secado + planchado hasta 5kg', precioVentaBase: 20.00, stockControl: false, orden: 5 },
-  { id: 'PROD-EXT-006', codigo: codigoCat('EXT', 6), categoriaId: 'CAT-SERVICIOS-EXTRAS', nombre: 'Planchado Individual', descripcion: 'Planchado por prenda', precioVentaBase: 3.00, stockControl: false, orden: 6 },
-  { id: 'PROD-EXT-007', codigo: codigoCat('EXT', 7), categoriaId: 'CAT-SERVICIOS-EXTRAS', nombre: 'Masaje Terapéutico 30min', descripcion: 'Masaje relajante 30 min a habitación', precioVentaBase: 50.00, stockControl: false, orden: 7 },
-  { id: 'PROD-EXT-008', codigo: codigoCat('EXT', 8), categoriaId: 'CAT-SERVICIOS-EXTRAS', nombre: 'Masaje 60min Corporal', descripcion: 'Masaje completo 60 min', precioVentaBase: 85.00, stockControl: false, orden: 8 },
-  { id: 'PROD-EXT-009', codigo: codigoCat('EXT', 9), categoriaId: 'CAT-SERVICIOS-EXTRAS', nombre: 'Servicio de Habitación Delivery', descripcion: 'Cargo fijo pedido a habitación (no incluye platos)', precioVentaBase: 5.00, stockControl: false, orden: 9 },
-  { id: 'PROD-EXT-010', codigo: codigoCat('EXT', 10), categoriaId: 'CAT-SERVICIOS-EXTRAS', nombre: 'Alquiler Moto 8h', descripcion: 'Alquiler moto 150cc 8h día', precioVentaBase: 30.00, stockControl: false, orden: 10 },
-  { id: 'PROD-EXT-011', codigo: codigoCat('EXT', 11), categoriaId: 'CAT-SERVICIOS-EXTRAS', nombre: 'Alquiler Bicicleta día', descripcion: 'Bicicleta de montaña uso durante todo el día', precioVentaBase: 15.00, stockControl: false, orden: 11 },
-  { id: 'PROD-EXT-012', codigo: codigoCat('EXT', 12), categoriaId: 'CAT-SERVICIOS-EXTRAS', nombre: 'Renta Cocheras para Huésped', descripcion: 'Estacionamiento cubierto día/noche', precioVentaBase: 8.00, stockControl: false, orden: 12 },
-  { id: 'PROD-EXT-013', codigo: codigoCat('EXT', 13), categoriaId: 'CAT-SERVICIOS-EXTRAS', nombre: 'Servicio de Guardaequipaje', descripcion: 'Custodia maletas tras check-out o antes check-in', precioVentaBase: 10.00, stockControl: false, orden: 13 },
-  { id: 'PROD-EXT-014', codigo: codigoCat('EXT', 14), categoriaId: 'CAT-SERVICIOS-EXTRAS', nombre: 'Decoración Romántica Habitación', descripcion: 'Flores, pétalos, chocolates, velas. Pedido 4h anticipación', precioVentaBase: 60.00, stockControl: false, orden: 14 },
-  { id: 'PROD-EXT-015', codigo: codigoCat('EXT', 15), categoriaId: 'CAT-SERVICIOS-EXTRAS', nombre: 'Cumpleaños Sorpresa Mini', descripcion: 'Pastel, globos, vela, tarjeta. Pedido 24h', precioVentaBase: 40.00, stockControl: false, orden: 15 },
-  { id: 'PROD-EXT-016', codigo: codigoCat('EXT', 16), categoriaId: 'CAT-SERVICIOS-EXTRAS', nombre: 'Desayuno a la Habitación (entrega)', descripcion: 'Delivery de desayuno ya pagado / en menú + S/5 entrega', precioVentaBase: 5.00, stockControl: false, orden: 16 },
-  { id: 'PROD-EXT-017', codigo: codigoCat('EXT', 17), categoriaId: 'CAT-SERVICIOS-EXTRAS', nombre: 'Saco adicional de Calefacción', descripcion: 'Saco térmico + frazada adicional noche fría', precioVentaBase: 10.00, stockControl: false, orden: 17 },
-  { id: 'PROD-EXT-018', codigo: codigoCat('EXT', 18), categoriaId: 'CAT-SERVICIOS-EXTRAS', nombre: 'Actividad Yoga Piscina (clase 1h)', descripcion: 'Clase guiada yoga frente piscina mañana 6am', precioVentaBase: 25.00, stockControl: false, orden: 18 },
+  // ========== POSTRES ==========
+  { id: 'PROD-POS-001', codigo: 'POS-001', categoriaId: 'CAT-POSTRES', nombre: 'Waffles', descripcion: 'Con frutas del bosque, miel y/o fudge de chocolate.', precioVentaBase: 15.00, stockControl: false, orden: 1 },
+  { id: 'PROD-POS-002', codigo: 'POS-002', categoriaId: 'CAT-POSTRES', nombre: 'Crepe con Helados', descripcion: 'Fudge de chocolate, gragas, helados de estación.', precioVentaBase: 15.00, stockControl: false, orden: 2 },
+  { id: 'PROD-POS-003', codigo: 'POS-003', categoriaId: 'CAT-POSTRES', nombre: 'Ensalada de Frutas', descripcion: 'Frutas de estación, miel y/o yogur.', precioVentaBase: 15.00, stockControl: false, orden: 3 },
+  { id: 'PROD-POS-004', codigo: 'POS-004', categoriaId: 'CAT-POSTRES', nombre: 'Helados', descripcion: '', precioVentaBase: 7.00, stockControl: false, orden: 4 },
 ];
 
 async function _insertCatOrProd(key: string, idUnico: string, dataFinal: any, method: 'add' | 'update') {

@@ -16,6 +16,17 @@
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <link rel="manifest" href="/manifest.webmanifest" />
     <title>Casa Sumaq Allpa - Sistema de Gestión</title>
+    <style>
+      /* CSS CRÍTICO inline: forzar visibilidad del root */
+      html, body { margin: 0; padding: 0; width: 100%; height: 100%; background: #fff; }
+      #root {
+        display: block !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+        position: relative !important;
+        z-index: 1 !important;
+      }
+    </style>
     <script>
       (function () {
         try {
@@ -99,6 +110,27 @@
   </head>
   <body>
     <div id="root"></div>
+    <script>
+      // Limpieza única de overlays residuales de Ionic (solo al cargar la página).
+      // NO usar intervalos ni MutationObserver: eliminar overlays dinámicos rompe
+      // el ciclo de vida de Ionic (present/dismiss) y causa "framework delegate is missing".
+      (function () {
+        var SELECTORES = 'ion-overlay, ion-modal, ion-alert, ion-toast, ion-popover, ion-action-sheet, ion-loading, ion-picker, ion-backdrop, .backdrop-no-scroll';
+        try {
+          var els = document.querySelectorAll(SELECTORES);
+          els.forEach(function (el) {
+            try {
+              if (el && el.parentNode) el.parentNode.removeChild(el);
+              else if (el && el.remove) el.remove();
+            } catch (_) {}
+          });
+          var bodyStyle = document.body.getAttribute('style') || '';
+          if (bodyStyle.indexOf('overflow') !== -1) {
+            document.body.style.overflow = '';
+          }
+        } catch (_) {}
+      })();
+    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

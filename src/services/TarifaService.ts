@@ -37,17 +37,15 @@ async function hidratarTarifasGroup(force = false): Promise<boolean> {
   if (_hidratando) return _hidratando;
   _hidratando = (async () => {
     try {
-      const [imps, temps, pols, proms, tars] = await Promise.all([
+      const [imps, temps, pols, tars] = await Promise.all([
         dbRemota.allAsync<ImpuestoTarifa>(KEY_IMP),
         dbRemota.allAsync<Temporada>(KEY_TEMP),
         dbRemota.allAsync<PoliticaCancelacion>(KEY_POL),
-        dbRemota.allAsync<CodigoPromocional>(KEY_PROM),
         dbRemota.allAsync<Tarifa>(KEY_TAR),
       ]);
       if (imps && imps.length) db.upsertAll<ImpuestoTarifa>(KEY_IMP, imps);
       if (temps && temps.length) db.upsertAll<Temporada>(KEY_TEMP, temps);
       if (pols && pols.length) db.upsertAll<PoliticaCancelacion>(KEY_POL, pols);
-      if (proms && proms.length) db.upsertAll<CodigoPromocional>(KEY_PROM, proms);
       if (tars && tars.length) db.upsertAll<Tarifa>(KEY_TAR, tars);
       // RE-APLICAR pendientes luego de hidratar todo (promociones/usos tarifas offline nunca se pierdan)
       try { pendingSync.applyPendingLocal?.(); } catch (_) {}

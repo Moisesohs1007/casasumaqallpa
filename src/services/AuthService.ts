@@ -190,6 +190,182 @@ export const AuthService = {
       return { ok: false, error: e?.message || 'Error de conexión.' };
     }
   },
+
+  async listarUsuarios(): Promise<any[]> {
+    try {
+      const { data, error } = await supabase
+        .from('usuarios')
+        .select('*, username:payload->>username')
+        .order('apellidos', { ascending: true });
+      if (error) throw error;
+      const lista = (data || []).map((u: any) => {
+        if (!u.username && u.payload?.username) u.username = u.payload.username;
+        return u;
+      });
+      _guardarCacheUsuarios(lista);
+      return lista;
+    } catch {
+      return _leerCacheUsuarios();
+    }
+  },
+
+  async listarRoles(): Promise<any[]> {
+    try {
+      const { data, error } = await supabase
+        .from('roles')
+        .select('*')
+        .order('nivel_jerarquia', { ascending: true });
+      if (error) throw error;
+      return data || [];
+    } catch {
+      return [];
+    }
+  },
+
+  async crearUsuario(datos: {
+    nombres: string;
+    apellidos: string;
+    username: string;
+    password: string;
+    rol_id: string;
+    correo_electronico?: string;
+    telefono?: string;
+  }): Promise<{ ok: boolean; error?: string; usuario?: any }> {
+    const { nombres, apellidos, username, password, rol_id } = datos;
+    if (!nombres.trim() || !apellidos.trim()) return { ok: false, error: 'Nombres y apellidos son obligatorios.' };
+    if (!username.trim()) return { ok: false, error: 'El nombre de usuario es obligatorio.' };
+    if (username.trim().length < 3) return { ok: false, error: 'El usuario debe tener al menos 3 caracteres.' };
+    if (!password || password.length < 4) return { ok: false, error: 'La contraseña debe tener al menos 4 caracteres.' };
+    if (!rol_id) return { ok: false, error: 'Debes seleccionar un rol.' };
+
+    try {
+      const { data: existente } = await supabase
+        .from('usuarios')
+        .select('id')
+        .or(`payload->>username.ilike.${username.trim().toLowerCase()}`)
+        .limit(1)
+        .maybeSingle();
+      if (existente) return { ok: false, error: 'Ya existe un usuario con ese nombre de usuario.' };
+
+      const hash = await hashPassword(password);
+      const iniciales = `${(nombres[0] || '').toUpperCase()}${(apellidos[0] || '').toUpperCase()}`;
+      const nuevoId = `USR-${Date.now().toString(36).toUpperCase()}`;
+      const payload = {
+        username: username.trim().toLowerCase(),
+        nombres: nombres.trim(),
+        apellidos: apellidos.trim(),
+        ...(datos.correo_electronico ? { correo_electronico: datos.correo_electronico } : {}),
+        ...(datos.telefono ? { telefono: datos.telefono } : {}),
+      };
+
+      const { data, error } = await supabase
+        .from('usuarios')
+        .insert({
+          id: nuevoId,
+          uuid: nuevoId,
+          iniciales,
+          nombres: nombres.trim(),
+          apellidos: apellidos.trim(),
+          correo_electronico: datos.correo_electronico || '',
+          telefono: datos.telefono || '',
+          rol_id,
+          estado: 'ACTIVO',
+          password_hash: hash,
+          payload,
+        })
+        .select()
+        .single();
+
+      if (error) return { ok: false, error: error.message };
+
+      const cache = _leerCacheUsuarios();
+      cache.push(data);
+      _guardarCacheUsuarios(cache);
+
+      return { ok: true, usuario: data };
+    } catch (e: any) {
+      return { ok: false, error: e?.message || 'Error al crear el usuario.' };
+    }
+  },
+
+  async actualizarUsuario(usuarioId: string, datos: {
+    nombres?: string;
+    apellidos?: string;
+    username?: string;
+    rol_id?: string;
+    correo_electronico?: string | null;
+    telefono?: string | null;
+    password?: string;
+  }): Promise<{ ok: boolean; error?: string }> {
+    try {
+      const { data: actual } = await supabase
+        .from('usuarios')
+        .select('payload')
+        .eq('id', usuarioId)
+        .single();
+      if (!actual) return { ok: false, error: 'Usuario no encontrado.' };
+
+      const payloadActual = actual.payload || {};
+      const updates: any = {
+        nombres: datos.nombres ?? payloadActual.nombres,
+        apellidos: datos.apellidos ?? payloadActual.apellidos,
+        rol_id: datos.rol_id,
+      };
+      if (datos.correo_electronico !== undefined) updates.correo_electronico = datos.correo_electronico || '';
+      if (datos.telefono !== undefined) updates.telefono = datos.telefono || '';
+
+      const payloadNuevo = {
+        ...payloadActual,
+        ...(datos.nombres ? { nombres: datos.nombres } : {}),
+        ...(datos.apellidos ? { apellidos: datos.apellidos } : {}),
+        ...(datos.username ? { username: datos.username.trim().toLowerCase() } : {}),
+        ...(datos.correo_electronico !== undefined ? { correo_electronico: datos.correo_electronico } : {}),
+        ...(datos.telefono !== undefined ? { telefono: datos.telefono } : {}),
+      };
+      updates.payload = payloadNuevo;
+
+      if (datos.password && datos.password.length >= 4) {
+        updates.password_hash = await hashPassword(datos.password);
+      }
+
+      const { error } = await supabase
+        .from('usuarios')
+        .update(updates)
+        .eq('id', usuarioId);
+      if (error) return { ok: false, error: error.message };
+
+      return { ok: true };
+    } catch (e: any) {
+      return { ok: false, error: e?.message || 'Error al actualizar el usuario.' };
+    }
+  },
+
+  async cambiarEstadoUsuario(usuarioId: string, estado: 'ACTIVO' | 'INACTIVO'): Promise<{ ok: boolean; error?: string }> {
+    try {
+      const { error } = await supabase
+        .from('usuarios')
+        .update({ estado })
+        .eq('id', usuarioId);
+      if (error) return { ok: false, error: error.message };
+      return { ok: true };
+    } catch (e: any) {
+      return { ok: false, error: e?.message || 'Error al cambiar el estado.' };
+    }
+  },
+
+  async usernameDisponible(username: string): Promise<boolean> {
+    try {
+      const { data } = await supabase
+        .from('usuarios')
+        .select('id')
+        .or(`payload->>username.ilike.${username.trim().toLowerCase()}`)
+        .limit(1)
+        .maybeSingle();
+      return !data;
+    } catch {
+      return true;
+    }
+  },
 };
 
 export default AuthService;

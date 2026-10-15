@@ -27,11 +27,21 @@ import FolioPage from './pages/Folio/Folio';
 import LoginPage from './pages/Login/Login';
 import { HabitacionService, ReservaService, TarifaService, PosService, HuespedService, FolioService, pendingSync, seedProductos, AuthService, type SesionUsuario } from './services';
 import { dbRemota } from './services/__supabase_db__';
+import { aplicarEstilosTicket } from './utils/ticketStyles';
 
 setupIonicReact({
   mode: 'md',
   animated: true,
 });
+
+// VERSIÓN de la app - incrementar con cada cambio para detectar actualizaciones
+const APP_VERSION = 'v3.2-important';
+if (typeof document !== 'undefined') {
+  document.title = `Casa Sumaq Allpa · ${APP_VERSION}`;
+}
+
+// Aplicar estilos de ticket según la configuración de impresora guardada
+aplicarEstilosTicket();
 
 const STORAGE_KEY = 'lodge_ultima_pestana_v1';
 const RUTAS_TAB = ['/home', '/reservas', '/habitaciones', '/pos', '/perfil'];
@@ -52,10 +62,6 @@ const SUPABASE_ANON_FOR_PING =
 let _pingCache: { ts: number; result: boolean } | null = null;
 let _pingEnCurso: Promise<boolean> | null = null;
 
-function timeoutPromise(ms: number, label: string) {
-  return new Promise<never>((_, rj) => setTimeout(() => rj(new Error(label)), ms));
-}
-
 async function _pingSupabaseReal(): Promise<boolean> {
   const ahora = Date.now();
   if (_pingCache && (ahora - _pingCache.ts) < PING_CACHE_MS) return _pingCache.result;
@@ -64,66 +70,48 @@ async function _pingSupabaseReal(): Promise<boolean> {
   _pingEnCurso = (async (): Promise<boolean> => {
     let ultimoOk = false;
     for (let intento = 1; intento <= PING_RETRY; intento++) {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), PING_TIMEOUT_MS);
+      let ok = false;
       try {
-        // CAPA 1: Supabase client si existe
-        const client = dbRemota?.client;
-        let ok = false;
-        if (client && (client as any).from) {
-          try {
-            const req = (client as any).from('impuestos').select('id', { count: 'exact', head: true }).limit(1);
-            const res = await Promise.race([req, timeoutPromise(PING_TIMEOUT_MS, `C1_T${intento}`)]);
-            ok = !(res?.error);
-          } catch { ok = false; }
-        }
-        // CAPA 2: Fallback fetch() directo a REST API
-        if (!ok && typeof fetch === 'function') {
-          try {
-            const req = fetch(
-              `${SUPABASE_URL_FOR_PING}/rest/v1/impuestos?select=id&limit=1`,
-              {
-                method: 'GET',
-                headers: {
-                  apikey: SUPABASE_ANON_FOR_PING,
-                  Authorization: `Bearer ${SUPABASE_ANON_FOR_PING}`,
-                  Accept: 'application/json',
-                  Range: '0-0',
-                },
-                credentials: 'omit' as RequestCredentials,
-                cache: 'no-store',
-              }
-            );
-            const res = await Promise.race([req, timeoutPromise(PING_TIMEOUT_MS, `C2_T${intento}`)]) as Response;
-            ok = !!res && res.ok;
-          } catch { ok = false; }
-        }
-        // CAPA 3: Optimista navigator.onLine + httpbin tiny HEAD
-        if (!ok) {
-          const navOnline = typeof navigator !== 'undefined' ? !!navigator.onLine : true;
-          if (navOnline) {
-            try {
-              const tiny = await Promise.race([
-                fetch('https://httpbin.org/get', { method: 'HEAD', cache: 'no-store', credentials: 'omit' }),
-                timeoutPromise(1800, `C3_T${intento}`),
-              ]) as any;
-              ok = !!tiny && (!!tiny.ok || !!tiny.status || !!tiny.type);
-            } catch { ok = navOnline; }
-          } else {
-            ok = false;
+        const res = await fetch(
+          `${SUPABASE_URL_FOR_PING}/rest/v1/impuestos?select=id&limit=1`,
+          {
+            method: 'GET',
+            headers: {
+              apikey: SUPABASE_ANON_FOR_PING,
+              Authorization: `Bearer ${SUPABASE_ANON_FOR_PING}`,
+              Accept: 'application/json',
+            },
+            credentials: 'omit',
+            cache: 'no-store',
+            signal: controller.signal,
           }
-        }
-        ultimoOk = !!ok;
-        if (ultimoOk) break;
-        // Entre intentos esperamos 400ms
-        if (intento < PING_RETRY) {
-          await new Promise((r) => setTimeout(r, 400));
-        }
-      } catch {
-        ultimoOk = false;
-        if (intento < PING_RETRY) await new Promise((r) => setTimeout(r, 400));
+        );
+        ok = res.ok;
+      } catch (e) {
+        ok = false;
+      } finally {
+        clearTimeout(timeoutId);
       }
+      if (!ok) {
+        const navOnline = typeof navigator !== 'undefined' ? !!navigator.onLine : true;
+        if (navOnline) {
+          try {
+            const tinyController = new AbortController();
+            const tinyTimeout = setTimeout(() => tinyController.abort(), 1800);
+            const tiny = await fetch('https://httpbin.org/get', { method: 'HEAD', cache: 'no-store', credentials: 'omit', signal: tinyController.signal });
+            ok = !!tiny && !!tiny.ok;
+            clearTimeout(tinyTimeout);
+          } catch { ok = navOnline; }
+        }
+      }
+      ultimoOk = !!ok;
+      if (ultimoOk) break;
+      if (intento < PING_RETRY) await new Promise((r) => setTimeout(r, 400));
     }
     const navOnline = typeof navigator !== 'undefined' ? !!navigator.onLine : true;
-    const finalOk = ultimoOk || navOnline; // Último optimista: si navegador dice online = online
+    const finalOk = ultimoOk || navOnline;
     _pingCache = { ts: Date.now(), result: !!finalOk };
     return !!finalOk;
   })();
@@ -460,16 +448,11 @@ const App: React.FC = () => {
     return () => window.removeEventListener('lodge:logout', onLogout);
   }, []);
 
-  if (!sesion) {
-    return (
-      <IonApp>
-        <LoginPage onLoginOk={(u) => setSesion(u)} />
-      </IonApp>
-    );
-  }
-
   return (
     <IonApp>
+      {!sesion ? (
+        <LoginPage onLoginOk={(u) => setSesion(u)} />
+      ) : (
       <IonReactRouter basename="/casasumaqallpa">
         <ControlPestanaPersistente />
         <IonTabs>
@@ -506,6 +489,7 @@ const App: React.FC = () => {
           <TabBarCondicional />
         </IonTabs>
       </IonReactRouter>
+      )}
 
       {/* BADGE FLOTANTE Pendientes N>0: inf-dcha, sobre TabBar. Click = Reintentar sync */}
       {pendientesCount > 0 && (

@@ -35,16 +35,20 @@ import {
   useIonAlert,
   IonSpinner,
   IonItemDivider,
+  IonCheckbox,
 } from '@ionic/react';
 import {
   add, create, trash, save, close, bedOutline, buildOutline, pricetag,
   cube, addCircle, removeCircle, archive, restaurant,
   search, layers, fileTray, warning, checkmarkCircle,
   informationCircle, documentText, barcode, cash, people, refresh, logOutOutline, lockClosed,
+  playOutline, pauseOutline, print,
 } from 'ionicons/icons';
 import { Usuario, Rol, RolUsuario, ModuloPermiso, Moneda, AuditFields, Habitacion, TipoHabitacion, EstadoHabitacion } from '../../types';
-import { HabitacionService, CatalogoFBService, InventarioService, seedProductos, type MoverStockResult, TarifaService, PosService, pendingSync, AuthService } from '../../services';
+import { HabitacionService, CatalogoFBService, InventarioService, seedProductos, type MoverStockResult, TarifaService, PosService, pendingSync, AuthService, ReportesService, rangoHoy, rangoAyer, rangoSemana, rangoMes, rangoMesAnterior, ImpresoraConfigService, type ImpresoraConfig, type TamanoPapel, type MetodoImpresion } from '../../services';
+import type { RangoFechas, ResumenReportes } from '../../services/ReportesService';
 import { supabase } from '../../services/__supabase_db__';
+import { aplicarEstilosTicket } from '../../utils/ticketStyles';
 import './Perfil.css';
 
 const EVENTO_REFRESCAR = 'lodge:refrescarAhora' as const;
@@ -152,14 +156,16 @@ const PerfilPage: React.FC = () => {
   const [confirmBorrar, setConfirmBorrar] = useState<{ id: string; codigo: string } | null>(null);
   const [habDetalle, setHabDetalle] = useState<Habitacion | null>(null);
 
-  const [tabPrincipal, setTabPrincipal] = useState<'HABITACIONES' | 'PRODUCTOS' | 'REPORTES' | 'CUENTA'>('HABITACIONES');
+  const [tabPrincipal, setTabPrincipal] = useState<'HABITACIONES' | 'PRODUCTOS' | 'REPORTES' | 'USUARIOS' | 'CUENTA'>('HABITACIONES');
   const [prodDetalle, setProdDetalle] = useState<any | null>(null);
+  const [impresoraConfig, setImpresoraConfig] = useState<ImpresoraConfig>(ImpresoraConfigService.obtener());
 
   const sesion = AuthService.sesionActual();
   const puedeGestionarHab = AuthService.tienePermiso(sesion, 'HABITACIONES', 'ADMIN');
   const puedeCambiarEstadoHab = AuthService.tienePermiso(sesion, 'HABITACIONES', 'ESCRITURA');
-  const puedeGestionarProd = AuthService.tienePermiso(sesion, 'INVENTARIO', 'ADMIN') || AuthService.tienePermiso(sesion, 'PRODUCTOS', 'ADMIN');
-  const puedeGestionarStock = AuthService.tienePermiso(sesion, 'INVENTARIO', 'ESCRITURA') || AuthService.tienePermiso(sesion, 'INVENTARIO', 'ADMIN');
+  const puedeGestionarProd = AuthService.tienePermiso(sesion, 'INVENTARIO', 'ADMIN') || AuthService.tienePermiso(sesion, 'PRODUCTOS', 'ADMIN') || AuthService.tienePermiso(sesion, 'POS_FB', 'ADMIN');
+  const puedeGestionarStock = AuthService.tienePermiso(sesion, 'INVENTARIO', 'ESCRITURA') || AuthService.tienePermiso(sesion, 'INVENTARIO', 'ADMIN') || AuthService.tienePermiso(sesion, 'POS_FB', 'ADMIN');
+  const puedeGestionarUsuarios = AuthService.tienePermiso(sesion, 'USUARIOS_ROLES', 'ADMIN') || AuthService.tienePermiso(sesion, 'USUARIOS_ROLES', 'ESCRITURA');
 
   // ==================== STOCK / PRODUCTOS STATES ====================
   const [categoriasFB, setCategoriasFB] = useState<any[]>([]);
@@ -188,6 +194,170 @@ const PerfilPage: React.FC = () => {
   const [pwdConfirmar, setPwdConfirmar] = useState('');
   const [pwdProcesando, setPwdProcesando] = useState(false);
   const [pwdMensaje, setPwdMensaje] = useState<{ tipo: 'ok' | 'error'; texto: string } | null>(null);
+
+  // ==================== USUARIOS STATES ====================
+  const [usuariosLista, setUsuariosLista] = useState<any[]>([]);
+  const [rolesLista, setRolesLista] = useState<any[]>([]);
+  const [usuariosLoading, setUsuariosLoading] = useState(false);
+  const [modalUsuarioAbierto, setModalUsuarioAbierto] = useState(false);
+  const [editandoUsuarioId, setEditandoUsuarioId] = useState<string | null>(null);
+  const [formUsuario, setFormUsuario] = useState({
+    nombres: '',
+    apellidos: '',
+    username: '',
+    password: '',
+    rol_id: '',
+    correo_electronico: '',
+    telefono: '',
+  });
+  const [usuarioProcesando, setUsuarioProcesando] = useState(false);
+  const [usuarioMensaje, setUsuarioMensaje] = useState<{ tipo: 'ok' | 'error'; texto: string } | null>(null);
+
+  // ==================== REPORTES STATES ====================
+  const [rangoRapido, setRangoRapido] = useState<string>('HOY');
+  const [fechaDesde, setFechaDesde] = useState<string>(ReportesService.isoAFechaInput(rangoHoy().desdeISO));
+  const [fechaHasta, setFechaHasta] = useState<string>(ReportesService.isoAFechaInput(rangoHoy().hastaISO));
+  const [resumenReportes, setResumenReportes] = useState<ResumenReportes | null>(null);
+  const [reportesLoading, setReportesLoading] = useState(false);
+  const [tabReportes, setTabReportes] = useState<string>('RESUMEN');
+
+  const calcularReportes = useCallback(() => {
+    setReportesLoading(true);
+    try {
+      const rango: RangoFechas = {
+        desdeISO: ReportesService.fechaInputAISO(fechaDesde, false),
+        hastaISO: ReportesService.fechaInputAISO(fechaHasta, true),
+      };
+      const res = ReportesService.calcular(rango);
+      setResumenReportes(res);
+    } catch (e) {
+      console.error('[Reportes] error al calcular:', e);
+    } finally {
+      setReportesLoading(false);
+    }
+  }, [fechaDesde, fechaHasta]);
+
+  const aplicarRangoRapido = (tipo: string) => {
+    setRangoRapido(tipo);
+    let r: RangoFechas;
+    switch (tipo) {
+      case 'HOY': r = rangoHoy(); break;
+      case 'AYER': r = rangoAyer(); break;
+      case 'SEMANA': r = rangoSemana(); break;
+      case 'MES': r = rangoMes(); break;
+      case 'MES_ANTERIOR': r = rangoMesAnterior(); break;
+      default: r = rangoHoy();
+    }
+    setFechaDesde(ReportesService.isoAFechaInput(r.desdeISO));
+    setFechaHasta(ReportesService.isoAFechaInput(r.hastaISO));
+  };
+
+  const cargarUsuarios = useCallback(async () => {
+    setUsuariosLoading(true);
+    try {
+      const [usuarios, roles] = await Promise.all([
+        AuthService.listarUsuarios(),
+        AuthService.listarRoles(),
+      ]);
+      setUsuariosLista(usuarios);
+      setRolesLista(roles);
+    } catch (e) {
+      console.warn('Error cargando usuarios:', e);
+    } finally {
+      setUsuariosLoading(false);
+    }
+  }, []);
+
+  const abrirNuevoUsuario = () => {
+    setEditandoUsuarioId(null);
+    setFormUsuario({ nombres: '', apellidos: '', username: '', password: '', rol_id: rolesLista[0]?.id || '', correo_electronico: '', telefono: '' });
+    setUsuarioMensaje(null);
+    setModalUsuarioAbierto(true);
+  };
+
+  const abrirEditarUsuario = (u: any) => {
+    setEditandoUsuarioId(u.id);
+    setFormUsuario({
+      nombres: u.nombres || u.payload?.nombres || '',
+      apellidos: u.apellidos || u.payload?.apellidos || '',
+      username: u.username || u.payload?.username || '',
+      password: '',
+      rol_id: u.rol_id || '',
+      correo_electronico: u.correo_electronico || u.payload?.correo_electronico || '',
+      telefono: u.telefono || u.payload?.telefono || '',
+    });
+    setUsuarioMensaje(null);
+    setModalUsuarioAbierto(true);
+  };
+
+  const guardarUsuario = async () => {
+    setUsuarioMensaje(null);
+    if (!formUsuario.nombres.trim() || !formUsuario.apellidos.trim()) {
+      setUsuarioMensaje({ tipo: 'error', texto: 'Nombres y apellidos son obligatorios.' });
+      return;
+    }
+    if (!formUsuario.username.trim() || formUsuario.username.trim().length < 3) {
+      setUsuarioMensaje({ tipo: 'error', texto: 'El usuario debe tener al menos 3 caracteres.' });
+      return;
+    }
+    if (!formUsuario.rol_id) {
+      setUsuarioMensaje({ tipo: 'error', texto: 'Selecciona un rol.' });
+      return;
+    }
+    if (!editandoUsuarioId && (!formUsuario.password || formUsuario.password.length < 4)) {
+      setUsuarioMensaje({ tipo: 'error', texto: 'La contraseña debe tener al menos 4 caracteres.' });
+      return;
+    }
+    setUsuarioProcesando(true);
+    try {
+      let res;
+      if (editandoUsuarioId) {
+        const datos: any = {
+          nombres: formUsuario.nombres,
+          apellidos: formUsuario.apellidos,
+          username: formUsuario.username,
+          rol_id: formUsuario.rol_id,
+          correo_electronico: formUsuario.correo_electronico || null,
+          telefono: formUsuario.telefono || null,
+        };
+        if (formUsuario.password && formUsuario.password.length >= 4) datos.password = formUsuario.password;
+        res = await AuthService.actualizarUsuario(editandoUsuarioId, datos);
+      } else {
+        res = await AuthService.crearUsuario({
+          nombres: formUsuario.nombres,
+          apellidos: formUsuario.apellidos,
+          username: formUsuario.username,
+          password: formUsuario.password,
+          rol_id: formUsuario.rol_id,
+          correo_electronico: formUsuario.correo_electronico || undefined,
+          telefono: formUsuario.telefono || undefined,
+        });
+      }
+      if (!res.ok) {
+        setUsuarioMensaje({ tipo: 'error', texto: res.error || 'Error al guardar.' });
+        return;
+      }
+      setUsuarioMensaje({ tipo: 'ok', texto: editandoUsuarioId ? 'Usuario actualizado correctamente.' : 'Usuario creado correctamente.' });
+      await cargarUsuarios();
+      setTimeout(() => setModalUsuarioAbierto(false), 800);
+    } catch (e: any) {
+      setUsuarioMensaje({ tipo: 'error', texto: e?.message || 'Error inesperado.' });
+    } finally {
+      setUsuarioProcesando(false);
+    }
+  };
+
+  const toggleEstadoUsuario = async (u: any) => {
+    const nuevoEstado = u.estado === 'ACTIVO' ? 'INACTIVO' : 'ACTIVO';
+    try {
+      const res = await AuthService.cambiarEstadoUsuario(u.id, nuevoEstado as 'ACTIVO' | 'INACTIVO');
+      if (res.ok) {
+        setUsuariosLista((lista) => lista.map((x) => x.id === u.id ? { ...x, estado: nuevoEstado } : x));
+      }
+    } catch (e) {
+      console.warn('Error cambiando estado:', e);
+    }
+  };
 
   const manejarCambioContrasena = async () => {
     setPwdMensaje(null);
@@ -293,7 +463,15 @@ const PerfilPage: React.FC = () => {
     setModalAbierto(true);
   };
 
+  const guardarImpresoraConfig = (parcial: Partial<ImpresoraConfig>) => {
+    const nueva = ImpresoraConfigService.actualizar(parcial);
+    setImpresoraConfig(nueva);
+    aplicarEstilosTicket();
+  };
+
   const refreshingRefPerfil = useRef(false);
+  const calcularReportesRef = useRef(calcularReportes);
+  calcularReportesRef.current = calcularReportes;
   const refrescarFuerzaActual = useCallback(async (postFlush = false) => {
     if (refreshingRefPerfil.current) return;
     refreshingRefPerfil.current = true;
@@ -308,15 +486,21 @@ const PerfilPage: React.FC = () => {
       try { pendingSync.applyPendingLocal?.(); } catch (_) {}
       try { cargarHabs(); } catch (_) {}
       try { cargarCatProd(); } catch (_) {}
+      if (tabPrincipal === 'REPORTES') {
+        try { calcularReportesRef.current(); } catch (_) {}
+      }
     } finally {
       refreshingRefPerfil.current = false;
       if (postFlush) {
         try { pendingSync.processQueue?.(false); } catch (_) {}
         cargarHabs(); cargarCatProd();
+        if (tabPrincipal === 'REPORTES') {
+          try { calcularReportesRef.current(); } catch (_) {}
+        }
       }
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [tabPrincipal]);
   const refrescarPerfilRef = useRef(refrescarFuerzaActual);
   refrescarPerfilRef.current = refrescarFuerzaActual;
 
@@ -372,6 +556,7 @@ const PerfilPage: React.FC = () => {
         try { (HabitacionService as any).actualizarTipo?.(form.tipoHabitacionId, { precioBaseNoche: form.precioNoche }); } catch { /* noop */ }
       }
       setModalAbierto(false);
+      setHabSeleccionadaId('');
       cargarHabs();
     } catch (e: any) {
       mostrarToast(e?.message || 'Error al guardar habitación.');
@@ -429,6 +614,20 @@ const PerfilPage: React.FC = () => {
 
   useIonViewWillEnter(() => { refrescarPerfilRef.current(); });
 
+  // Cargar usuarios cuando se abre la pestaña USUARIOS
+  useEffect(() => {
+    if (tabPrincipal === 'USUARIOS' && puedeGestionarUsuarios) {
+      cargarUsuarios();
+    }
+  }, [tabPrincipal, puedeGestionarUsuarios, cargarUsuarios]);
+
+  // Calcular reportes cuando se abre la pestaña REPORTES o cambian las fechas
+  useEffect(() => {
+    if (tabPrincipal === 'REPORTES') {
+      calcularReportes();
+    }
+  }, [tabPrincipal, calcularReportes]);
+
   // === Hooks NUEVOS: Listener global + Realtime deps = [] estable ===
   useEffect(() => {
     let alive = true;
@@ -449,7 +648,7 @@ const PerfilPage: React.FC = () => {
   useEffect(() => {
     let alive = true;
     let debounceId: any;
-    const TABLAS_RT = ['habitaciones', 'tipos_habitacion', 'categorias_fb', 'productos_fb', 'presentaciones_fb', 'tarifas', 'temporadas', 'politicas_cancelacion', 'codigos_promocionales', 'impuestos', 'mesas', 'puntos_venta'];
+    const TABLAS_RT = ['habitaciones', 'tipos_habitacion', 'categorias_fb', 'productos_fb', 'presentaciones_fb', 'tarifas', 'temporadas', 'politicas_cancelacion', 'impuestos', 'mesas', 'puntos_venta', 'comandas', 'comandas_detalles'];
     const recargarDebounced = () => {
       if (!alive) return;
       clearTimeout(debounceId);
@@ -485,18 +684,19 @@ const PerfilPage: React.FC = () => {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Cuando se selecciona un producto del selector → abrir modal
+  // Cuando se selecciona un producto del selector → abrir modal de editar directamente
   useEffect(() => {
     if (!prodSeleccionadoId) return;
+    if (modalProdAbierto) return;
     const p = productosFB.find((x) => x.id === prodSeleccionadoId);
-    if (p) setProdDetalle(p);
-  }, [prodSeleccionadoId, productosFB]);
+    if (p) abrirEditarProd(p);
+  }, [prodSeleccionadoId, productosFB, modalProdAbierto]);
 
-  // Cuando se selecciona una habitación del selector → abrir modal
+  // Cuando se selecciona una habitación del selector → abrir modal de editar directamente
   useEffect(() => {
     if (!habSeleccionadaId) return;
     const h = habsAdmin.find((x) => x.id === habSeleccionadaId);
-    if (h) setHabDetalle(h);
+    if (h) abrirEditar(h);
   }, [habSeleccionadaId, habsAdmin]);
 
   const generarCodigoProdAuto = (categoriaIdSel: string): string => {
@@ -512,6 +712,26 @@ const PerfilPage: React.FC = () => {
       return Number.isFinite(n) ? Math.max(max, n) : max;
     }, 0);
     return `${prefijo}-${String(consecutivo + 1).padStart(3, '0')}`;
+  };
+
+  const generarCodigoUnico = (categoriaIdSel: string, excluirId?: string): string => {
+    const cat = categoriasFB.find(c => c.id === categoriaIdSel);
+    if (!cat) return '';
+    const prefijoFull = String((cat.payload?.codigo) || cat.codigo || `CAT-${String(cat.id||'').slice(0,3).toUpperCase()}`);
+    const prefijo = prefijoFull.replace(/^CAT-/, '').slice(0, 6).toUpperCase();
+    if (!prefijo) return '';
+    const codigosExistentes = new Set(
+      productosFB
+        .filter((p: any) => p.id !== excluirId)
+        .map((p: any) => String(p.codigo || '').toUpperCase())
+    );
+    let consecutivo = 1;
+    let candidato = `${prefijo}-${String(consecutivo).padStart(3, '0')}`;
+    while (codigosExistentes.has(candidato)) {
+      consecutivo++;
+      candidato = `${prefijo}-${String(consecutivo).padStart(3, '0')}`;
+    }
+    return candidato;
   };
 
   const stockPlanoProd = (p: any) => {
@@ -579,12 +799,11 @@ const PerfilPage: React.FC = () => {
     setFormProd({
       ...FORM_VACIO_PROD,
       categoriaId: catDefaultId,
-      codigo: catDefaultId ? generarCodigoProdAuto(catDefaultId) : '',
+      codigo: catDefaultId ? generarCodigoUnico(catDefaultId) : '',
     });
     setModalProdAbierto(true);
   };
-  const abrirEditarProd = async (p: any) => {
-    await refrescarFuerzaActual();
+  const abrirEditarProd = (p: any) => {
     const plano = stockPlanoProd(p);
     setEditandoProdId(p.id);
     setFormProd({
@@ -604,23 +823,120 @@ const PerfilPage: React.FC = () => {
       observaciones: p.observaciones || p.notasInternas || '',
     });
     setModalProdAbierto(true);
+    refrescarFuerzaActual().catch(() => {});
   };
+
+  // ============ IMPRIMIR INVENTARIO DE PRODUCTOS ============
+  // Solo incluye productos ENVASEMBOTellados (stockControl=true), excluye platos/jugos/bebidas preparadas
+  const imprimirInventarioProductos = () => {
+    const hoy = new Date().toLocaleString('es-PE', { dateStyle: 'short', timeStyle: 'short' });
+    const categorias = [...categoriasFB].sort((a, b) => (a.orden ?? 0) - (b.orden ?? 0));
+    // Solo productos con control de stock (envasados/embotellados)
+    const productos = productosFB.filter((p) => stockPlanoProd(p).stockControl === true);
+    const totalProductos = productos.length;
+    let totalValor = 0;
+
+    const esc = (s: any) => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+    let filas = '';
+    for (const cat of categorias) {
+      const prodsCat = productos.filter((p) => p.categoriaId === cat.id).sort((a, b) => (a.orden ?? 0) - (b.orden ?? 0) || (a.nombre || '').localeCompare(b.nombre || ''));
+      if (prodsCat.length === 0) continue;
+      filas += `<tr class="cat-row"><td colspan="7"><strong>${esc(cat.nombre)}</strong> <span style="color:#888;font-weight:normal">(${prodsCat.length} productos)</span></td></tr>`;
+      for (const p of prodsCat) {
+        const plano = stockPlanoProd(p);
+        const stockActual = Number(plano.stockActual || 0);
+        const precio = Number(p.precioVentaBase || 0);
+        const costo = Number(p.costoAproximado || p.costoUnitario || 0);
+        totalValor += stockActual * costo;
+        const bajo = plano.stockControl && plano.stockMinimo > 0 && stockActual <= plano.stockMinimo;
+        filas += `<tr>
+          <td>${esc(p.codigo || '')}</td>
+          <td>${esc(p.nombre || '')}</td>
+          <td style="text-align:center">${esc(p.unidadMedida || 'UND')}</td>
+          <td style="text-align:right;font-weight:600">${stockActual}</td>
+          <td style="text-align:right;color:${bajo ? '#d32f2f' : '#666'}">${plano.stockMinimo || 0}</td>
+          <td style="text-align:right">S/ ${precio.toFixed(2)}</td>
+          <td class="fisica-col" style="border-bottom:1px solid #ccc">&nbsp;</td>
+        </tr>`;
+      }
+    }
+
+    if (!filas) {
+      filas = `<tr><td colspan="7" style="text-align:center;padding:20px;color:#999">No hay productos envasados/embotellados con control de stock.</td></tr>`;
+    }
+
+    const html = `<!DOCTYPE html>
+<html lang="es"><head><meta charset="utf-8"/><title>Inventario de Productos - ${hoy}</title>
+<style>
+  *{box-sizing:border-box}
+  body{font-family:Arial,Helvetica,sans-serif;font-size:11px;margin:12mm;color:#222}
+  h1{font-size:16px;margin:0 0 2px}
+  .sub{color:#666;font-size:11px;margin-bottom:10px}
+  table{width:100%;border-collapse:collapse}
+  th,td{border:1px solid #ddd;padding:4px 6px;text-align:left}
+  th{background:#f2f2f2;font-size:10px;text-transform:uppercase}
+  .cat-row td{background:#eef4fb;border-top:2px solid #4a90d9;font-weight:700}
+  .fisica-col{min-width:60px}
+  tfoot td{font-weight:700;background:#fafafa}
+  .totales{margin-top:12px;font-size:11px}
+  .firma{margin-top:40px;display:flex;justify-content:space-between}
+  .firma div{border-top:1px solid #333;width:200px;text-align:center;padding-top:4px;font-size:10px}
+  @media print{body{margin:8mm}}
+</style></head>
+<body>
+  <h1>Inventario de Productos Envasados</h1>
+  <div class="sub">Casa Sumaq Allpa · Generado: ${hoy} · Total: ${totalProductos} productos con control de stock</div>
+  <table>
+    <thead>
+      <tr>
+        <th style="width:80px">Código</th>
+        <th>Producto</th>
+        <th style="width:50px;text-align:center">Und</th>
+        <th style="width:60px;text-align:right">Stock</th>
+        <th style="width:60px;text-align:right">Stock Mín</th>
+        <th style="width:70px;text-align:right">Precio Vta</th>
+        <th style="width:80px">Cant. Física</th>
+      </tr>
+    </thead>
+    <tbody>${filas}</tbody>
+    <tfoot>
+      <tr><td colspan="3" style="text-align:right">Total productos:</td><td colspan="2">${totalProductos}</td><td colspan="2"></td></tr>
+    </tfoot>
+  </table>
+  <div class="totales">Valor total en inventario (costo): <strong>S/ ${totalValor.toFixed(2)}</strong></div>
+  <div class="firma">
+    <div>Responsable de almacén</div>
+    <div>Administración</div>
+  </div>
+  <script>window.onload=function(){setTimeout(function(){window.print();},300);};<\/script>
+</body></html>`;
+
+    const w = window.open('', '_blank', 'width=900,height=700');
+    if (!w) { mostrarToast('Permite ventanas emergentes para imprimir'); return; }
+    w.document.open();
+    w.document.write(html);
+    w.document.close();
+  };
+
   const guardarProd = () => {
     if (!formProd.nombre.trim()) { mostrarToast('Nombre producto es obligatorio'); return; }
     if (!formProd.categoriaId) { mostrarToast('Selecciona categoría'); return; }
     try {
-      const codigoFinal = (formProd.codigo || '').trim()
-        ? formProd.codigo.trim()
-        : (generarCodigoProdAuto(formProd.categoriaId) || formProd.nombre.trim());
+      const codigoFinal = (!editandoProdId)
+        ? (generarCodigoUnico(formProd.categoriaId) || formProd.nombre.trim())
+        : (formProd.codigo || '').trim();
       const data = {
         ...formProd,
         codigo: codigoFinal,
         nombre: formProd.nombre.trim(),
         descripcion: formProd.descripcion.trim(),
+        unidadMedida: formProd.unidadMedida || 'UND',
         precioVentaBase: Number(formProd.precioVentaBase || 0),
         costoAproximado: Number(formProd.costoAproximado || 0),
-        stockActual: Number(formProd.stockActual || 0),
-        stockMinimo: Number(formProd.stockMinimo || 0),
+        stockControl: !!formProd.stockControl,
+        stockActual: formProd.stockControl ? Number(formProd.stockActual || 0) : 0,
+        stockMinimo: formProd.stockControl ? Number(formProd.stockMinimo || 0) : 0,
         orden: Number(formProd.orden || 0),
         observaciones: formProd.observaciones.trim(),
       };
@@ -632,6 +948,7 @@ const PerfilPage: React.FC = () => {
         mostrarToast(`Producto creado ✅`);
       }
       setModalProdAbierto(false);
+      setProdSeleccionadoId('');
       cargarCatProd();
     } catch (e: any) { mostrarToast(e?.message || 'Error al guardar producto.'); }
   };
@@ -790,8 +1107,14 @@ const PerfilPage: React.FC = () => {
             <IonIcon icon={documentText} />
             <IonLabel>Reportes</IonLabel>
           </IonSegmentButton>
-          <IonSegmentButton value="CUENTA" type="button">
+          {puedeGestionarUsuarios && (
+          <IonSegmentButton value="USUARIOS" type="button">
             <IonIcon icon={people} />
+            <IonLabel>Usuarios</IonLabel>
+          </IonSegmentButton>
+          )}
+          <IonSegmentButton value="CUENTA" type="button">
+            <IonIcon icon={lockClosed} />
             <IonLabel>Cuenta</IonLabel>
           </IonSegmentButton>
         </IonSegment>
@@ -858,6 +1181,224 @@ const PerfilPage: React.FC = () => {
             >
               {pwdProcesando ? <IonSpinner name="crescent" /> : 'Cambiar contraseña'}
             </IonButton>
+          </IonCardContent>
+        </IonCard>
+
+        {/* =============== CONFIGURACIÓN DE IMPRESORA =============== */}
+        <IonCard className="section-card">
+          <IonCardHeader className="section-header">
+            <div className="section-header-title">
+              <div className="section-icon" style={{ background: 'linear-gradient(135deg, #0ea5e9, #0284c7)' }}>
+                <IonIcon icon={print} />
+              </div>
+              <div>
+                <div className="section-title">Impresora térmica</div>
+                <div className="section-subtitle">Configura tu impresora de tickets (REDPOS HQ201 58mm)</div>
+              </div>
+            </div>
+          </IonCardHeader>
+          <IonCardContent>
+            {/* Tamaño de papel */}
+            <IonItem lines="full" style={{ '--padding-start': '0', '--padding-end': '0' }}>
+              <IonLabel>
+                <h2 style={{ margin: 0, fontSize: 14, fontWeight: 600 }}>Tamaño de papel</h2>
+                <p style={{ margin: '2px 0', fontSize: 12, color: 'var(--ion-color-medium)' }}>
+                  REDPOS HQ201 usa rollo de 58mm
+                </p>
+              </IonLabel>
+              <IonSelect
+                slot="end"
+                value={impresoraConfig.tamanoPapel}
+                onIonChange={(e: any) => guardarImpresoraConfig({ tamanoPapel: e.detail.value as TamanoPapel })}
+                style={{ maxWidth: 130 }}
+              >
+                <IonSelectOption value={58}>58 mm (estándar)</IonSelectOption>
+                <IonSelectOption value={80}>80 mm (ancho)</IonSelectOption>
+              </IonSelect>
+            </IonItem>
+
+            {/* Método de impresión */}
+            <IonItem lines="full" style={{ '--padding-start': '0', '--padding-end': '0' }}>
+              <IonLabel>
+                <h2 style={{ margin: 0, fontSize: 14, fontWeight: 600 }}>Método de impresión</h2>
+                <p style={{ margin: '2px 0', fontSize: 12, color: 'var(--ion-color-medium)' }}>
+                  {ImpresoraConfigService.plataforma() === 'android'
+                    ? 'Android: usa Sistema + app de impresión Bluetooth'
+                    : 'PC: Sistema usa el driver de Windows'}
+                </p>
+              </IonLabel>
+              <IonSelect
+                slot="end"
+                value={impresoraConfig.metodoImpresion}
+                onIonChange={(e: any) => guardarImpresoraConfig({ metodoImpresion: e.detail.value as MetodoImpresion })}
+                style={{ maxWidth: 160 }}
+              >
+                <IonSelectOption value="sistema">Sistema (window.print)</IonSelectOption>
+                <IonSelectOption value="webusb" disabled={!ImpresoraConfigService.soportaWebUSB()}>
+                  USB directo {!ImpresoraConfigService.soportaWebUSB() ? '(no soportado)' : ''}
+                </IonSelectOption>
+              </IonSelect>
+            </IonItem>
+
+            {/* Nombre de empresa */}
+            <IonItem lines="full" style={{ '--padding-start': '0', '--padding-end': '0' }}>
+              <IonLabel position="stacked" style={{ fontSize: 13, fontWeight: 600 }}>Nombre en el ticket</IonLabel>
+              <IonInput
+                value={impresoraConfig.nombreEmpresa}
+                onIonChange={(e: any) => guardarImpresoraConfig({ nombreEmpresa: e.detail.value })}
+                placeholder="Casa Sumaq Allpa"
+              />
+            </IonItem>
+
+            {/* Mostrar IGV */}
+            <IonItem lines="full" style={{ '--padding-start': '0', '--padding-end': '0' }}>
+              <IonLabel>
+                <h2 style={{ margin: 0, fontSize: 14, fontWeight: 600 }}>Mostrar IGV en ticket</h2>
+              </IonLabel>
+              <IonCheckbox
+                slot="end"
+                checked={impresoraConfig.mostrarIgv}
+                onIonChange={(e: any) => guardarImpresoraConfig({ mostrarIgv: e.detail.checked })}
+              />
+            </IonItem>
+
+            {/* Información según plataforma */}
+            <div style={{ marginTop: 12, padding: '10px 12px', borderRadius: 8, background: 'var(--ion-color-light)', fontSize: 12, lineHeight: 1.5 }}>
+              {ImpresoraConfigService.plataforma() === 'android' && (
+                <>
+                  <strong>📱 Android:</strong> Para imprimir por Bluetooth instala una app de servicio de impresión como <em>PrintHand</em> o <em>Bluetooth Printer</em> en Google Play. Luego en el diálogo de impresión elige tu REDPOS HQ201.
+                </>
+              )}
+              {ImpresoraConfigService.plataforma() === 'windows' && (
+                <>
+                  <strong>🖥️ Windows:</strong> Instala el driver de la REDPOS HQ201, conéctala por USB y selecciónala como impresora por defecto. El diálogo de impresión aparecerá automáticamente.
+                </>
+              )}
+              {!['android', 'windows'].includes(ImpresoraConfigService.plataforma()) && (
+                <>
+                  <strong>ℹ️ Este dispositivo:</strong> La impresión por Bluetooth directa no está soportada desde el navegador. Usa una conexión USB o un dispositivo Windows/Android.
+                </>
+              )}
+            </div>
+
+            {/* Botón de prueba */}
+            <IonButton
+              expand="block"
+              fill="outline"
+              color="primary"
+              style={{ marginTop: 12 }}
+              onClick={() => {
+                const w = window.open('', '_blank');
+                if (!w) return;
+                const ancho = impresoraConfig.tamanoPapel;
+                w.document.write(`
+                  <html><head><title>Prueba ticket ${ancho}mm</title>
+                  <style>
+                    @page { size: ${ancho}mm auto; margin: 0; }
+                    body { font-family: 'Courier New', monospace; font-size: 11px; width: ${ancho}mm; margin: 0 auto; padding: 4mm 3mm; }
+                    h1 { font-size: 14px; text-align: center; margin: 0 0 4px; }
+                    .line { border-bottom: 1px dashed #000; margin: 6px 0; }
+                    .row { display: flex; justify-content: space-between; }
+                  </style></head><body>
+                    <h1>${impresoraConfig.nombreEmpresa || 'Casa Sumaq Allpa'}</h1>
+                    <div style="text-align:center;font-size:10px;">Ticket de prueba ${ancho}mm</div>
+                    <div class="line"></div>
+                    <div class="row"><span>Producto</span><span>Precio</span></div>
+                    <div class="row"><span>Prueba 1</span><span>S/ 10.00</span></div>
+                    <div class="row"><span>Prueba 2</span><span>S/ 25.50</span></div>
+                    <div class="line"></div>
+                    <div class="row"><strong>TOTAL</strong><strong>S/ 35.50</strong></div>
+                    <div style="text-align:center;margin-top:8px;font-size:10px;">¡Impresión OK!</div>
+                  </body></html>
+                `);
+                w.document.close();
+                setTimeout(() => { w.print(); w.close(); }, 300);
+              }}
+            >
+              <IonIcon icon={print} slot="start" />
+              Imprimir ticket de prueba
+            </IonButton>
+          </IonCardContent>
+        </IonCard>
+        </>
+        )}
+
+        {/* =============== PESTAÑA: USUARIOS =============== */}
+        {tabPrincipal === 'USUARIOS' && puedeGestionarUsuarios && (
+        <>
+        <IonCard className="section-card">
+          <IonCardHeader className="section-header">
+            <div className="section-header-title">
+              <div className="section-icon" style={{ background: 'linear-gradient(135deg, #8b5cf6, #7c3aed)' }}>
+                <IonIcon icon={people} />
+              </div>
+              <div>
+                <div className="section-title">Usuarios del sistema</div>
+                <div className="section-subtitle">
+                  {usuariosLista.length} usuario(s) · Gestiona accesos y roles
+                </div>
+              </div>
+            </div>
+            <IonButton color="primary" className="section-btn-add" onClick={abrirNuevoUsuario}>
+              <IonIcon slot="start" icon={add} />
+              Nuevo usuario
+            </IonButton>
+          </IonCardHeader>
+          <IonCardContent className="section-content">
+            {usuariosLoading ? (
+              <div style={{ textAlign: 'center', padding: 24 }}>
+                <IonSpinner name="crescent" />
+              </div>
+            ) : usuariosLista.length === 0 ? (
+              <div className="empty-state">
+                <IonIcon icon={people} className="empty-state-icon" />
+                <div className="empty-state-title">No hay usuarios registrados</div>
+                <div className="empty-state-text">Crea el primer usuario usando el botón superior.</div>
+              </div>
+            ) : (
+              <IonList lines="inset">
+                {usuariosLista.map((u) => {
+                  const rol = rolesLista.find((r) => r.id === u.rol_id);
+                  const username = u.username || u.payload?.username || '(sin usuario)';
+                  const esActivo = String(u.estado || '').toUpperCase() === 'ACTIVO';
+                  return (
+                    <IonItem key={u.id} className="usuario-item">
+                      <IonAvatar slot="start" style={{ background: esActivo ? 'linear-gradient(135deg,#10b981,#059669)' : '#9ca3af' }}>
+                        <span style={{ color: '#fff', fontWeight: 700, fontSize: 14 }}>
+                          {(u.iniciales || `${(u.nombres||'')[0]}${(u.apellidos||'')[0]}`).toUpperCase().slice(0,2)}
+                        </span>
+                      </IonAvatar>
+                      <IonLabel>
+                        <h2 style={{ margin: 0, fontSize: 15, fontWeight: 600 }}>
+                          {u.nombres || u.payload?.nombres} {u.apellidos || u.payload?.apellidos}
+                        </h2>
+                        <p style={{ margin: '2px 0', fontSize: 13, color: 'var(--ion-color-medium)' }}>
+                          @{username}
+                        </p>
+                        <p style={{ margin: '2px 0', fontSize: 12 }}>
+                          <IonBadge color={esActivo ? 'success' : 'medium'} style={{ marginRight: 6 }}>
+                            {esActivo ? 'ACTIVO' : 'INACTIVO'}
+                          </IonBadge>
+                          <IonBadge color="tertiary">{rol?.nombre || 'Sin rol'}</IonBadge>
+                        </p>
+                      </IonLabel>
+                      <IonButtons slot="end">
+                        <IonButton fill="clear" color="primary" onClick={() => abrirEditarUsuario(u)}>
+                          <IonIcon icon={create} />
+                        </IonButton>
+                        <IonButton
+                          fill="clear"
+                          color={esActivo ? 'medium' : 'success'}
+                          onClick={() => toggleEstadoUsuario(u)}
+                        >
+                          <IonIcon icon={esActivo ? pauseOutline : playOutline} />
+                        </IonButton>
+                      </IonButtons>
+                    </IonItem>
+                  );
+                })}
+              </IonList>
+            )}
           </IonCardContent>
         </IonCard>
         </>
@@ -958,6 +1499,10 @@ const PerfilPage: React.FC = () => {
               <IonButton size="default" color="primary" className="btn-stock-header" onClick={() => { setBusqStockGlobal(''); setModalStockGlobalAbierto(true); }}>
                 <IonIcon slot="start" icon={archive} />
                 +Stock Global
+              </IonButton>
+              <IonButton size="default" color="medium" fill="outline" className="btn-stock-header" onClick={imprimirInventarioProductos}>
+                <IonIcon slot="start" icon={print} />
+                Imprimir
               </IonButton>
             </div>
           </IonCardHeader>
@@ -1114,30 +1659,464 @@ const PerfilPage: React.FC = () => {
         </>
         )}
 
-        {/* =============== PESTAÑA: REPORTES (placeholder) =============== */}
+        {/* =============== PESTAÑA: REPORTES =============== */}
         {tabPrincipal === 'REPORTES' && (
-          <IonCard className="section-card">
-            <IonCardHeader className="section-header">
-              <div className="section-header-title">
-                <div className="section-icon" style={{ background: 'linear-gradient(135deg, #0ea5e9, #0284c7)' }}>
-                  <IonIcon icon={documentText} />
+          <>
+            <IonCard className="section-card reportes-print-area">
+              <IonCardHeader className="section-header">
+                <div className="section-header-title">
+                  <div className="section-icon" style={{ background: 'linear-gradient(135deg, #0ea5e9, #0284c7)' }}>
+                    <IonIcon icon={documentText} />
+                  </div>
+                  <div>
+                    <div className="section-title">Reportes de ventas</div>
+                    <div className="section-subtitle">Consumos, ganancias y métodos de pago</div>
+                  </div>
                 </div>
-                <div>
-                  <div className="section-title">Reportes</div>
-                  <div className="section-subtitle">Módulo en construcción</div>
+              </IonCardHeader>
+              <IonCardContent>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '16px', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                    {[
+                      { id: 'HOY', label: 'Hoy' },
+                      { id: 'AYER', label: 'Ayer' },
+                      { id: 'SEMANA', label: '7 días' },
+                      { id: 'MES', label: 'Este mes' },
+                      { id: 'MES_ANTERIOR', label: 'Mes anterior' },
+                    ].map((b) => (
+                      <IonButton
+                        key={b.id}
+                        size="small"
+                        fill={rangoRapido === b.id ? 'solid' : 'outline'}
+                        color="primary"
+                        onClick={() => { aplicarRangoRapido(b.id); }}
+                      >
+                        {b.label}
+                      </IonButton>
+                    ))}
+                  </div>
+                  <IonButton size="small" color="success" onClick={() => window.print()} className="no-print">
+                    <IonIcon slot="start" icon={documentText} /> Exportar PDF
+                  </IonButton>
                 </div>
+                <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-end', flexWrap: 'wrap' }}>
+                  <div style={{ flex: '1 1 140px' }}>
+                    <div style={{ fontSize: '12px', color: '#6b7280', marginBottom: '4px' }}>Desde</div>
+                    <IonInput type="date" value={fechaDesde} onIonChange={(e) => { setFechaDesde(e.detail.value!); setRangoRapido(''); }} />
+                  </div>
+                  <div style={{ flex: '1 1 140px' }}>
+                    <div style={{ fontSize: '12px', color: '#6b7280', marginBottom: '4px' }}>Hasta</div>
+                    <IonInput type="date" value={fechaHasta} onIonChange={(e) => { setFechaHasta(e.detail.value!); setRangoRapido(''); }} />
+                  </div>
+                  <IonButton color="primary" onClick={async () => {
+                    setReportesLoading(true);
+                    await refrescarFuerzaActual(true);
+                    calcularReportes();
+                  }}>
+                    <IonIcon slot="start" icon={refresh} /> Actualizar
+                  </IonButton>
+                </div>
+              </IonCardContent>
+            </IonCard>
+
+            {reportesLoading && (
+              <div style={{ textAlign: 'center', padding: '32px' }}>
+                <IonSpinner name="crescent" />
+                <div style={{ marginTop: '8px', color: '#6b7280' }}>Calculando reportes…</div>
               </div>
-            </IonCardHeader>
-            <IonCardContent>
-              <div className="empty-state">
-                <IonIcon icon={documentText} className="empty-state-icon" />
-                <div className="empty-state-title">Reportes próximamente</div>
-                <div className="empty-state-text">
-                  Aquí verás: ventas POS, consumos por habitación, ganancias, métodos de pago y movimientos de inventario.
+            )}
+
+            {!reportesLoading && resumenReportes && (
+              <>
+                {/* Pestañas internas */}
+                <div className="no-print" style={{ display: 'flex', gap: '6px', marginBottom: '16px', flexWrap: 'wrap' }}>
+                  {[
+                    { id: 'RESUMEN', label: 'Resumen' },
+                    { id: 'PRODUCTOS', label: 'Productos' },
+                    { id: 'CATEGORIAS', label: 'Categorías' },
+                    { id: 'PAGOS', label: 'Métodos de pago' },
+                    { id: 'MOZOS', label: 'Mozos' },
+                    { id: 'TENDENCIA', label: 'Tendencia' },
+                  ].map((t) => (
+                    <IonButton
+                      key={t.id}
+                      size="small"
+                      fill={tabReportes === t.id ? 'solid' : 'outline'}
+                      color={tabReportes === t.id ? 'primary' : 'medium'}
+                      onClick={() => setTabReportes(t.id)}
+                    >
+                      {t.label}
+                    </IonButton>
+                  ))}
                 </div>
-              </div>
-            </IonCardContent>
-          </IonCard>
+
+                {resumenReportes.kpis.totalComandas === 0 ? (
+                  <IonCard className="section-card reportes-print-area">
+                    <IonCardContent>
+                      <div className="empty-state">
+                        <IonIcon icon={documentText} className="empty-state-icon" />
+                        <div className="empty-state-title">Sin ventas en el período</div>
+                        <div className="empty-state-text">No hay comandas cobradas entre las fechas seleccionadas.</div>
+                      </div>
+                    </IonCardContent>
+                  </IonCard>
+                ) : (
+                  <>
+                    {/* PESTAÑA RESUMEN */}
+                    {tabReportes === 'RESUMEN' && (
+                      <>
+                        {/* KPIs principales */}
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '12px', marginBottom: '16px' }}>
+                          <IonCard className="kpi-card reportes-print-area" style={{ margin: 0 }}>
+                            <IonCardContent style={{ padding: '16px' }}>
+                              <div style={{ fontSize: '12px', color: '#6b7280' }}>Ventas totales</div>
+                              <div style={{ fontSize: '22px', fontWeight: 700, color: '#059669', marginTop: '4px' }}>
+                                {ReportesService.formatearMonto(resumenReportes.kpis.totalVentas)}
+                              </div>
+                            </IonCardContent>
+                          </IonCard>
+                          <IonCard className="kpi-card reportes-print-area" style={{ margin: 0 }}>
+                            <IonCardContent style={{ padding: '16px' }}>
+                              <div style={{ fontSize: '12px', color: '#6b7280' }}>Comandas</div>
+                              <div style={{ fontSize: '22px', fontWeight: 700, color: '#2563eb', marginTop: '4px' }}>
+                                {ReportesService.formatearNumero(resumenReportes.kpis.totalComandas)}
+                              </div>
+                            </IonCardContent>
+                          </IonCard>
+                          <IonCard className="kpi-card reportes-print-area" style={{ margin: 0 }}>
+                            <IonCardContent style={{ padding: '16px' }}>
+                              <div style={{ fontSize: '12px', color: '#6b7280' }}>Ticket promedio</div>
+                              <div style={{ fontSize: '22px', fontWeight: 700, color: '#7c3aed', marginTop: '4px' }}>
+                                {ReportesService.formatearMonto(resumenReportes.kpis.ticketPromedio)}
+                              </div>
+                            </IonCardContent>
+                          </IonCard>
+                          <IonCard className="kpi-card reportes-print-area" style={{ margin: 0 }}>
+                            <IonCardContent style={{ padding: '16px' }}>
+                              <div style={{ fontSize: '12px', color: '#6b7280' }}>Productos vendidos</div>
+                              <div style={{ fontSize: '22px', fontWeight: 700, color: '#d97706', marginTop: '4px' }}>
+                                {ReportesService.formatearNumero(resumenReportes.kpis.totalProductosVendidos)}
+                              </div>
+                            </IonCardContent>
+                          </IonCard>
+                          <IonCard className="kpi-card reportes-print-area" style={{ margin: 0 }}>
+                            <IonCardContent style={{ padding: '16px' }}>
+                              <div style={{ fontSize: '12px', color: '#6b7280' }}>Ganancia estimada</div>
+                              <div style={{ fontSize: '22px', fontWeight: 700, color: '#059669', marginTop: '4px' }}>
+                                {ReportesService.formatearMonto(resumenReportes.kpis.gananciaEstimada)}
+                              </div>
+                            </IonCardContent>
+                          </IonCard>
+                        </div>
+
+                        {/* KPIs secundarios */}
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '12px', marginBottom: '16px' }}>
+                          <IonCard className="kpi-card reportes-print-area" style={{ margin: 0 }}>
+                            <IonCardContent style={{ padding: '14px' }}>
+                              <div style={{ fontSize: '11px', color: '#6b7280' }}>Pers. x comanda</div>
+                              <div style={{ fontSize: '18px', fontWeight: 700, color: '#0891b2', marginTop: '2px' }}>
+                                {resumenReportes.kpis.promedioPersonasPorComanda.toFixed(1)}
+                              </div>
+                            </IonCardContent>
+                          </IonCard>
+                          <IonCard className="kpi-card reportes-print-area" style={{ margin: 0 }}>
+                            <IonCardContent style={{ padding: '14px' }}>
+                              <div style={{ fontSize: '11px', color: '#6b7280' }}>Consumo x persona</div>
+                              <div style={{ fontSize: '18px', fontWeight: 700, color: '#0891b2', marginTop: '2px' }}>
+                                {ReportesService.formatearMonto(resumenReportes.kpis.consumoPromedioPorPersona)}
+                              </div>
+                            </IonCardContent>
+                          </IonCard>
+                          <IonCard className="kpi-card reportes-print-area" style={{ margin: 0 }}>
+                            <IonCardContent style={{ padding: '14px' }}>
+                              <div style={{ fontSize: '11px', color: '#6b7280' }}>Tiempo atención prom.</div>
+                              <div style={{ fontSize: '18px', fontWeight: 700, color: '#0891b2', marginTop: '2px' }}>
+                                {ReportesService.formatearMinutos(resumenReportes.kpis.tiempoPromedioAtencionMinutos)}
+                              </div>
+                            </IonCardContent>
+                          </IonCard>
+                          <IonCard className="kpi-card reportes-print-area" style={{ margin: 0 }}>
+                            <IonCardContent style={{ padding: '14px' }}>
+                              <div style={{ fontSize: '11px', color: '#6b7280' }}>Impuestos</div>
+                              <div style={{ fontSize: '18px', fontWeight: 700, color: '#64748b', marginTop: '2px' }}>
+                                {ReportesService.formatearMonto(resumenReportes.kpis.totalImpuestos)}
+                              </div>
+                            </IonCardContent>
+                          </IonCard>
+                          <IonCard className="kpi-card reportes-print-area" style={{ margin: 0 }}>
+                            <IonCardContent style={{ padding: '14px' }}>
+                              <div style={{ fontSize: '11px', color: '#6b7280' }}>Descuentos</div>
+                              <div style={{ fontSize: '18px', fontWeight: 700, color: '#dc2626', marginTop: '2px' }}>
+                                {ReportesService.formatearMonto(resumenReportes.kpis.totalDescuentos)}
+                              </div>
+                            </IonCardContent>
+                          </IonCard>
+                          <IonCard className="kpi-card reportes-print-area" style={{ margin: 0 }}>
+                            <IonCardContent style={{ padding: '14px' }}>
+                              <div style={{ fontSize: '11px', color: '#6b7280' }}>Propinas</div>
+                              <div style={{ fontSize: '18px', fontWeight: 700, color: '#64748b', marginTop: '2px' }}>
+                                {ReportesService.formatearMonto(resumenReportes.kpis.totalPropinas)}
+                              </div>
+                            </IonCardContent>
+                          </IonCard>
+                        </div>
+
+                        {/* Top productos */}
+                        <IonCard className="section-card reportes-print-area">
+                          <IonCardHeader className="section-header section-header-sm">
+                            <div className="section-title small">Top productos vendidos</div>
+                          </IonCardHeader>
+                          <IonCardContent>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                              {resumenReportes.topProductos.map((p, i) => (
+                                <div key={p.productoId} style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                  <div style={{ width: '24px', height: '24px', borderRadius: '50%', background: i < 3 ? '#f59e0b' : '#e5e7eb', color: i < 3 ? '#fff' : '#6b7280', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', fontWeight: 700, flexShrink: 0 }}>
+                                    {i + 1}
+                                  </div>
+                                  <div style={{ flex: 1, minWidth: 0 }}>
+                                    <div style={{ fontWeight: 600, fontSize: '14px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.nombre}</div>
+                                    <div style={{ fontSize: '12px', color: '#6b7280' }}>{p.categoriaNombre} · {ReportesService.formatearNumero(p.cantidad)} uds.</div>
+                                  </div>
+                                  <div style={{ fontWeight: 700, color: '#059669', fontSize: '14px' }}>
+                                    {ReportesService.formatearMonto(p.ingreso)}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </IonCardContent>
+                        </IonCard>
+
+                        {/* Tipo de consumo */}
+                        {resumenReportes.ventasPorTipoConsumo.length > 0 && (
+                          <IonCard className="section-card reportes-print-area">
+                            <IonCardHeader className="section-header section-header-sm">
+                              <div className="section-title small">Ventas por tipo de consumo</div>
+                            </IonCardHeader>
+                            <IonCardContent>
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                                {resumenReportes.ventasPorTipoConsumo.map((t) => (
+                                  <div key={t.tipoConsumo}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                                      <span style={{ fontWeight: 600, fontSize: '13px' }}>{ReportesService.etiquetaTipoConsumo(t.tipoConsumo)}</span>
+                                      <span style={{ fontSize: '13px' }}>
+                                        <b style={{ color: '#059669' }}>{ReportesService.formatearMonto(t.ingreso)}</b>
+                                        <span style={{ color: '#6b7280' }}> · {t.cantidad} comandas</span>
+                                      </span>
+                                    </div>
+                                    <div style={{ height: '8px', background: '#f3f4f6', borderRadius: '4px', overflow: 'hidden' }}>
+                                      <div style={{ height: '100%', width: `${Math.min(t.porcentaje, 100)}%`, background: 'linear-gradient(90deg, #a855f7, #7c3aed)', borderRadius: '4px' }} />
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            </IonCardContent>
+                          </IonCard>
+                        )}
+                      </>
+                    )}
+
+                    {/* PESTAÑA PRODUCTOS */}
+                    {tabReportes === 'PRODUCTOS' && (
+                      <IonCard className="section-card reportes-print-area">
+                        <IonCardHeader className="section-header section-header-sm">
+                          <div className="section-title small">Detalle de productos vendidos ({resumenReportes.todosProductos.length})</div>
+                        </IonCardHeader>
+                        <IonCardContent style={{ overflowX: 'auto' }}>
+                          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+                            <thead>
+                              <tr style={{ borderBottom: '2px solid #e5e7eb' }}>
+                                <th style={{ textAlign: 'left', padding: '8px', color: '#6b7280' }}>Producto</th>
+                                <th style={{ textAlign: 'left', padding: '8px', color: '#6b7280' }}>Categoría</th>
+                                <th style={{ textAlign: 'right', padding: '8px', color: '#6b7280' }}>Cant.</th>
+                                <th style={{ textAlign: 'right', padding: '8px', color: '#6b7280' }}>Ingreso</th>
+                                <th style={{ textAlign: 'right', padding: '8px', color: '#6b7280' }}>Costo</th>
+                                <th style={{ textAlign: 'right', padding: '8px', color: '#6b7280' }}>Ganancia</th>
+                                <th style={{ textAlign: 'right', padding: '8px', color: '#6b7280' }}>Margen</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {resumenReportes.todosProductos.map((p) => (
+                                <tr key={p.productoId} style={{ borderBottom: '1px solid #f3f4f6' }}>
+                                  <td style={{ padding: '8px', fontWeight: 500 }}>{p.nombre}</td>
+                                  <td style={{ padding: '8px', color: '#6b7280' }}>{p.categoriaNombre}</td>
+                                  <td style={{ padding: '8px', textAlign: 'right' }}>{ReportesService.formatearNumero(p.cantidad)}</td>
+                                  <td style={{ padding: '8px', textAlign: 'right', color: '#059669', fontWeight: 600 }}>{ReportesService.formatearMonto(p.ingreso)}</td>
+                                  <td style={{ padding: '8px', textAlign: 'right', color: '#6b7280' }}>{ReportesService.formatearMonto(p.costoEstimado)}</td>
+                                  <td style={{ padding: '8px', textAlign: 'right', color: p.ganancia >= 0 ? '#059669' : '#dc2626', fontWeight: 600 }}>{ReportesService.formatearMonto(p.ganancia)}</td>
+                                  <td style={{ padding: '8px', textAlign: 'right' }}>
+                                    <span style={{ color: p.margenPorcentaje >= 0 ? '#059669' : '#dc2626', fontWeight: 600 }}>{p.margenPorcentaje.toFixed(1)}%</span>
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                            <tfoot>
+                              <tr style={{ borderTop: '2px solid #e5e7eb', fontWeight: 700 }}>
+                                <td style={{ padding: '8px' }} colSpan={2}>TOTAL</td>
+                                <td style={{ padding: '8px', textAlign: 'right' }}>{ReportesService.formatearNumero(resumenReportes.kpis.totalProductosVendidos)}</td>
+                                <td style={{ padding: '8px', textAlign: 'right', color: '#059669' }}>{ReportesService.formatearMonto(resumenReportes.kpis.totalVentas)}</td>
+                                <td style={{ padding: '8px', textAlign: 'right' }}>{ReportesService.formatearMonto(resumenReportes.todosProductos.reduce((s, p) => s + p.costoEstimado, 0))}</td>
+                                <td style={{ padding: '8px', textAlign: 'right', color: '#059669' }}>{ReportesService.formatearMonto(resumenReportes.kpis.gananciaEstimada)}</td>
+                                <td style={{ padding: '8px', textAlign: 'right' }}>{resumenReportes.kpis.totalVentas > 0 ? ((resumenReportes.kpis.gananciaEstimada / resumenReportes.kpis.totalVentas) * 100).toFixed(1) : 0}%</td>
+                              </tr>
+                            </tfoot>
+                          </table>
+                        </IonCardContent>
+                      </IonCard>
+                    )}
+
+                    {/* PESTAÑA CATEGORÍAS */}
+                    {tabReportes === 'CATEGORIAS' && (
+                      <IonCard className="section-card reportes-print-area">
+                        <IonCardHeader className="section-header section-header-sm">
+                          <div className="section-title small">Ventas por categoría</div>
+                        </IonCardHeader>
+                        <IonCardContent>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                            {resumenReportes.ventasPorCategoria.map((c) => (
+                              <div key={c.categoriaId}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                                  <span style={{ fontWeight: 600, fontSize: '13px' }}>{c.categoriaNombre}</span>
+                                  <span style={{ fontSize: '13px' }}>
+                                    <b style={{ color: '#059669' }}>{ReportesService.formatearMonto(c.ingreso)}</b>
+                                    <span style={{ color: '#6b7280' }}> · {c.porcentaje.toFixed(1)}% · {ReportesService.formatearNumero(c.cantidad)} uds.</span>
+                                  </span>
+                                </div>
+                                <div style={{ height: '12px', background: '#f3f4f6', borderRadius: '4px', overflow: 'hidden' }}>
+                                  <div style={{ height: '100%', width: `${Math.min(c.porcentaje, 100)}%`, background: 'linear-gradient(90deg, #10b981, #059669)', borderRadius: '4px' }} />
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </IonCardContent>
+                      </IonCard>
+                    )}
+
+                    {/* PESTAÑA MÉTODOS DE PAGO */}
+                    {tabReportes === 'PAGOS' && (
+                      <IonCard className="section-card reportes-print-area">
+                        <IonCardHeader className="section-header section-header-sm">
+                          <div className="section-title small">Métodos de pago</div>
+                        </IonCardHeader>
+                        <IonCardContent>
+                          {resumenReportes.ventasPorMetodoPago.length === 0 ? (
+                            <div style={{ color: '#6b7280', textAlign: 'center', padding: '16px' }}>No hay datos de métodos de pago.</div>
+                          ) : (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                              {resumenReportes.ventasPorMetodoPago.map((m) => (
+                                <div key={m.metodoPago}>
+                                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                                    <span style={{ fontWeight: 600, fontSize: '13px' }}>{ReportesService.etiquetaMetodoPago(m.metodoPago)}</span>
+                                    <span style={{ fontSize: '13px' }}>
+                                      <b style={{ color: '#059669' }}>{ReportesService.formatearMonto(m.monto)}</b>
+                                      <span style={{ color: '#6b7280' }}> · {m.porcentaje.toFixed(1)}% · {m.cantidad} ops.</span>
+                                    </span>
+                                  </div>
+                                  <div style={{ height: '12px', background: '#f3f4f6', borderRadius: '4px', overflow: 'hidden' }}>
+                                    <div style={{ height: '100%', width: `${Math.min(m.porcentaje, 100)}%`, background: 'linear-gradient(90deg, #3b82f6, #2563eb)', borderRadius: '4px' }} />
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </IonCardContent>
+                      </IonCard>
+                    )}
+
+                    {/* PESTAÑA MOZOS */}
+                    {tabReportes === 'MOZOS' && (
+                      <IonCard className="section-card reportes-print-area">
+                        <IonCardHeader className="section-header section-header-sm">
+                          <div className="section-title small">Desempeño por mozo</div>
+                        </IonCardHeader>
+                        <IonCardContent style={{ overflowX: 'auto' }}>
+                          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+                            <thead>
+                              <tr style={{ borderBottom: '2px solid #e5e7eb' }}>
+                                <th style={{ textAlign: 'left', padding: '8px', color: '#6b7280' }}>Mozo</th>
+                                <th style={{ textAlign: 'right', padding: '8px', color: '#6b7280' }}>Comandas</th>
+                                <th style={{ textAlign: 'right', padding: '8px', color: '#6b7280' }}>Ventas</th>
+                                <th style={{ textAlign: 'right', padding: '8px', color: '#6b7280' }}>Ticket prom.</th>
+                                <th style={{ textAlign: 'right', padding: '8px', color: '#6b7280' }}>% del total</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {resumenReportes.ventasPorMozo.map((m) => (
+                                <tr key={m.mozoId} style={{ borderBottom: '1px solid #f3f4f6' }}>
+                                  <td style={{ padding: '8px', fontWeight: 500 }}>{m.mozoNombre}</td>
+                                  <td style={{ padding: '8px', textAlign: 'right' }}>{m.cantidadComandas}</td>
+                                  <td style={{ padding: '8px', textAlign: 'right', color: '#059669', fontWeight: 600 }}>{ReportesService.formatearMonto(m.ventas)}</td>
+                                  <td style={{ padding: '8px', textAlign: 'right' }}>{ReportesService.formatearMonto(m.ticketPromedio)}</td>
+                                  <td style={{ padding: '8px', textAlign: 'right' }}>{resumenReportes.kpis.totalVentas > 0 ? ((m.ventas / resumenReportes.kpis.totalVentas) * 100).toFixed(1) : 0}%</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </IonCardContent>
+                      </IonCard>
+                    )}
+
+                    {/* PESTAÑA TENDENCIA */}
+                    {tabReportes === 'TENDENCIA' && (
+                      <>
+                        {/* Ventas por día */}
+                        <IonCard className="section-card reportes-print-area">
+                          <IonCardHeader className="section-header section-header-sm">
+                            <div className="section-title small">Ventas por día</div>
+                          </IonCardHeader>
+                          <IonCardContent>
+                            {(() => {
+                              const maxVenta = Math.max(...resumenReportes.ventasPorFecha.map((v) => v.ventas), 1);
+                              return (
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                  {resumenReportes.ventasPorFecha.map((v) => (
+                                    <div key={v.fecha}>
+                                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                                        <span style={{ fontWeight: 600, fontSize: '13px' }}>{v.fechaLabel}</span>
+                                        <span style={{ fontSize: '13px' }}>
+                                          <b style={{ color: '#059669' }}>{ReportesService.formatearMonto(v.ventas)}</b>
+                                          <span style={{ color: '#6b7280' }}> · {v.cantidadComandas} comandas</span>
+                                        </span>
+                                      </div>
+                                      <div style={{ height: '10px', background: '#f3f4f6', borderRadius: '4px', overflow: 'hidden' }}>
+                                        <div style={{ height: '100%', width: `${(v.ventas / maxVenta) * 100}%`, background: 'linear-gradient(90deg, #06b6d4, #0891b2)', borderRadius: '4px' }} />
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              );
+                            })()}
+                          </IonCardContent>
+                        </IonCard>
+
+                        {/* Ventas por hora */}
+                        <IonCard className="section-card reportes-print-area">
+                          <IonCardHeader className="section-header section-header-sm">
+                            <div className="section-title small">Ventas por hora del día</div>
+                          </IonCardHeader>
+                          <IonCardContent>
+                            {(() => {
+                              const maxVenta = Math.max(...resumenReportes.ventasPorHora.map((v) => v.ventas), 1);
+                              return (
+                                <div style={{ display: 'flex', gap: '4px', alignItems: 'flex-end', height: '160px', overflowX: 'auto' }}>
+                                  {resumenReportes.ventasPorHora.map((v) => (
+                                    <div key={v.hora} style={{ flex: '1 1 40px', minWidth: '36px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
+                                      <div style={{ fontSize: '10px', color: '#6b7280', fontWeight: 600 }}>{ReportesService.formatearMonto(v.ventas).replace('S/', '')}</div>
+                                      <div style={{ width: '100%', height: `${(v.ventas / maxVenta) * 120}px`, minHeight: '4px', background: 'linear-gradient(180deg, #f59e0b, #d97706)', borderRadius: '4px 4px 0 0' }} />
+                                      <div style={{ fontSize: '10px', color: '#6b7280' }}>{v.horaLabel}</div>
+                                    </div>
+                                  ))}
+                                </div>
+                              );
+                            })()}
+                          </IonCardContent>
+                        </IonCard>
+                      </>
+                    )}
+                  </>
+                )}
+              </>
+            )}
+          </>
         )}
 
         <IonCard className="section-card config-card">
@@ -1155,7 +2134,9 @@ const PerfilPage: React.FC = () => {
         {toast && <div className="admin-toast">{toast}</div>}
 
         {/* ============ MODAL: Nueva / Editar Habitación PROFESIONAL ============ */}
-        <IonModal isOpen={modalAbierto} onDidDismiss={() => setModalAbierto(false)} initialBreakpoint={0.95} breakpoints={[0, 0.5, 0.95, 1]}>
+        <IonModal isOpen={modalAbierto} onDidDismiss={() => { setModalAbierto(false); setHabSeleccionadaId(''); }}
+          // @ts-expect-error cssClass works at runtime
+          cssClass="modal-fit modal-form">
           <IonHeader className="ion-no-border">
             <IonToolbar color={editandoId ? 'primary' : 'success'}>
               <IonButtons slot="start">
@@ -1345,15 +2326,6 @@ const PerfilPage: React.FC = () => {
               </IonItem>
             </div>
 
-            <div className="modal-actions-footer">
-              <IonButton size="default" color="medium" fill="outline" expand="block" onClick={() => setModalAbierto(false)}>
-                <IonIcon slot="start" icon={close} /> Cancelar
-              </IonButton>
-              <IonButton size="default" color={editandoId ? 'primary' : 'success'} expand="block" onClick={guardarHab}>
-                <IonIcon slot="start" icon={save} />
-                {editandoId ? 'Guardar cambios' : 'Crear habitación'}
-              </IonButton>
-            </div>
           </IonContent>
         </IonModal>
 
@@ -1430,8 +2402,9 @@ const PerfilPage: React.FC = () => {
         {/* ============ MODAL: Nueva / Editar PRODUCTO · COMPACTO 1 PANTALLA (sin segment, fusionado) ============ */}
         <IonModal
           isOpen={modalProdAbierto}
-          onDidDismiss={() => setModalProdAbierto(false)}
-          style={{ '--height': 'calc(100vh - 24px)', '--width': 'min(720px, 97vw)', '--border-radius': '12px', '--box-shadow': '0 10px 40px rgba(0,0,0,.18)' }}
+          onDidDismiss={() => { setModalProdAbierto(false); setProdSeleccionadoId(''); }}
+          // @ts-expect-error cssClass works at runtime
+          cssClass="modal-fit modal-form"
         >
           <IonHeader className="ion-no-border">
             <IonToolbar color={editandoProdId ? 'primary' : 'success'} style={{ '--min-height': '44px' }}>
@@ -1451,7 +2424,7 @@ const PerfilPage: React.FC = () => {
               </IonButtons>
             </IonToolbar>
           </IonHeader>
-          <IonContent style={{ '--background': '#f7f9fc', padding: 10, overflowY: 'auto' }} scrollEvents>
+          <div style={{ background: '#f7f9fc', padding: 10, overflowY: 'auto', maxHeight: 'calc(96vh - 50px)' }}>
             {/* ===== SECCIÓN 1 · IDENTIFICACIÓN ===== */}
             <div className="modal-section" style={{ marginBottom: 8, padding: 10, background: '#fff', borderRadius: 10 }}>
               <div className="modal-section-title" style={{ fontSize: 11, marginBottom: 8, marginTop: 0 }}>
@@ -1464,9 +2437,10 @@ const PerfilPage: React.FC = () => {
                       <IonInput
                         label="Código"
                         labelPlacement="stacked"
-                        placeholder="Ej: CER-001"
+                        placeholder="Automático"
                         value={formProd.codigo}
-                        onIonInput={(e: any) => setFormProd({ ...formProd, codigo: String(e.target.value || '') })}
+                        readonly
+                        disabled
                       />
                     </IonItem>
                   </IonCol>
@@ -1511,11 +2485,7 @@ const PerfilPage: React.FC = () => {
                         placeholder="Selecciona categoría"
                         onIonChange={(e: any) => {
                           const nuevaCatId = e.target.value;
-                          const catPrevia = categoriasFB.find(c => c.id === formProd.categoriaId);
-                          const prefijoPrevio = catPrevia ? String((catPrevia.payload?.codigo) || catPrevia.codigo || '').replace(/^CAT-/, '').slice(0, 6).toUpperCase() : '';
-                          const codigoActual = String(formProd.codigo || '').toUpperCase();
-                          const debeRegenerar = !formProd.codigo.trim() || (prefijoPrevio && codigoActual.startsWith(`${prefijoPrevio}-`));
-                          const nuevoCodigo = (debeRegenerar && nuevaCatId) ? generarCodigoProdAuto(nuevaCatId) : formProd.codigo;
+                          const nuevoCodigo = (!editandoProdId && nuevaCatId) ? generarCodigoUnico(nuevaCatId) : formProd.codigo;
                           setFormProd({ ...formProd, categoriaId: nuevaCatId, codigo: nuevoCodigo });
                         }}
                         interface="action-sheet"
@@ -1526,215 +2496,31 @@ const PerfilPage: React.FC = () => {
                       </IonSelect>
                     </IonItem>
                   </IonCol>
-                  <IonCol size="12" sizeMd="4" className="ion-align-self-end">
-                    <IonGrid style={{ padding: 0 }}>
-                      <IonRow>
-                        <IonCol size="4" style={{ padding: 2 }}>
-                          <IonButton
-                            expand="block"
-                            size="small"
-                            color="tertiary"
-                            style={{ fontSize: 11, fontWeight: 800, margin: 0 }}
-                            onClick={() => {
-                              try {
-                                const maxOrden = categoriasFB.reduce((m, c) => Math.max(m, Number(c.orden || 0)), 0);
-                                presentarCatAlert({
-                                  header: '➕ Nueva categoría',
-                                  subHeader: 'Se agregará sobre la marcha al selector',
-                                  cssClass: 'alert-compact',
-                                  inputs: [
-                                    { name: 'nombre', type: 'text', placeholder: 'Nombre categoría * (ej: Ensaladas)', value: '' },
-                                    { name: 'orden', type: 'number', placeholder: `Orden (default ${maxOrden + 10})`, value: String(maxOrden + 10) },
-                                  ],
-                                  buttons: [
-                                    { text: 'Cancelar', role: 'cancel', cssClass: 'secondary' },
-                                    {
-                                      text: '✅ Sin stock',
-                                      handler: (d: any) => {
-                                        const nombre = String(d?.nombre || '').trim();
-                                        if (!nombre) { mostrarToast('Nombre categoría es obligatorio'); return false; }
-                                        const orden = Number(d?.orden || (maxOrden + 10));
-                                        try {
-                                          const catCreada = CatalogoFBService.crearCategoria({
-                                            nombre, descripcion: nombre, orden, estado: 'ACTIVO',
-                                            codigo: 'CAT-' + nombre.substring(0, 6).toUpperCase(),
-                                            color: '#374151', payload: { defaultStockControl: false, sistema: false },
-                                          }, usuario.id);
-                                          try { setCategoriasFB(CatalogoFBService.listarCategorias() || []); cargarCatProd(); } catch {}
-                                          if (catCreada?.id) {
-                                            const catPrevia2 = categoriasFB.find(c => c.id === formProd.categoriaId);
-                                            const prefijoPrevio = catPrevia2 ? String((catPrevia2.payload?.codigo) || catPrevia2.codigo || '').replace(/^CAT-/, '').slice(0, 6).toUpperCase() : '';
-                                            const codigoActual2 = String(formProd.codigo || '').toUpperCase();
-                                            const debeRegenerar2 = !formProd.codigo.trim() || (prefijoPrevio && codigoActual2.startsWith(`${prefijoPrevio}-`));
-                                            setFormProd({
-                                              ...formProd,
-                                              categoriaId: catCreada.id,
-                                              codigo: (debeRegenerar2 ? generarCodigoProdAuto(catCreada.id) : formProd.codigo)
-                                            });
-                                          }
-                                          mostrarToast(`✅ Categoría "${nombre}" creada y seleccionada`);
-                                          return true;
-                                        } catch (e2: any) { mostrarToast(e2?.message || 'Error al crear categoría'); return false; }
-                                      }
-                                    },
-                                    {
-                                      text: '📦 Con stock',
-                                      handler: (d: any) => {
-                                        const nombre = String(d?.nombre || '').trim();
-                                        if (!nombre) { mostrarToast('Nombre categoría es obligatorio'); return false; }
-                                        const orden = Number(d?.orden || (maxOrden + 10));
-                                        try {
-                                          const catCreada = CatalogoFBService.crearCategoria({
-                                            nombre, descripcion: nombre, orden, estado: 'ACTIVO',
-                                            codigo: 'CAT-' + nombre.substring(0, 6).toUpperCase(),
-                                            color: '#065f46', payload: { defaultStockControl: true, sistema: false },
-                                          }, usuario.id);
-                                          try { setCategoriasFB(CatalogoFBService.listarCategorias() || []); cargarCatProd(); } catch {}
-                                          if (catCreada?.id) {
-                                            const catPrevia2 = categoriasFB.find(c => c.id === formProd.categoriaId);
-                                            const prefijoPrevio = catPrevia2 ? String((catPrevia2.payload?.codigo) || catPrevia2.codigo || '').replace(/^CAT-/, '').slice(0, 6).toUpperCase() : '';
-                                            const codigoActual2 = String(formProd.codigo || '').toUpperCase();
-                                            const debeRegenerar2 = !formProd.codigo.trim() || (prefijoPrevio && codigoActual2.startsWith(`${prefijoPrevio}-`));
-                                            setFormProd({
-                                              ...formProd,
-                                              categoriaId: catCreada.id,
-                                              codigo: (debeRegenerar2 ? generarCodigoProdAuto(catCreada.id) : formProd.codigo),
-                                              stockControl: true, stockActual: 0, stockMinimo: Math.max(3, Number(formProd.stockMinimo || 0) || 3),
-                                            });
-                                          }
-                                          mostrarToast(`✅ Categoría "${nombre}" creada y seleccionada (con stock)`);
-                                          return true;
-                                        } catch (e2: any) { mostrarToast(e2?.message || 'Error al crear categoría'); return false; }
-                                      }
-                                    }
-                                  ]
-                                });
-                              } catch (er1) { console.error(er1); }
-                            }}
-                          >
-                            <IonIcon slot="icon-only" icon={add} />
-                          </IonButton>
-                        </IonCol>
-                        <IonCol size="4" style={{ padding: 2 }}>
-                          <IonButton
-                            expand="block"
-                            size="small"
-                            color="primary"
-                            disabled={!formProd.categoriaId}
-                            style={{ fontSize: 11, fontWeight: 800, margin: 0 }}
-                            onClick={() => {
-                              try {
-                                const cat = categoriasFB.find(c => c.id === formProd.categoriaId);
-                                if (!cat) { mostrarToast('Selecciona categoría primero'); return; }
-                                presentarCrudCatAlert({
-                                  header: `✏️ Editar: ${cat.nombre}`,
-                                  inputs: [
-                                    { name: 'nombre', type: 'text', placeholder: 'Nombre categoría *', value: cat.nombre },
-                                    { name: 'orden', type: 'number', placeholder: 'Orden', value: String(Number(cat.orden || 0)) },
-                                    { name: 'descripcion', type: 'text', placeholder: 'Descripción', value: cat.descripcion || '' },
-                                  ],
-                                  buttons: [
-                                    { text: 'Cancelar', role: 'cancel' },
-                                    {
-                                      text: '💾 Guardar',
-                                      handler: (d: any) => {
-                                        const nombre = String(d?.nombre || '').trim();
-                                        if (!nombre) { mostrarToast('Nombre es obligatorio'); return false; }
-                                        try {
-                                          CatalogoFBService.actualizarCategoria(cat.id, {
-                                            ...cat,
-                                            nombre,
-                                            orden: Number(d?.orden || cat.orden || 0),
-                                            descripcion: String(d?.descripcion || '').trim(),
-                                          }, usuario.id);
-                                          try { setCategoriasFB(CatalogoFBService.listarCategorias() || []); cargarCatProd(); } catch {}
-                                          mostrarToast(`✅ Categoría actualizada`);
-                                          return true;
-                                        } catch (e2: any) { mostrarToast(e2?.message || 'Error al actualizar'); return false; }
-                                      }
-                                    }
-                                  ]
-                                });
-                              } catch (err) { console.error(err); }
-                            }}
-                          >
-                            <IonIcon slot="icon-only" icon={create} />
-                          </IonButton>
-                        </IonCol>
-                        <IonCol size="4" style={{ padding: 2 }}>
-                          <IonButton
-                            expand="block"
-                            size="small"
-                            color="danger"
-                            disabled={!formProd.categoriaId}
-                            style={{ fontSize: 11, fontWeight: 800, margin: 0 }}
-                            onClick={() => {
-                              try {
-                                const cat = categoriasFB.find(c => c.id === formProd.categoriaId);
-                                if (!cat) { mostrarToast('Selecciona categoría primero'); return; }
-                                const prodsUso = productosFB.filter((p) => p.categoriaId === cat.id).length;
-                                if (prodsUso > 0) {
-                                  mostrarToast(`⛔ ${prodsUso} productos usan "${cat.nombre}". Ve a Productos para migrarlos.`);
-                                  setFiltroCatId(cat.id); setTabStock('PRODUCTOS');
-                                  return;
-                                }
-                                presentarConfirmBorrarCatAlert({
-                                  header: `🗑️ Eliminar "${cat.nombre}"`,
-                                  subHeader: `Categoría con ${prodsUso} productos (SIN USO).`,
-                                  message: `Se eliminará permanentemente la categoría. No se puede deshacer.`,
-                                  buttons: [
-                                    { text: 'Cancelar', role: 'cancel' },
-                                    {
-                                      text: 'SÍ, ELIMINAR',
-                                      role: 'destructive',
-                                      handler: () => {
-                                        try {
-                                          CatalogoFBService.eliminarCategoria(cat.id);
-                                          try { setCategoriasFB(CatalogoFBService.listarCategorias() || []); cargarCatProd(); } catch {}
-                                          setFormProd((prev: any) => ({ ...prev, categoriaId: '', codigo: '' }));
-                                          mostrarToast(`✅ Categoría "${cat.nombre}" eliminada`);
-                                          return true;
-                                        } catch (e2: any) { mostrarToast(e2?.message || 'Error al eliminar'); return false; }
-                                      }
-                                    }
-                                  ]
-                                });
-                              } catch (err) { console.error(err); }
-                            }}
-                          >
-                            <IonIcon slot="icon-only" icon={trash} />
-                          </IonButton>
-                        </IonCol>
-                      </IonRow>
-                      <IonRow>
-                        <IonCol size="12" sizeMd="12">
-                          <IonItem className="form-item" lines="none" style={{ '--min-height': '40px', '--padding-start': 4, '--padding-end': 4 }}>
-                            <IonSelect
-                              label="Estado"
-                              labelPlacement="stacked"
-                              value={formProd.estado}
-                              onIonChange={(e: any) => setFormProd({ ...formProd, estado: e.target.value as any })}
-                            >
-                              <IonSelectOption value="ACTIVO">✅ ACTIVO (visible en POS y carta)</IonSelectOption>
-                              <IonSelectOption value="INACTIVO">⛔ INACTIVO (oculto)</IonSelectOption>
-                            </IonSelect>
-                          </IonItem>
-                        </IonCol>
-                      </IonRow>
-                    </IonGrid>
+                  <IonCol size="12" sizeMd="4">
+                    <IonItem className="form-item" lines="none" style={{ '--min-height': '40px', '--padding-start': 4, '--padding-end': 4 }}>
+                      <IonSelect
+                        label="Estado"
+                        labelPlacement="stacked"
+                        value={formProd.estado}
+                        onIonChange={(e: any) => setFormProd({ ...formProd, estado: e.target.value as any })}
+                      >
+                        <IonSelectOption value="ACTIVO">✅ ACTIVO</IonSelectOption>
+                        <IonSelectOption value="INACTIVO">⛔ INACTIVO</IonSelectOption>
+                      </IonSelect>
+                    </IonItem>
                   </IonCol>
                 </IonRow>
               </IonGrid>
             </div>
 
-            {/* ===== SECCIÓN 3 · PRECIOS Y COSTO + INVENTARIO FUSIONADOS ===== */}
+            {/* ===== SECCIÓN 3 · PRECIOS Y STOCK ===== */}
             <div className="modal-section" style={{ marginBottom: 8, padding: 10, background: '#fff', borderRadius: 10 }}>
               <div className="modal-section-title" style={{ fontSize: 11, marginBottom: 8, marginTop: 0 }}>
-                <IonIcon icon={cash} style={{ fontSize: 13 }} />&nbsp;PRECIOS · COSTO · INVENTARIO
+                <IonIcon icon={cash} style={{ fontSize: 13 }} />&nbsp;PRECIOS · COSTO · STOCK
               </div>
               <IonGrid style={{ padding: 0 }}>
                 <IonRow>
-                  <IonCol size="12" sizeMd="4">
+                  <IonCol size="6">
                     <IonItem className="form-item" lines="none" style={{ '--min-height': '40px', '--padding-start': 4, '--padding-end': 4 }}>
                       <IonInput
                         label="Precio venta (S/) *"
@@ -1746,7 +2532,7 @@ const PerfilPage: React.FC = () => {
                       />
                     </IonItem>
                   </IonCol>
-                  <IonCol size="12" sizeMd="4">
+                  <IonCol size="6">
                     <IonItem className="form-item" lines="none" style={{ '--min-height': '40px', '--padding-start': 4, '--padding-end': 4 }}>
                       <IonInput
                         label="Precio costo (S/)"
@@ -1758,146 +2544,63 @@ const PerfilPage: React.FC = () => {
                       />
                     </IonItem>
                   </IonCol>
-                  <IonCol size="12" sizeMd="4">
-                    <IonItem className="form-item" lines="none" style={{ '--min-height': '40px', '--padding-start': 4, '--padding-end': 4 }}>
-                      <IonSelect
-                        label="Unidad de medida"
-                        labelPlacement="stacked"
-                        value={formProd.unidadMedida}
-                        placeholder="Selecciona unidad"
-                        interface="action-sheet"
-                        onIonChange={(e: any) => setFormProd({ ...formProd, unidadMedida: e.target.value })}
-                      >
-                        <IonSelectOption value="UND">UND (Unidad)</IonSelectOption>
-                        <IonSelectOption value="L">L (Litros)</IonSelectOption>
-                        <IonSelectOption value="ML">ML (Mililitros)</IonSelectOption>
-                        <IonSelectOption value="KG">KG (Kilogramos)</IonSelectOption>
-                        <IonSelectOption value="G">G (Gramos)</IonSelectOption>
-                        <IonSelectOption value="DOC">DOC (Docena)</IonSelectOption>
-                        <IonSelectOption value="CAJ">CAJ (Caja)</IonSelectOption>
-                        <IonSelectOption value="PAQ">PAQ (Paquete)</IonSelectOption>
-                      </IonSelect>
-                    </IonItem>
-                  </IonCol>
                 </IonRow>
                 {Number(formProd.precioVentaBase || 0) > 0 && (
-                  <div className="modal-summary" style={{ marginTop: 4, padding: 8, borderRadius: 8 }}>
-                    <div className="summary-row" style={{ marginBottom: 2 }}>
-                      <span style={{ fontSize: 12 }}>Margen unitario estimado:</span>
-                      <strong className="summary-value" style={{ fontSize: 13 }}>
-                        {fmtSoles(Number(formProd.precioVentaBase || 0) - Number(formProd.costoAproximado || 0))}
-                      </strong>
-                    </div>
-                    <div className="summary-row">
-                      <span style={{ fontSize: 12 }}>% rentabilidad:</span>
-                      <strong className="summary-value" style={{ fontSize: 13,
-                        color: Number(formProd.precioVentaBase || 0) > 0
-                          ? (((Number(formProd.precioVentaBase || 0) - Number(formProd.costoAproximado || 0)) / Number(formProd.precioVentaBase || 1)) * 100) >= 40
-                            ? '#2dd36f'
-                            : (((Number(formProd.precioVentaBase || 0) - Number(formProd.costoAproximado || 0)) / Number(formProd.precioVentaBase || 1)) * 100) >= 20
-                              ? '#ffc409'
-                              : '#eb445a'
-                          : '#999'
-                      }}>
-                        {Number(formProd.precioVentaBase || 0) > 0
-                          ? Math.round(((Number(formProd.precioVentaBase || 0) - Number(formProd.costoAproximado || 0)) / Number(formProd.precioVentaBase || 1)) * 100)
-                          : 0}%
-                      </strong>
-                    </div>
+                  <div style={{ fontSize: 11, color: '#666', margin: '2px 4px 6px' }}>
+                    Ganancia: <strong style={{ color: '#2dd36f' }}>{fmtSoles(Number(formProd.precioVentaBase || 0) - Number(formProd.costoAproximado || 0))}</strong>
+                    ({Math.round(((Number(formProd.precioVentaBase || 0) - Number(formProd.costoAproximado || 0)) / Number(formProd.precioVentaBase || 1)) * 100)}%)
                   </div>
                 )}
 
-                {/* CONTROL STOCK FUSIONADO (antes tab INVENTARIO) · 2 fila compacta */}
-                <div style={{ marginTop: 8 }}>
-                  <div className="stock-control-question" style={{ fontSize: 12, fontWeight: 800, marginBottom: 4 }}>
-                    <IonIcon icon={cube} />&nbsp;Control de inventario y stock:
-                  </div>
-                  <IonSegment
-                    value={formProd.stockControl ? 'SI' : 'NO'}
-                    onIonChange={(e: any) => setFormProd({ ...formProd, stockControl: e.target.value === 'SI' })}
-                    className="stock-segment-big"
-                    style={{ width: '100%' }}
-                  >
-                    <IonSegmentButton value="NO" type="button" color="medium" style={{ fontSize: 12 }}>
-                      <IonLabel>🍽️ Preparación sin stock</IonLabel>
-                    </IonSegmentButton>
-                    <IonSegmentButton value="SI" type="button" color="success" style={{ fontSize: 12 }}>
-                      <IonLabel>📦 Físico con stock</IonLabel>
-                    </IonSegmentButton>
-                  </IonSegment>
-                </div>
-              </IonGrid>
+                {/* Checkbox: Controlar inventario */}
+                <IonItem lines="none" style={{ '--min-height': '40px', '--padding-start': 0, '--padding-end': 0, marginBottom: formProd.stockControl ? 6 : 0 }}>
+                  <IonCheckbox
+                    slot="start"
+                    checked={formProd.stockControl}
+                    onIonChange={(e: any) => setFormProd({ ...formProd, stockControl: e.detail.checked, stockActual: e.detail.checked ? formProd.stockActual : 0, stockMinimo: e.detail.checked ? formProd.stockMinimo : 0 })}
+                  />
+                  <IonLabel style={{ fontSize: 13 }}>
+                    <strong>Controlar inventario</strong>
+                    <div style={{ fontSize: 11, color: '#666', fontWeight: 'normal' }}>
+                      {formProd.stockControl ? 'Se contará físicamente y se descontará al venderse' : 'Producto preparado (no se controla stock)'}
+                    </div>
+                  </IonLabel>
+                </IonItem>
 
-              {formProd.stockControl && (
-                <IonGrid style={{ padding: 0, marginTop: 6 }}>
-                  <IonRow>
-                    <IonCol size="12" sizeMd="6">
-                      <div className="stock-input-card stock-input-success" style={{ padding: 6, borderRadius: 8 }}>
-                        <div className="stock-input-label" style={{ fontSize: 11, marginBottom: 2 }}>Stock actual</div>
-                        <IonItem lines="none" className="stock-input-item" style={{ '--min-height': '36px', '--padding-start': 4, '--padding-end': 4 }}>
-                          <IonInput
-                            type="number" step="1" min="0" inputMode="numeric"
-                            placeholder="Ej: 0"
-                            value={formProd.stockActual}
-                            onIonInput={(e: any) => setFormProd({ ...formProd, stockActual: Number(e.target.value || 0) })}
-                          />
-                        </IonItem>
-                      </div>
-                    </IonCol>
-                    <IonCol size="12" sizeMd="6">
-                      <div className="stock-input-card stock-input-warning" style={{ padding: 6, borderRadius: 8 }}>
-                        <div className="stock-input-label" style={{ fontSize: 11, marginBottom: 2 }}>Stock mínimo (alerta)</div>
-                        <IonItem lines="none" className="stock-input-item" style={{ '--min-height': '36px', '--padding-start': 4, '--padding-end': 4 }}>
-                          <IonInput
-                            type="number" step="1" min="0" inputMode="numeric"
-                            placeholder="Ej: 6"
-                            value={formProd.stockMinimo}
-                            onIonInput={(e: any) => setFormProd({ ...formProd, stockMinimo: Number(e.target.value || 0) })}
-                          />
-                        </IonItem>
-                      </div>
-                    </IonCol>
-                  </IonRow>
-                </IonGrid>
-              )}
-            </div>
-
-            {/* ===== SECCIÓN 4 · NOTAS (muy compacta) ===== */}
-            <div className="modal-section" style={{ marginBottom: 12, padding: 10, background: '#fff', borderRadius: 10 }}>
-              <div className="modal-section-title" style={{ fontSize: 11, marginBottom: 4, marginTop: 0 }}>
-                <IonIcon icon={documentText} style={{ fontSize: 13 }} />&nbsp;NOTAS INTERNAS
-              </div>
-              <IonItem lines="none" className="form-item" style={{ '--min-height': '46px', '--padding-start': 4, '--padding-end': 4 }}>
-                <IonTextarea
-                  label="Observaciones"
-                  labelPlacement="stacked"
-                  rows={1.5}
-                  placeholder="Proveedor, códigos internos... (opcional)"
-                  value={formProd.observaciones}
-                  onIonInput={(e: any) => setFormProd({ ...formProd, observaciones: String(e.target.value || '') })}
-                />
-              </IonItem>
-            </div>
-
-            {/* Footer botones */}
-            <div style={{ paddingBottom: 4 }}>
-              <IonGrid style={{ padding: 0 }}>
+                {formProd.stockControl && (
                 <IonRow>
                   <IonCol size="6">
-                    <IonButton color="medium" fill="outline" expand="block" onClick={() => setModalProdAbierto(false)}>
-                      <IonIcon slot="start" icon={close} /> Cancelar
-                    </IonButton>
+                    <div className="stock-input-card stock-input-success" style={{ padding: 6, borderRadius: 8 }}>
+                      <div className="stock-input-label" style={{ fontSize: 11, marginBottom: 2 }}>Stock actual</div>
+                      <IonItem lines="none" className="stock-input-item" style={{ '--min-height': '36px', '--padding-start': 4, '--padding-end': 4 }}>
+                        <IonInput
+                          type="number" step="1" min="0" inputMode="numeric"
+                          placeholder="Ej: 0"
+                          value={formProd.stockActual}
+                          onIonInput={(e: any) => setFormProd({ ...formProd, stockActual: Number(e.target.value || 0) })}
+                        />
+                      </IonItem>
+                    </div>
                   </IonCol>
                   <IonCol size="6">
-                    <IonButton color={editandoProdId ? 'primary' : 'success'} expand="block" onClick={guardarProd}>
-                      <IonIcon slot="start" icon={save} />
-                      {editandoProdId ? 'Guardar cambios' : 'Crear producto'}
-                    </IonButton>
+                    <div className="stock-input-card stock-input-warning" style={{ padding: 6, borderRadius: 8 }}>
+                      <div className="stock-input-label" style={{ fontSize: 11, marginBottom: 2 }}>Stock mínimo</div>
+                      <IonItem lines="none" className="stock-input-item" style={{ '--min-height': '36px', '--padding-start': 4, '--padding-end': 4 }}>
+                        <IonInput
+                          type="number" step="1" min="0" inputMode="numeric"
+                          placeholder="Ej: 6"
+                          value={formProd.stockMinimo}
+                          onIonInput={(e: any) => setFormProd({ ...formProd, stockMinimo: Number(e.target.value || 0) })}
+                        />
+                      </IonItem>
+                    </div>
                   </IonCol>
                 </IonRow>
+                )}
               </IonGrid>
             </div>
-          </IonContent>
+
+          </div>
         </IonModal>
 
         {/* ============ MODAL: Agregar / Quitar Stock PROFESIONAL ============ */}
@@ -2181,7 +2884,7 @@ const PerfilPage: React.FC = () => {
               <IonTitle>{habDetalle?.codigo} · {habDetalle?.nombre}</IonTitle>
             </IonToolbar>
           </IonHeader>
-          <IonContent className="ion-padding">
+          <div style={{ overflowY: 'auto', maxHeight: '70vh', padding: '4px 0' }}>
             {habDetalle && (() => {
               const tipo = tiposHab.find((t) => t.id === habDetalle.tipoHabitacionId);
               const hAny = habDetalle as any;
@@ -2241,7 +2944,7 @@ const PerfilPage: React.FC = () => {
                 </>
               );
             })()}
-          </IonContent>
+          </div>
         </IonModal>
 
         {/* ============ MODAL: Detalle Producto ============ */}
@@ -2257,7 +2960,7 @@ const PerfilPage: React.FC = () => {
               <IonTitle>{prodDetalle?.codigo} · {prodDetalle?.nombre}</IonTitle>
             </IonToolbar>
           </IonHeader>
-          <IonContent className="ion-padding">
+          <div style={{ overflowY: 'auto', maxHeight: '70vh', padding: '4px 0' }}>
             {prodDetalle && (() => {
               const plano = stockPlanoProd(prodDetalle);
               const cat = categoriasFB.find((c) => c.id === prodDetalle.categoriaId);
@@ -2309,7 +3012,114 @@ const PerfilPage: React.FC = () => {
                 </>
               );
             })()}
-          </IonContent>
+          </div>
+        </IonModal>
+
+        {/* ============ MODAL: Nuevo / Editar USUARIO ============ */}
+        <IonModal
+          isOpen={modalUsuarioAbierto}
+          onDidDismiss={() => { setModalUsuarioAbierto(false); setEditandoUsuarioId(null); }}
+          // @ts-expect-error cssClass works at runtime
+          cssClass="modal-fit modal-form"
+        >
+          <IonHeader className="ion-no-border">
+            <IonToolbar color="primary" style={{ '--min-height': '44px' }}>
+              <IonButtons slot="start">
+                <IonButton onClick={() => setModalUsuarioAbierto(false)}>
+                  <IonIcon slot="icon-only" icon={close} />
+                </IonButton>
+              </IonButtons>
+              <IonTitle style={{ fontSize: 15 }}>
+                <IonIcon icon={people} />&nbsp;{editandoUsuarioId ? 'Editar usuario' : 'Nuevo usuario'}
+              </IonTitle>
+              <IonButtons slot="end">
+                <IonButton color="light" size="small" onClick={() => setModalUsuarioAbierto(false)}>Cancelar</IonButton>
+                <IonButton strong size="small" onClick={guardarUsuario} disabled={usuarioProcesando}>
+                  <IonIcon slot="start" icon={save} />{usuarioProcesando ? '...' : ' Guardar'}
+                </IonButton>
+              </IonButtons>
+            </IonToolbar>
+          </IonHeader>
+          <div style={{ background: '#f7f9fc', padding: 12, overflowY: 'auto', maxHeight: 'calc(96vh - 50px)' }}>
+            <div style={{ padding: 10, background: '#fff', borderRadius: 10, marginBottom: 10 }}>
+              <div style={{ fontSize: 11, color: '#64748b', fontWeight: 600, marginBottom: 8 }}>DATOS PERSONALES</div>
+              <IonGrid style={{ padding: 0 }}>
+                <IonRow>
+                  <IonCol size="12" sizeMd="6">
+                    <IonItem className="form-item" lines="none" style={{ '--min-height': '40px', '--padding-start': 4, '--padding-end': 4 }}>
+                      <IonInput label="Nombres" labelPlacement="stacked" value={formUsuario.nombres}
+                        onIonInput={(e) => setFormUsuario({ ...formUsuario, nombres: (e.target as HTMLIonInputElement).value as string })} />
+                    </IonItem>
+                  </IonCol>
+                  <IonCol size="12" sizeMd="6">
+                    <IonItem className="form-item" lines="none" style={{ '--min-height': '40px', '--padding-start': 4, '--padding-end': 4 }}>
+                      <IonInput label="Apellidos" labelPlacement="stacked" value={formUsuario.apellidos}
+                        onIonInput={(e) => setFormUsuario({ ...formUsuario, apellidos: (e.target as HTMLIonInputElement).value as string })} />
+                    </IonItem>
+                  </IonCol>
+                </IonRow>
+                <IonRow>
+                  <IonCol size="12" sizeMd="6">
+                    <IonItem className="form-item" lines="none" style={{ '--min-height': '40px', '--padding-start': 4, '--padding-end': 4 }}>
+                      <IonInput label="Email (opcional)" labelPlacement="stacked" type="email" value={formUsuario.correo_electronico}
+                        onIonInput={(e) => setFormUsuario({ ...formUsuario, correo_electronico: (e.target as HTMLIonInputElement).value as string })} />
+                    </IonItem>
+                  </IonCol>
+                  <IonCol size="12" sizeMd="6">
+                    <IonItem className="form-item" lines="none" style={{ '--min-height': '40px', '--padding-start': 4, '--padding-end': 4 }}>
+                      <IonInput label="Teléfono (opcional)" labelPlacement="stacked" value={formUsuario.telefono}
+                        onIonInput={(e) => setFormUsuario({ ...formUsuario, telefono: (e.target as HTMLIonInputElement).value as string })} />
+                    </IonItem>
+                  </IonCol>
+                </IonRow>
+              </IonGrid>
+            </div>
+
+            <div style={{ padding: 10, background: '#fff', borderRadius: 10, marginBottom: 10 }}>
+              <div style={{ fontSize: 11, color: '#64748b', fontWeight: 600, marginBottom: 8 }}>ACCESO AL SISTEMA</div>
+              <IonGrid style={{ padding: 0 }}>
+                <IonRow>
+                  <IonCol size="12" sizeMd="6">
+                    <IonItem className="form-item" lines="none" style={{ '--min-height': '40px', '--padding-start': 4, '--padding-end': 4 }}>
+                      <IonInput label="Nombre de usuario" labelPlacement="stacked" value={formUsuario.username}
+                        onIonInput={(e) => setFormUsuario({ ...formUsuario, username: (e.target as HTMLIonInputElement).value as string })} />
+                    </IonItem>
+                  </IonCol>
+                  <IonCol size="12" sizeMd="6">
+                    <IonItem className="form-item" lines="none" style={{ '--min-height': '40px', '--padding-start': 4, '--padding-end': 4 }}>
+                      <IonSelect label="Rol" labelPlacement="stacked" value={formUsuario.rol_id}
+                        onIonChange={(e) => setFormUsuario({ ...formUsuario, rol_id: e.detail.value })}>
+                        {rolesLista.map((r) => (
+                          <IonSelectOption key={r.id} value={r.id}>{r.nombre}</IonSelectOption>
+                        ))}
+                      </IonSelect>
+                    </IonItem>
+                  </IonCol>
+                </IonRow>
+                <IonRow>
+                  <IonCol size="12">
+                    <IonItem className="form-item" lines="none" style={{ '--min-height': '40px', '--padding-start': 4, '--padding-end': 4 }}>
+                      <IonInput
+                        label={editandoUsuarioId ? 'Nueva contraseña (dejar vacío para no cambiar)' : 'Contraseña (mín 4 caracteres)'}
+                        labelPlacement="stacked" type="password" value={formUsuario.password}
+                        onIonInput={(e) => setFormUsuario({ ...formUsuario, password: (e.target as HTMLIonInputElement).value as string })} />
+                    </IonItem>
+                  </IonCol>
+                </IonRow>
+              </IonGrid>
+            </div>
+
+            {usuarioMensaje && (
+              <div style={{
+                background: usuarioMensaje.tipo === 'ok' ? '#ecfdf5' : '#fef2f2',
+                color: usuarioMensaje.tipo === 'ok' ? '#047857' : '#b91c1c',
+                padding: '10px 12px', borderRadius: 8, fontSize: 13, marginBottom: 10,
+                border: `1px solid ${usuarioMensaje.tipo === 'ok' ? '#a7f3d0' : '#fecaca'}`,
+              }}>
+                {usuarioMensaje.texto}
+              </div>
+            )}
+          </div>
         </IonModal>
 
       </IonContent>

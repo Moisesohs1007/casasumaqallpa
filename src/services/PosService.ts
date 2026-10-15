@@ -34,6 +34,8 @@ const POS_KEYS_HIDRATAR = [KEY_ALERG, KEY_CAT, KEY_PROD, KEY_PRES, KEY_MOD, KEY_
 let _hidratadoPos = false;
 let _hidratandoPos: Promise<boolean> | null = null;
 
+const _syncPromisesComandas: Map<string, Promise<void>> = new Map();
+
 async function _hidratarDesdeSupabasePos(force = false): Promise<boolean> {
   if (_hidratadoPos && !force) return true;
   if (!dbRemota.isOnline()) return false;
@@ -124,6 +126,13 @@ export const CatalogoFBService = {
     return db.getById<ProductoFB>(KEY_PROD, id);
   },
   crearProducto(payload: any, usuarioId = 'system-catalogo'): ProductoFB {
+    const stockControl = payload.stockControl ?? false;
+    const stockActual = Number(payload.stockActual || 0);
+    const stockMinimo = Number(payload.stockMinimo || 0);
+    const payloadMerge: any = (payload.payload && typeof payload.payload === 'object') ? { ...payload.payload } : {};
+    payloadMerge.stockControl = stockControl;
+    payloadMerge.stockActual = stockActual;
+    payloadMerge.stockMinimo = stockMinimo;
     const data = {
       codigo: payload.codigo || '',
       nombre: payload.nombre || '',
@@ -138,12 +147,13 @@ export const CatalogoFBService = {
       estacionesCocinaIds: payload.estacionesCocinaIds || [],
       unidadMedida: payload.unidadMedida || 'UND',
       estado: payload.estado ?? 'ACTIVO',
-      stockControl: payload.stockControl ?? false,
-      stockActual: Number(payload.stockActual || 0),
-      stockMinimo: Number(payload.stockMinimo || 0),
+      stockControl,
+      stockActual,
+      stockMinimo,
       orden: payload.orden ?? 0,
       imagenUrl: payload.imagenUrl || null,
       observaciones: payload.observaciones || '',
+      payload: payloadMerge,
       createdAt: seedUtil.nowISO(),
       updatedAt: seedUtil.nowISO(),
       createdBy: usuarioId,
@@ -160,6 +170,14 @@ export const CatalogoFBService = {
     if (delta.costoAproximado !== undefined) delta.costoAproximado = Number(delta.costoAproximado || 0);
     if (delta.stockActual !== undefined) delta.stockActual = Number(delta.stockActual || 0);
     if (delta.stockMinimo !== undefined) delta.stockMinimo = Number(delta.stockMinimo || 0);
+    if (delta.stockControl !== undefined || delta.stockActual !== undefined || delta.stockMinimo !== undefined) {
+      const actual = db.getById<any>(KEY_PROD, id);
+      const payloadMerge: any = (actual?.payload && typeof actual.payload === 'object') ? { ...actual.payload } : {};
+      if (delta.stockControl !== undefined) payloadMerge.stockControl = delta.stockControl;
+      if (delta.stockActual !== undefined) payloadMerge.stockActual = delta.stockActual;
+      if (delta.stockMinimo !== undefined) payloadMerge.stockMinimo = delta.stockMinimo;
+      delta.payload = payloadMerge;
+    }
     const upd = db.update<ProductoFB>(KEY_PROD, id, delta as any);
     if (upd) (async () => { await _remotoConQueue('update', KEY_PROD, id, delta, () => dbRemota.updateAsync<ProductoFB>(KEY_PROD, id, delta as any)); })().catch(() => {});
     return upd;
@@ -656,7 +674,8 @@ export const ComandaService = {
     };
     const comandaSeed = db.add<Comanda>(KEY_COM, comandaData as unknown as Create<Comanda>);
     const payloadComanda = { ...comandaData, id: comandaSeed.id };
-    (async () => { try { await _remotoConQueue('add', KEY_COM, comandaSeed.id, payloadComanda, () => dbRemota.addAsync<Comanda>(KEY_COM, payloadComanda as any)); } catch (_) {} })().catch(()=>{});
+    const syncComandaPromise = (async () => { try { await _remotoConQueue('add', KEY_COM, comandaSeed.id, payloadComanda, () => dbRemota.addAsync<Comanda>(KEY_COM, payloadComanda as any)); } catch (_) {} })();
+    _syncPromisesComandas.set(comandaSeed.id, syncComandaPromise);
 
     const comandaId = comandaSeed.id;
     const cargosFolioCreados: CargoFolio[] = [];
@@ -732,7 +751,7 @@ export const ComandaService = {
       };
       const detalle = db.add<ComandaDetalle>(KEY_COMDET, detalleData as unknown as Create<ComandaDetalle>);
       const payloadDetalle = { ...detalleData, id: detalle.id };
-      (async () => { try { await _remotoConQueue('add', KEY_COMDET, detalle.id, payloadDetalle, () => dbRemota.addAsync<ComandaDetalle>(KEY_COMDET, payloadDetalle as any)); } catch (_) {} })().catch(()=>{});
+      syncComandaPromise.then(() => { try { _remotoConQueue('add', KEY_COMDET, detalle.id, payloadDetalle, () => dbRemota.addAsync<ComandaDetalle>(KEY_COMDET, payloadDetalle as any)); } catch (_) {} }).catch(()=>{});
 
       // ===== DESCUENTO AUTOMÁTICO DE STOCK (por cada línea comanda room service o POS) =====
       try {
@@ -1006,7 +1025,10 @@ export const ComandaService = {
     if (!comanda) return undefined;
 
     if (comanda.mesaId && comanda.mesa?.zona !== 'ROOM_SERVICE') {
-      MesaService.cambiarEstado(comanda.mesaId, 'SUCIA', params.usuarioId);
+      // Las ventas walk-in (cliente eventual) no tienen mesa física que limpiar.
+      // Volver a LIBRE directamente. Las demás mesas quedan SUCIA para limpieza.
+      const nuevoEstado = comanda.mesa?.zona === 'WALK_IN' ? 'LIBRE' : 'SUCIA';
+      MesaService.cambiarEstado(comanda.mesaId, nuevoEstado, params.usuarioId);
     }
 
     const now = seedUtil.nowISO();
@@ -1042,7 +1064,8 @@ export const ComandaService = {
     const cerrada = db.update<Comanda>(KEY_COM, params.comandaId, delta as unknown as Update<Comanda>);
     if (cerrada) {
       const payloadDeltaCerrar = { id: params.comandaId, ...delta };
-      (async () => { try { await _remotoConQueue('update', KEY_COM, params.comandaId, payloadDeltaCerrar, () => dbRemota.updateAsync<Comanda>(KEY_COM, params.comandaId, delta as any)); } catch (_) {} })().catch(()=>{});
+      const syncComanda = _syncPromisesComandas.get(params.comandaId) || Promise.resolve();
+      syncComanda.then(() => { try { _remotoConQueue('update', KEY_COM, params.comandaId, payloadDeltaCerrar, () => dbRemota.updateAsync<Comanda>(KEY_COM, params.comandaId, delta as any)); } catch (_) {} }).catch(()=>{});
     }
     return cerrada ? this.buscarPorId(cerrada.id) : undefined;
   },

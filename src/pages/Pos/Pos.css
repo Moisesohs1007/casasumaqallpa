@@ -218,69 +218,53 @@
 .modal-card ion-grid { padding: 8px 10px 2px; }
 .modal-card ion-col { padding: 4px 6px !important; }
 
-/* ============ Nota Venta TICKET 80mm ============ */
+/* ============ Nota Venta TICKET (58mm / 80mm configurable) ============ */
+/* Variables de tamaño de papel (se aplican dinámicamente según configuración) */
+:root {
+  --ticket-ancho: 204px;      /* ancho en px (58mm ≈ 204px, 80mm ≈ 300px) */
+  --ticket-ancho-mm: 58mm;    /* ancho del @page para impresión */
+  --ticket-fuente: 12px;      /* tamaño de fuente base del ticket */
+  --ticket-padding: 8px 10px; /* padding interno */
+}
 .nota-venta {
-  width: 300px; /* aprox 80mm */
-  margin: 10px auto; padding: 10px 12px;
+  width: var(--ticket-ancho);
+  margin: 10px auto; padding: var(--ticket-padding);
   border: 1px dashed #d1d5db; border-radius: 6px;
-  font-family: 'Courier New', Courier, monospace; font-size: 13px;
+  font-family: 'Courier New', Courier, monospace; font-size: var(--ticket-fuente);
   color: #111; background: #fff;
 }
 .nv-header { text-align: center; padding-bottom: 6px; border-bottom: 1px dashed #111; }
 .nv-logo {
   font-family: 'Brush Script MT', 'Segoe Script', cursive;
-  font-size: 28px; font-weight: 700; letter-spacing: 0.5px;
+  font-size: 24px; font-weight: 700; letter-spacing: 0.5px;
   color: #0f172a; line-height: 1.1;
 }
-.nv-nombre-empresa { font-weight: 700; font-size: 14px; margin-top: 2px; }
+.nv-nombre-empresa { font-weight: 700; font-size: 13px; margin-top: 2px; }
 .nv-linea-uno { font-weight: 600; margin-top: 4px; }
-.nv-linea { font-size: 12px; opacity: 0.95; }
+.nv-linea { font-size: 11px; opacity: 0.95; }
 .nv-cliente {
-  padding: 6px 0; border-bottom: 1px dashed #111; line-height: 1.4; font-size: 12.5px;
+  padding: 6px 0; border-bottom: 1px dashed #111; line-height: 1.4; font-size: 11.5px;
 }
 .nv-tabla {
-  width: 100%; border-collapse: collapse; margin: 6px 0; font-size: 12px;
+  width: 100%; border-collapse: collapse; margin: 6px 0; font-size: 11px;
 }
 .nv-tabla th, .nv-tabla td { padding: 2px 2px; vertical-align: top; }
 .nv-tabla thead th {
   border-bottom: 1px dashed #111; padding-bottom: 3px;
-  font-weight: 700; font-size: 11px;
+  font-weight: 700; font-size: 10px;
 }
 .nv-totales { padding-top: 4px; border-top: 1px dashed #111; margin-top: 2px; }
 .nv-total-row {
-  display: flex; justify-content: space-between; padding: 2px 0; font-size: 12.5px;
+  display: flex; justify-content: space-between; padding: 2px 0; font-size: 11.5px;
 }
-.nv-total-final { font-weight: 900; font-size: 15px; border-top: 1px solid #111; border-bottom: 1px solid #111; margin: 3px 0; padding: 4px 0; }
+.nv-total-final { font-weight: 900; font-size: 14px; border-top: 1px solid #111; border-bottom: 1px solid #111; margin: 3px 0; padding: 4px 0; }
 .nv-pagado { color: #16a34a; font-weight: 700; }
-.nv-footer { text-align: center; padding: 8px 0 2px; font-size: 11.5px; }
-.nv-corte { text-align: center; font-size: 11px; opacity: .6; margin-top: 6px; }
+.nv-footer { text-align: center; padding: 8px 0 2px; font-size: 10.5px; }
+.nv-corte { text-align: center; font-size: 10px; opacity: .6; margin-top: 6px; }
 
-/* ============ Media PRINT (imprimir solo ticket) ============ */
-@media print {
-  @page { size: 80mm auto; margin: 0; }
-  html, body {
-    margin: 0 !important; padding: 0 !important; background: #fff !important;
-    -webkit-print-color-adjust: exact; print-color-adjust: exact;
-  }
-  ion-app, ion-router-outlet, .pos-page,
-  ion-header, ion-footer,
-  .no-print, .modal-backdrop::before,
-  .walkin-grid, .chips-filtro, .modal-foot {
-    display: none !important;
-  }
-  .no-print-bg { background: #fff !important; position: static !important; padding: 0 !important; }
-  .print-area-wrap {
-    position: static !important; transform: none !important;
-    box-shadow: none !important; max-width: 100% !important;
-    width: 100% !important; border-radius: 0 !important; overflow: visible !important;
-    max-height: none !important; padding: 0 !important;
-  }
-  .nota-venta {
-    border: none !important; border-radius: 0 !important;
-    width: 100% !important; max-width: 80mm; margin: 0 auto !important; padding: 4mm 3mm !important;
-    box-shadow: none !important;
-  }
-}
+/* NOTA: El @media print está en global.css y se inyecta dinámicamente
+   desde src/utils/ticketStyles.ts (inyectarEstiloPrint) para soportar
+   tamaños de papel variables (58mm/80mm). No agregar @media print aquí. */
 
 /* ============ Desktop layout (≥ 768px) ============ */
 @media (min-width: 768px) {

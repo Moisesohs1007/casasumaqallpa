@@ -23,24 +23,7 @@ function encodeUriBajo(url: string): string {
   return base + encodeURIComponent(name);
 }
 const PORTADA_CANDIDATOS = [
-  `${BASE_URL}/portada.webp`,
-  `${BASE_URL}/portada.jpg`,
-  `${BASE_URL}/portada.png`,
   `${BASE_URL}/portada.jpeg`,
-  `${BASE_URL}/WhatsApp Image 2026-10-06 at 2.07.54 PM(1).jpeg`,
-  `${BASE_URL}/WhatsApp Image 2026-10-06 at 2.07.54 PM 1 .jpeg`,
-  `${BASE_URL}/logo.webp`,
-  `${BASE_URL}/logo.jpg`,
-  `${BASE_URL}/logo.png`,
-  `${BASE_URL}/logo.jpeg`,
-  `${BASE_URL}/portada-sumaq.webp`,
-  `${BASE_URL}/portada-sumaq.jpg`,
-  `${BASE_URL}/portada-sumaq.png`,
-  `${BASE_URL}/portada-sumaq.jpeg`,
-  `${BASE_URL}/portada-sumaq-allpa.webp`,
-  `${BASE_URL}/portada-sumaq-allpa.jpg`,
-  `${BASE_URL}/portada-sumaq-allpa.png`,
-  `${BASE_URL}/portada-sumaq-allpa.jpeg`,
 ].map((u) => encodeUriBajo(u));
 function probeUrl(url: string): Promise<string | null> {
   return new Promise((resolve) => {

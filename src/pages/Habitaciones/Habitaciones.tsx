@@ -9,8 +9,9 @@ import {
 import type { Color } from '@ionic/core';
 import { add, remove, trash, close, save, receiptOutline, wallet, cart, person, restaurant, bed, cash, pricetag, refresh } from 'ionicons/icons';
 import { Habitacion, EstadoHabitacion, ProductoFB, Reserva } from '../../types';
-import { HabitacionService, ReservaService, CatalogoFBService, InventarioService, seedProductos, FolioService, CargoFolioService, PagoFolioService, ImpuestoService, pendingSync, seedUtil } from '../../services';
+import { HabitacionService, ReservaService, CatalogoFBService, InventarioService, seedProductos, FolioService, CargoFolioService, PagoFolioService, ImpuestoService, pendingSync, seedUtil, ImpresoraConfigService } from '../../services';
 import { supabase } from '../../services/__supabase_db__';
+import { imprimirTicket } from '../../utils/ticketStyles';
 import CheckinModal from '../../components/modals/CheckinModal';
 import CheckoutModal from '../../components/modals/CheckoutModal';
 import TomarComanda from '../../components/modals/TomarComanda';
@@ -184,11 +185,34 @@ const HabitacionesPage: React.FC = () => {
       try { pendingSync.applyPendingLocal?.(); } catch (_) {}
       try {
         const lista = await HabitacionService.listarTodas();
-        const snap = stableStringify(lista);
+        const reservaCheckedIn = new Set<string>();
+        try {
+          const rs = await (ReservaService as any).listarTodas?.() || [];
+          for (const r of rs) {
+            const e = String(r.estado || '').toUpperCase().replace(/[^A-Z]/g, '');
+            if (!(e.includes('CHECKIN') || e.includes('CHECKEDIN'))) continue;
+            const habs: any[] = (r.habitaciones || []) as any[];
+            for (const h of habs) {
+              const id = h.habitacionId || h.habitacion?.id;
+              if (id) reservaCheckedIn.add(String(id));
+            }
+          }
+        } catch (_) {}
+        const listaCorregida = lista.map((h: Habitacion) => {
+          const tieneCheckIn = reservaCheckedIn.has(String(h.id));
+          if (tieneCheckIn && h.estado !== 'OCUPADA') {
+            return { ...h, estado: 'OCUPADA' as EstadoHabitacion };
+          }
+          if (!tieneCheckIn && h.estado === 'OCUPADA') {
+            return { ...h, estado: 'LIBRE' as EstadoHabitacion };
+          }
+          return h;
+        });
+        const snap = stableStringify(listaCorregida);
         if (snap !== snapshotHab.current) {
           snapshotHab.current = snap;
           huboCambioReal = true;
-          setHabitacionesRef.current(lista);
+          setHabitacionesRef.current(listaCorregida);
         }
       } catch {
         if (snapshotHab.current !== '[]') {
@@ -209,11 +233,30 @@ const HabitacionesPage: React.FC = () => {
         try { await pendingSync.processQueue?.(false); } catch (_) {}
         try {
           const lista = await HabitacionService.listarTodas();
-          const snap = stableStringify(lista);
+          const reservaCheckedIn = new Set<string>();
+          try {
+            const rs = await (ReservaService as any).listarTodas?.() || [];
+            for (const r of rs) {
+              const e = String(r.estado || '').toUpperCase().replace(/[^A-Z]/g, '');
+              if (!(e.includes('CHECKIN') || e.includes('CHECKEDIN'))) continue;
+              const habs: any[] = (r.habitaciones || []) as any[];
+              for (const h of habs) {
+                const id = h.habitacionId || h.habitacion?.id;
+                if (id) reservaCheckedIn.add(String(id));
+              }
+            }
+          } catch (_) {}
+          const listaCorregida = lista.map((h: Habitacion) => {
+            const tieneCheckIn = reservaCheckedIn.has(String(h.id));
+            if (tieneCheckIn && h.estado !== 'OCUPADA') return { ...h, estado: 'OCUPADA' as EstadoHabitacion };
+            if (!tieneCheckIn && h.estado === 'OCUPADA') return { ...h, estado: 'LIBRE' as EstadoHabitacion };
+            return h;
+          });
+          const snap = stableStringify(listaCorregida);
           if (snap !== snapshotHab.current) {
             snapshotHab.current = snap;
             huboPostCambio = true;
-            setHabitacionesRef.current(lista);
+            setHabitacionesRef.current(listaCorregida);
           }
         } catch {
           if (snapshotHab.current !== '[]') {
@@ -235,10 +278,29 @@ const HabitacionesPage: React.FC = () => {
   const cargar = async () => {
     try {
       const lista = await HabitacionService.listarTodas();
-      const snap = stableStringify(lista);
+      const reservaCheckedIn = new Set<string>();
+      try {
+        const rs = await (ReservaService as any).listarTodas?.() || [];
+        for (const r of rs) {
+          const e = String(r.estado || '').toUpperCase().replace(/[^A-Z]/g, '');
+          if (!(e.includes('CHECKIN') || e.includes('CHECKEDIN'))) continue;
+          const habs: any[] = (r.habitaciones || []) as any[];
+          for (const h of habs) {
+            const id = h.habitacionId || h.habitacion?.id;
+            if (id) reservaCheckedIn.add(String(id));
+          }
+        }
+      } catch (_) {}
+      const listaCorregida = lista.map((h: Habitacion) => {
+        const tieneCheckIn = reservaCheckedIn.has(String(h.id));
+        if (tieneCheckIn && h.estado !== 'OCUPADA') return { ...h, estado: 'OCUPADA' as EstadoHabitacion };
+        if (!tieneCheckIn && h.estado === 'OCUPADA') return { ...h, estado: 'LIBRE' as EstadoHabitacion };
+        return h;
+      });
+      const snap = stableStringify(listaCorregida);
       if (snap !== snapshotHab.current) {
         snapshotHab.current = snap;
-        setHabitacionesRef.current(lista);
+        setHabitacionesRef.current(listaCorregida);
         snapshotRefreshTick.current++;
         setRefreshTickRef.current(snapshotRefreshTick.current);
       }
@@ -1104,6 +1166,33 @@ const HabitacionesPage: React.FC = () => {
   const totalPagosF = calcularTotalPagos(folioActivo?.pagos || []);
   const saldoPendiente = Math.max(0, totalesFolio.total - totalPagosF);
 
+  // ============ IMPRESIÓN NOTA CHECK-OUT (desacoplado del checkout) ============
+  const imprimirNotaCheckout = () => {
+    imprimirTicket(() => {
+      setTimeout(() => setNotaVentaCheckout(null), 400);
+    }, 100);
+  };
+
+  // ============ FINALIZAR CHECK-OUT (sin imprimir) ============
+  const finalizarCheckout = async () => {
+    if (!notaVentaCheckout?.habId) return;
+    try { await refrescarFuerza(); } catch(_) {}
+    const habObj = habitaciones.find(h => h.id === notaVentaCheckout.habId);
+    if (habObj) {
+      try { marcarEstado(habObj, 'LIBRE'); } catch(e: any) { console.error('[Checkout] No se pudo marcar LIBRE:', e?.message || e); }
+    }
+    try {
+      if (checkoutReservaId) {
+        const r = (window as any).ReservaService?.buscarPorId?.(checkoutReservaId);
+        if (r && String(r.estado || '') !== 'CHECKED_OUT') {
+          try { (window as any).ReservaService?.cambiarEstado?.(checkoutReservaId, 'CHECKED_OUT', { usuarioResponsableId: USUARIO_ACTUAL.id, comentario: 'Check-out finalizado', informacionAdicional: { fechaCheckoutReal: new Date().toISOString() } }); } catch(_){}
+        }
+      }
+    } catch(_){}
+    setNotaVentaCheckout(null);
+    mostrarToast('✅ Check-out finalizado · Habitación marcada LIBRE');
+  };
+
   // ============ RENDER ============
   return (
     <IonPage>
@@ -1429,8 +1518,8 @@ const HabitacionesPage: React.FC = () => {
                 </div>
                 <div className="nota-venta">
                   <div className="nv-header">
-                    <div className="nv-logo">Sumaq Allpa</div>
-                    <div className="nv-nombre-empresa">Casa Sumaq Allpa</div>
+                    <div className="nv-logo">{ImpresoraConfigService.obtener().nombreEmpresa.split(' ').slice(-1)[0] || 'Sumaq Allpa'}</div>
+                    <div className="nv-nombre-empresa">{ImpresoraConfigService.obtener().nombreEmpresa || 'Casa Sumaq Allpa'}</div>
                     <div className="nv-linea-uno">Nota de Venta · {folio?.reserva?.id || checkoutReservaId || 'SIN-CORRELATIVO'}</div>
                     <div className="nv-linea">{fechaHoy()}</div>
                   </div>
@@ -1484,48 +1573,14 @@ const HabitacionesPage: React.FC = () => {
                   <div className="nv-corte">-- corte ticket --</div>
                 </div>
                 <div className="modal-foot no-print">
-                  <IonButton color="primary" onClick={() => {
-                    setTimeout(() => window.print(), 60);
-                    // === FIX BUG CHECKOUT: Si saldo pagado, AUTO-marcar habitación LIBRE y cerrar después de imprimir ===
-                    if (saldo <= 0.01 && notaVentaCheckout?.habId) {
-                      setTimeout(async () => {
-                        try {
-                          await refrescarFuerza();
-                        } catch(_) {}
-                        const habObj = habitaciones.find(h => h.id === notaVentaCheckout.habId);
-                        if (habObj) {
-                          try {
-                            // Primero a LIMPIEZA (estándar hotelero: check-out → limpieza),
-                            // luego marcar LIBRE automáticamente si el staff quiere.
-                            // Mantener LIBRE para que se vea disponible inmediatamente.
-                            marcarEstado(habObj, 'LIBRE');
-                          } catch(e: any) {
-                            console.error('[Checkout] No se pudo marcar LIBRE:', e?.message || e);
-                          }
-                        }
-                        try {
-                          if (checkoutReservaId) {
-                            const r = (window as any).ReservaService?.buscarPorId?.(checkoutReservaId);
-                            if (r && String(r.estado || '') !== 'CHECKED_OUT') {
-                              try { (window as any).ReservaService?.cambiarEstado?.(checkoutReservaId, 'CHECKED_OUT', { usuarioResponsableId: USUARIO_ACTUAL.id, comentario: 'Check-out desde Nota Venta (auto)', informacionAdicional: { fechaCheckoutReal: new Date().toISOString() } }); } catch(_){}
-                            }
-                          }
-                        } catch(_){}
-                        setTimeout(() => setNotaVentaCheckout(null), 1200);
-                      }, 900);
-                    }
-                  }}><IonIcon slot="start" icon={receiptOutline} />Imprimir (Ticket 80mm) {saldo <= 0.01 && '· Marcar LIBRE Auto'}</IonButton>
+                  <IonButton color="primary" onClick={imprimirNotaCheckout}><IonIcon slot="start" icon={receiptOutline} />Imprimir (Ticket {ImpresoraConfigService.obtener().tamanoPapel}mm)</IonButton>
                   {saldo <= 0.01 && (
-                    <IonButton color="success" onClick={() => {
-                      setNotaVentaCheckout(null);
-                      const habObj = habitaciones.find(h => h.id === notaVentaCheckout.habId);
-                      if (habObj) marcarEstado(habObj, 'LIBRE');
-                    }}>Finalizar Check-out · Marcar LIBRE</IonButton>
+                    <IonButton color="success" onClick={finalizarCheckout}>Finalizar Check-out · Marcar LIBRE</IonButton>
                   )}
                   {notaVentaCheckout && checkoutReservaId && (
                     <IonButton color="warning" fill="outline" onClick={() => { setNotaVentaCheckout(null); setCheckoutOpen(true); }}>Abrir CheckoutModal (servicio)</IonButton>
                   )}
-                  <IonButton color="medium" fill="outline" onClick={() => setNotaVentaCheckout(null)}>Cerrar</IonButton>
+                  <IonButton color="medium" fill="outline" onClick={() => setNotaVentaCheckout(null)}>Cerrar (sin imprimir)</IonButton>
                 </div>
               </div>
             </div>

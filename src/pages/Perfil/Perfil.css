@@ -1273,3 +1273,44 @@
   --padding-top: 8px;
   --padding-bottom: 8px;
 }
+
+/* ================ ESTILOS DE IMPRESIÓN (PDF) ================ */
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  .reportes-print-area,
+  .reportes-print-area * {
+    visibility: visible;
+  }
+  .reportes-print-area {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+  }
+  .no-print {
+    display: none !important;
+  }
+  ion-tab-bar,
+  ion-header,
+  ion-footer,
+  .admin-hero-card,
+  .config-card,
+  .ion-tab-bar {
+    display: none !important;
+  }
+  .kpi-card,
+  .section-card {
+    break-inside: avoid;
+    box-shadow: none !important;
+    border: 1px solid #ccc !important;
+  }
+  table {
+    font-size: 11px !important;
+  }
+  @page {
+    margin: 1cm;
+    size: A4 landscape;
+  }
+}

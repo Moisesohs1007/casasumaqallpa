@@ -12,9 +12,17 @@ import TomarComanda from '../../components/modals/TomarComanda';
 import PagoForm, { PagoFormValue } from '../../components/PagoForm';
 import { METODOS_PAGO_LISTA } from '../../types/etapa2';
 import { Mesa, Comanda, ProductoFB } from '../../types';
-import { MesaService, ComandaService, CatalogoFBService, InventarioService, seedProductos, PosService, pendingSync } from '../../services';
-import { supabase } from '../../services/__supabase_db__';
+import { MesaService, ComandaService, CatalogoFBService, InventarioService, seedProductos, PosService, pendingSync, ImpresoraConfigService } from '../../services';
+import { AuthService } from '../../services/AuthService';
+import { supabase, dbRemota } from '../../services/__supabase_db__';
+import { imprimirTicket } from '../../utils/ticketStyles';
 import './Pos.css';
+
+const PUNTO_VENTA_ID = 'PV-RESTAURANTE-01';
+const obtenerUsuarioActual = () => {
+  const sesion = AuthService.sesionActual();
+  return sesion ? { id: sesion.id, nombres: sesion.nombres, apellidos: sesion.apellidos } : { id: 'USR-SYSTEM', nombres: 'Sistema', apellidos: '' };
+};
 
 const EVENTO_REFRESCAR = 'lodge:refrescarAhora' as const;
 
@@ -539,9 +547,88 @@ const PosPage: React.FC = () => {
     setModalCobrar(true);
   };
 
-  const confirmarVenta = () => {
+  const confirmarVenta = async () => {
     if (!pagoForm || Number(pagoForm.monto) <= 0) { mostrarToast('Monto inválido'); return; }
     const idVenta = 'V-' + Date.now().toString().slice(-6);
+    const usuarioActual = obtenerUsuarioActual();
+
+    // Crear/obtener mesa walk-in
+    let mesaWalkIn = MesaService.listarTodas({ puntoVentaId: PUNTO_VENTA_ID }).find((m: any) => m && m.zona === 'WALK_IN');
+    if (!mesaWalkIn) {
+      try {
+        mesaWalkIn = MesaService.crear({
+          puntoVentaId: PUNTO_VENTA_ID,
+          codigo: 'WALK-IN',
+          nombre: 'WALK-IN',
+          nombreVisible: 'Cliente Eventual',
+          zona: 'WALK_IN',
+          capacidadPersonas: 1,
+          estado: 'LIBRE',
+          esCombinable: false,
+          esTransferible: false,
+        }, usuarioActual.id);
+      } catch (e) {
+        console.warn('[Pos.walkin] No se pudo crear mesa walk-in, usando mesa existente:', (e as Error).message);
+        mesaWalkIn = MesaService.listarTodas({ puntoVentaId: PUNTO_VENTA_ID })[0];
+      }
+    }
+
+    // IMPORTANTE: Sincronizar la mesa a Supabase ANTES de crear la comanda
+    // para evitar violación de clave foránea (comandas.mesa_id_fkey)
+    if (mesaWalkIn) {
+      try {
+        const mesaPayload: any = { ...mesaWalkIn };
+        delete mesaPayload._syncStatus;
+        delete mesaPayload._syncErrorMsg;
+        await dbRemota.addAsync('mesas', mesaPayload);
+      } catch (e) {
+        console.warn('[Pos.walkin] sync mesa a Supabase (no bloquea):', (e as Error).message);
+      }
+    }
+
+    // Construir líneas de comanda (solo las que tienen productoId)
+    const lineasComanda = carrito
+      .filter((l) => l.productoId)
+      .map((l) => ({
+        productoId: l.productoId!,
+        cantidad: l.cantidad,
+        observaciones: l.observaciones || undefined,
+      }));
+
+    let comandaId: string | undefined;
+    try {
+      if (mesaWalkIn && lineasComanda.length > 0) {
+        const resultado = ComandaService.crear({
+          puntoVentaId: PUNTO_VENTA_ID,
+          mesaId: mesaWalkIn.id,
+          usuarioIdMozoApertura: usuarioActual.id,
+          tipoComanda: 'MESA_RESTAURANTE',
+          tipoConsumo: 'COBRO_DIRECTO',
+          paxAdultos: 1,
+          paxNinos: 0,
+          observacionesInternas: `Venta walk-in cliente eventual - ${clienteForm.nombre?.trim() || 'Cliente Eventual'}`,
+          lineas: lineasComanda,
+        });
+        if (resultado?.comanda) {
+          comandaId = resultado.comanda.id;
+          // Cerrar y cobrar la comanda inmediatamente
+          ComandaService.cerrarYcobrar({
+            comandaId: resultado.comanda.id,
+            usuarioId: usuarioActual.id,
+            metodoPago: pagoForm.metodoPago,
+            montoTotalCobrado: Number(pagoForm.monto),
+            referencia: pagoForm.referencia || pagoForm.codigoAutorizacion || undefined,
+            observaciones: pagoForm.observaciones || `Walk-in ${idVenta}`,
+          });
+          // Esperar un momento para que la sincronización de la comanda y sus detalles
+          // se procese en orden (mesa -> comanda -> detalles -> cierre)
+          await new Promise((r) => setTimeout(r, 300));
+        }
+      }
+    } catch (e) {
+      console.warn('[Pos.walkin.confirmarVenta] Error creando comanda (no bloquea cobro):', (e as Error).message || e);
+    }
+
     // PACK D: Aplicar movimiento de inventario real (no cancelable después de cobrar)
     try {
       for (const l of carrito) {
@@ -550,9 +637,9 @@ const PosPage: React.FC = () => {
             l.productoId,
             -Number(l.cantidad || 0),
             `Venta walk-in cobrada ${idVenta}`,
-            'usr-walkin',
+            usuarioActual.id,
             {
-              referenciaId: idVenta,
+              referenciaId: comandaId || idVenta,
               referenciaTipo: 'VENTA_WALKIN_COBRADA',
               bloquearNegativo: false,
             }
@@ -587,7 +674,10 @@ const PosPage: React.FC = () => {
     setModalNotaVenta(v);
   };
   const doWindowPrint = () => {
-    setTimeout(() => window.print(), 60);
+    // Usa imprimirTicket que inyecta @page con el tamaño correcto (58mm/80mm)
+    imprimirTicket(() => {
+      setTimeout(() => setModalNotaVenta(null), 400);
+    }, 100);
   };
 
   // ========== Categorias memo ==========
@@ -869,7 +959,15 @@ const PosPage: React.FC = () => {
                 )}
                 {!loading && vistaMesas.map((m) => {
                   const openParaMesa = (mesa: PosVistaMesaRow) => {
-                    setPreMesaId(mesa.id); setPreHabitacionId(undefined); setPreTipoConsumo('MESA');
+                    if (mesa.habitacionVinculada) {
+                      setPreMesaId(undefined);
+                      setPreHabitacionId(mesa.habitacionVinculada);
+                      setPreTipoConsumo('CARGO_A_HABITACION');
+                    } else {
+                      setPreMesaId(mesa.id);
+                      setPreHabitacionId(undefined);
+                      setPreTipoConsumo('MESA');
+                    }
                     setComandaAEditarId(mesa.comanda?.id); setTomarComandaOpen(true);
                   };
                   return (
@@ -1049,8 +1147,8 @@ const PosPage: React.FC = () => {
               </div>
               <div className="nota-venta">
                 <div className="nv-header">
-                  <div className="nv-logo">Sumaq Allpa</div>
-                  <div className="nv-nombre-empresa">Casa Sumaq Allpa</div>
+                  <div className="nv-logo">{ImpresoraConfigService.obtener().nombreEmpresa.split(' ').slice(-1)[0] || 'Sumaq Allpa'}</div>
+                  <div className="nv-nombre-empresa">{ImpresoraConfigService.obtener().nombreEmpresa || 'Casa Sumaq Allpa'}</div>
                   <div className="nv-linea-uno">Nota de Venta · {modalNotaVenta.id}</div>
                   <div className="nv-linea">{modalNotaVenta.fecha}</div>
                 </div>
@@ -1091,8 +1189,8 @@ const PosPage: React.FC = () => {
                 <div className="nv-corte">-- corte ticket --</div>
               </div>
               <div className="modal-foot no-print">
-                <IonButton color="primary" onClick={doWindowPrint}><IonIcon slot="start" icon={receiptOutline} />Imprimir (Ticket 80mm)</IonButton>
-                <IonButton color="medium" fill="outline" onClick={() => setModalNotaVenta(null)}>Cerrar</IonButton>
+                <IonButton color="primary" onClick={doWindowPrint}><IonIcon slot="start" icon={receiptOutline} />Imprimir (Ticket {ImpresoraConfigService.obtener().tamanoPapel}mm)</IonButton>
+                <IonButton color="medium" fill="outline" onClick={() => setModalNotaVenta(null)}>Cerrar (sin imprimir)</IonButton>
               </div>
             </div>
           </div>

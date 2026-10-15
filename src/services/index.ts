@@ -6,6 +6,8 @@ export * from './FolioService';
 export * from './PosService';
 export * from './InventarioService';
 export * from './AuthService';
+export * from './ReportesService';
+export * from './ImpresoraConfigService';
 export * from './supabaseClient';
 export * from './__db__';
 export * as pendingSync from './__pending_sync__';

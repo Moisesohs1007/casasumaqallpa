@@ -135,7 +135,11 @@ export class SupabaseDB {
     if (!this.client || !TABLE[key]) return [];
     try {
       const { data, error } = await this.client.from(TABLE[key]).select('*').limit(10000);
-      if (error) { console.error(`[SupabaseDB.allAsync] ${TABLE[key]}:`, error.message); return []; }
+      if (error) {
+        const noExiste = error.code === 'PGRST205' || /Could not find the table|does not exist/i.test(error.message || '');
+        if (!noExiste) console.error(`[SupabaseDB.allAsync] ${TABLE[key]}:`, error.message);
+        return [];
+      }
       return (data || []).map((r) => normalizeRow<T>(r)).filter(Boolean) as T[];
     } catch (e) {
       console.error(`[SupabaseDB.allAsync] ${TABLE[key]} exception:`, (e as any)?.message || e);
