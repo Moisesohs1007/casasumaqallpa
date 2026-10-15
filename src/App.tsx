@@ -34,8 +34,10 @@ setupIonicReact({
   animated: true,
 });
 
-// VERSIÓN de la app - incrementar con cada cambio para detectar actualizaciones
-const APP_VERSION = 'v3.2-important';
+// VERSIÓN de la app - inyectada automáticamente por Vite en cada build.
+// Formato: v3.0-YYYY-MM-DD-HHh-commitHash (ej: v3.0-2026-10-14-22h30m-42a545a)
+// Así puedes verificar en la pestaña del navegador si el deploy se actualizó.
+const APP_VERSION: string = (typeof __APP_VERSION__ !== 'undefined') ? __APP_VERSION__ : 'v3.0-dev';
 if (typeof document !== 'undefined') {
   document.title = `Casa Sumaq Allpa · ${APP_VERSION}`;
 }
