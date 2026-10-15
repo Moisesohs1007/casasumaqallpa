@@ -233,33 +233,32 @@
   font-family: 'Courier New', Courier, monospace; font-size: var(--ticket-fuente);
   color: #111; background: #fff;
 }
-.nv-header { text-align: center; padding-bottom: 6px; border-bottom: 1px dashed #111; }
+.nv-header { text-align: center; padding-bottom: 6px; }
 .nv-logo {
   font-family: 'Brush Script MT', 'Segoe Script', cursive;
-  font-size: 24px; font-weight: 700; letter-spacing: 0.5px;
-  color: #0f172a; line-height: 1.1;
+  font-size: 22px; font-weight: 700; letter-spacing: 0.5px;
+  color: #0f172a; line-height: 1.1; text-align: center;
 }
-.nv-nombre-empresa { font-weight: 700; font-size: 13px; margin-top: 2px; }
+.nv-nombre-empresa { font-weight: 700; font-size: 12px; margin-top: 2px; text-align: center; }
 .nv-linea-uno { font-weight: 600; margin-top: 4px; }
 .nv-linea { font-size: 11px; opacity: 0.95; }
 .nv-cliente {
-  padding: 6px 0; border-bottom: 1px dashed #111; line-height: 1.4; font-size: 11.5px;
+  padding: 4px 0; line-height: 1.4; font-size: 11.5px;
 }
-.nv-tabla {
-  width: 100%; border-collapse: collapse; margin: 6px 0; font-size: 11px;
+.nv-separador {
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 11px; text-align: center; margin: 2px 0;
+  white-space: pre;
 }
-.nv-tabla th, .nv-tabla td { padding: 2px 2px; vertical-align: top; }
-.nv-tabla thead th {
-  border-bottom: 1px dashed #111; padding-bottom: 3px;
-  font-weight: 700; font-size: 10px;
+.nota-venta pre.nv-productos,
+.nota-venta pre.nv-totales-pre {
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 11px; line-height: 1.25; margin: 0; padding: 0;
+  white-space: pre; overflow: hidden; color: #111;
 }
-.nv-totales { padding-top: 4px; border-top: 1px dashed #111; margin-top: 2px; }
-.nv-total-row {
-  display: flex; justify-content: space-between; padding: 2px 0; font-size: 11.5px;
-}
-.nv-total-final { font-weight: 900; font-size: 14px; border-top: 1px solid #111; border-bottom: 1px solid #111; margin: 3px 0; padding: 4px 0; }
-.nv-pagado { color: #16a34a; font-weight: 700; }
-.nv-footer { text-align: center; padding: 8px 0 2px; font-size: 10.5px; }
+.nota-venta pre.nv-totales-pre { margin-top: 2px; }
+.nv-total-destacado { font-weight: 700; font-size: 13px; }
+.nv-footer { text-align: center; padding: 6px 0 2px; font-size: 10.5px; margin-top: 6px; }
 .nv-corte { text-align: center; font-size: 10px; opacity: .6; margin-top: 6px; }
 
 /* NOTA: El @media print está en global.css y se inyecta dinámicamente

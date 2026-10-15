@@ -16,6 +16,7 @@ import { MesaService, ComandaService, CatalogoFBService, InventarioService, seed
 import { AuthService } from '../../services/AuthService';
 import { supabase, dbRemota } from '../../services/__supabase_db__';
 import { imprimirTicket } from '../../utils/ticketStyles';
+import { lineaDoble, lineaCentrada, separador, lineaProducto, humanizarMetodoPago, getAnchoLinea } from '../../utils/ticketFormat';
 import './Pos.css';
 
 const PUNTO_VENTA_ID = 'PV-RESTAURANTE-01';
@@ -1152,41 +1153,46 @@ const PosPage: React.FC = () => {
                   <div className="nv-linea-uno">Nota de Venta · {modalNotaVenta.id}</div>
                   <div className="nv-linea">{modalNotaVenta.fecha}</div>
                 </div>
+                <div className="nv-separador">{separador(getAnchoLinea())}</div>
                 <div className="nv-cliente">
-                  <div><b>Cliente:</b> {modalNotaVenta.cliente}</div>
-                  <div><b>Método de pago:</b> {METODOS_PAGO_LISTA.find(m => m.id === modalNotaVenta.metodoPago)?.label || modalNotaVenta.metodoPago}</div>
-                  {modalNotaVenta.referencia && <div><b>Referencia:</b> {modalNotaVenta.referencia}</div>}
+                  <div className="nv-linea">Cliente: {modalNotaVenta.cliente}</div>
+                  <div className="nv-linea">Pago: {humanizarMetodoPago(modalNotaVenta.metodoPago)}</div>
+                  {modalNotaVenta.referencia && <div className="nv-linea">Ref: {modalNotaVenta.referencia}</div>}
                 </div>
-                <table className="nv-tabla">
-                  <thead>
-                    <tr>
-                      <th style={{ textAlign: 'left' }}>DESCRIPCIÓN</th>
-                      <th style={{ textAlign: 'center' }}>CANT</th>
-                      <th style={{ textAlign: 'right' }}>P.U.</th>
-                      <th style={{ textAlign: 'right' }}>SUBTOT</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {modalNotaVenta.lineas.map(l => (
-                      <tr key={l.id}>
-                        <td style={{ textAlign: 'left' }}>{l.nombre}{l.tipo === 'SERVICIO_EXTRA' ? ' (Servicio Extra)' : ''}</td>
-                        <td style={{ textAlign: 'center' }}>{l.cantidad}</td>
-                        <td style={{ textAlign: 'right' }}>{fmtSoles(l.precioUnit)}</td>
-                        <td style={{ textAlign: 'right' }}>{fmtSoles(l.cantidad * l.precioUnit)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-                <div className="nv-totales">
-                  <div className="nv-total-row"><span>SUBTOTAL:</span><span>{fmtSoles(modalNotaVenta.total)}</span></div>
-                  <div className="nv-total-row"><span>IGV (incluido 18%):</span><span>{fmtSoles(Number((modalNotaVenta.total * 18 / 118).toFixed(2)))}</span></div>
-                  <div className="nv-total-row nv-total-final"><span>TOTAL:</span><span>{fmtSoles(modalNotaVenta.total)}</span></div>
-                  <div className="nv-total-row nv-pagado"><span>MONTO PAGADO:</span><span>{fmtSoles(modalNotaVenta.montoPagado)}</span></div>
-                </div>
+                <div className="nv-separador">{separador(getAnchoLinea())}</div>
+                <pre className="nv-productos">{
+                  [
+                    lineaDoble('PRODUCTO', 'CANT SUBT', getAnchoLinea()),
+                    ...modalNotaVenta.lineas.map(l =>
+                      lineaProducto(
+                        l.nombre + (l.tipo === 'SERVICIO_EXTRA' ? ' (Srv Extra)' : ''),
+                        l.cantidad,
+                        l.cantidad * l.precioUnit,
+                        getAnchoLinea()
+                      )
+                    ),
+                  ].join('\n')
+                }</pre>
+                <div className="nv-separador">{separador(getAnchoLinea())}</div>
+                <pre className="nv-totales-pre">{
+                  (() => {
+                    const ancho = getAnchoLinea();
+                    const igv = Number((modalNotaVenta.total * 18 / 118).toFixed(2));
+                    const fmt = (n: number) => 'S/' + Number(n || 0).toFixed(2);
+                    return [
+                      lineaDoble('SUBTOTAL:', fmt(modalNotaVenta.total), ancho),
+                      lineaDoble('IGV (incluido 18%):', fmt(igv), ancho),
+                      lineaDoble('TOTAL:', fmt(modalNotaVenta.total), ancho),
+                      lineaDoble('MONTO PAGADO:', fmt(modalNotaVenta.montoPagado), ancho),
+                    ].join('\n');
+                  })()
+                }</pre>
+                <div className="nv-separador">{separador(getAnchoLinea())}</div>
                 <div className="nv-footer">
-                  Gracias por su visita. Esperamos volver a verle pronto.
+                  <div className="nv-linea">Gracias por su visita.</div>
+                  <div className="nv-linea">Esperamos volver a verle pronto.</div>
                 </div>
-                <div className="nv-corte">-- corte ticket --</div>
+                <div className="nv-corte">--- corte ticket ---</div>
               </div>
               <div className="modal-foot no-print">
                 <IonButton color="primary" onClick={doWindowPrint}><IonIcon slot="start" icon={receiptOutline} />Imprimir (Ticket {ImpresoraConfigService.obtener().tamanoPapel}mm)</IonButton>
