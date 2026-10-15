@@ -45,11 +45,12 @@ function normalizarTexto(texto: string): string {
 function tablaATextoPlano(tabla: HTMLTableElement): string {
   const lineas: string[] = [];
 
-  // Anchos de columna (en caracteres)
-  const W_DESC = 15;
+  // Anchos de columna (en caracteres) — TOTAL ≤ 30 para caber en 58mm
+  // Generic / Text Only imprime ~31 caracteres por línea.
+  const W_DESC = 10;
   const W_CANT = 3;
-  const W_PU = 8;
-  const W_SUBTOT = 8;
+  const W_PU = 7;
+  const W_SUBTOT = 7;
 
   const truncar = (s: string, w: number) => (s.length > w ? s.substring(0, w) : s);
   const centrar = (s: string, w: number) => {
@@ -66,6 +67,8 @@ function tablaATextoPlano(tabla: HTMLTableElement): string {
     const t = truncar(s, w);
     return t + ' '.repeat(w - t.length);
   };
+  // Quitar espacio en "S/ 20.00" -> "S/20.00" para ahorrar 1 caracter
+  const limpiarPrecio = (s: string) => s.replace(/S\/\s+/g, 'S/').replace(/\s+/g, ' ').trim();
 
   // Encabezado
   const thead = tabla.querySelector('thead');
@@ -89,8 +92,8 @@ function tablaATextoPlano(tabla: HTMLTableElement): string {
       lineas.push(
         izquierda(normalizarTexto(tds[0].textContent || ''), W_DESC) + ' ' +
         centrar(normalizarTexto(tds[1].textContent || ''), W_CANT) + ' ' +
-        derecha(normalizarTexto(tds[2].textContent || ''), W_PU) + ' ' +
-        derecha(normalizarTexto(tds[3].textContent || ''), W_SUBTOT)
+        derecha(limpiarPrecio(normalizarTexto(tds[2].textContent || '')), W_PU) + ' ' +
+        derecha(limpiarPrecio(normalizarTexto(tds[3].textContent || '')), W_SUBTOT)
       );
     }
   });
