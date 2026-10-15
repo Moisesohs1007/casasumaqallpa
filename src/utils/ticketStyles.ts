@@ -67,8 +67,7 @@ export function imprimirTicket(callbackAfterPrint?: () => void, delayMs: number 
   // ESTRATEGIA: @page { size: auto } respeta el tamaño de papel del driver
   // y evita múltiples páginas. El ticket usa width:100% para llenar el ancho.
   const css = `
-    /* @page: se actualizara dinamicamente con la altura real del ticket
-       para evitar espacio en blanco al final. Inicialmente auto. */
+    /* @page: auto para respetar el tamaño de papel del driver y evitar multiples paginas */
     @media print {
       @page { size: auto; margin: 0; }
     }
@@ -131,21 +130,21 @@ export function imprimirTicket(callbackAfterPrint?: () => void, delayMs: number 
     }
 
     /* Tablas dentro del ticket: mantener display de tabla */
-    body.lodge-printing #${TICKET_PRINT_ID} table { display: table !important; width: 100% !important; border-collapse: collapse !important; font-size: 9px !important; table-layout: fixed !important; }
+    body.lodge-printing #${TICKET_PRINT_ID} table { display: table !important; width: 100% !important; border-collapse: collapse !important; font-size: 8px !important; table-layout: fixed !important; }
     body.lodge-printing #${TICKET_PRINT_ID} thead { display: table-header-group !important; }
     body.lodge-printing #${TICKET_PRINT_ID} tbody { display: table-row-group !important; }
     body.lodge-printing #${TICKET_PRINT_ID} tr { display: table-row !important; }
     body.lodge-printing #${TICKET_PRINT_ID} th,
-    body.lodge-printing #${TICKET_PRINT_ID} td { display: table-cell !important; padding: 1px 2px !important; font-size: 9px !important; white-space: nowrap !important; overflow: hidden !important; text-overflow: ellipsis !important; }
-    /* Anchos de columna: DESCRIPCIÓN ocupa mas espacio para no dividir nombres largos */
+    body.lodge-printing #${TICKET_PRINT_ID} td { display: table-cell !important; padding: 1px 1px !important; font-size: 8px !important; white-space: nowrap !important; overflow: hidden !important; text-overflow: ellipsis !important; }
+    /* Anchos de columna: menos para CANT, mas para P.U. y SUBTOT */
     body.lodge-printing #${TICKET_PRINT_ID} th:nth-child(1),
-    body.lodge-printing #${TICKET_PRINT_ID} td:nth-child(1) { width: 48% !important; text-align: left !important; }
+    body.lodge-printing #${TICKET_PRINT_ID} td:nth-child(1) { width: 44% !important; text-align: left !important; }
     body.lodge-printing #${TICKET_PRINT_ID} th:nth-child(2),
-    body.lodge-printing #${TICKET_PRINT_ID} td:nth-child(2) { width: 14% !important; text-align: center !important; }
+    body.lodge-printing #${TICKET_PRINT_ID} td:nth-child(2) { width: 8% !important; text-align: center !important; }
     body.lodge-printing #${TICKET_PRINT_ID} th:nth-child(3),
-    body.lodge-printing #${TICKET_PRINT_ID} td:nth-child(3) { width: 19% !important; text-align: right !important; }
+    body.lodge-printing #${TICKET_PRINT_ID} td:nth-child(3) { width: 24% !important; text-align: right !important; }
     body.lodge-printing #${TICKET_PRINT_ID} th:nth-child(4),
-    body.lodge-printing #${TICKET_PRINT_ID} td:nth-child(4) { width: 19% !important; text-align: right !important; }
+    body.lodge-printing #${TICKET_PRINT_ID} td:nth-child(4) { width: 24% !important; text-align: right !important; }
 
     /* Texto dentro del ticket — forzar monospace y tamaños explícitos para
        evitar que el driver de la impresora sustituya fuentes con spacing raro */
@@ -237,23 +236,6 @@ export function imprimirTicket(callbackAfterPrint?: () => void, delayMs: number 
 
   // Forzar reflow para que el navegador calcule las dimensiones reales del ticket
   void document.body.offsetHeight;
-
-  // Medir la altura real del ticket y actualizar @page para cortar el papel
-  // justo después del contenido (sin espacio en blanco).
-  // Convertimos px a mm: 1px = 25.4/96 mm a 96 DPI.
-  const ticketHeightPx = ticket.offsetHeight;
-  const ticketHeightMm = Math.ceil((ticketHeightPx * 25.4) / 96) + 2; // +2mm de margen para el corte
-  const pageCss = `
-    @media print {
-      @page { size: ${tamanoMm}mm ${ticketHeightMm}mm; margin: 0; }
-    }
-    @page { size: ${tamanoMm}mm ${ticketHeightMm}mm; margin: 0; }
-  `;
-  // Reemplazar las reglas @page iniciales (auto) por la altura medida
-  style.textContent = style.textContent.replace(
-    /@media print\s*\{\s*@page\s*\{[^}]*\}\s*\}\s*@page\s*\{[^}]*\}/,
-    pageCss
-  );
 
   // Listener para limpiar y devolver el ticket
   let limpiado = false;
